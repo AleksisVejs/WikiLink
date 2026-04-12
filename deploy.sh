@@ -15,6 +15,9 @@
 #
 # Optional: cron every 5 minutes (replace USER):
 #   */5 * * * * /home/USER/wikilink/deploy.sh >> /home/USER/wikilink/deploy.log 2>&1
+#
+# By default the repo is hard-reset to origin (good for deploy-only clones). To keep local
+# commits/edits instead: DEPLOY_NO_HARD_RESET=1 ./deploy.sh
 
 set -euo pipefail
 
@@ -36,7 +39,11 @@ echo "[deploy] $(date -u +%Y-%m-%dT%H:%M:%SZ) in $REPO_ROOT"
 
 git fetch origin "$BRANCH"
 git checkout "$BRANCH"
-git pull origin "$BRANCH"
+if [[ -z "${DEPLOY_NO_HARD_RESET:-}" ]]; then
+  git reset --hard "origin/$BRANCH"
+else
+  git pull origin "$BRANCH"
+fi
 
 if command -v npm >/dev/null 2>&1; then
   if [[ -f package-lock.json ]]; then
