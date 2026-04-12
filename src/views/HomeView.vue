@@ -5,10 +5,7 @@
     <header class="relative z-20 border-b border-retro-border/40 shrink-0">
       <div class="max-w-6xl mx-auto px-4 sm:px-5 py-2 sm:py-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-lg flex items-center justify-center font-pixel text-[9px]"
-               style="background: linear-gradient(135deg, rgba(57,255,20,0.15), rgba(0,229,255,0.1)); border: 1px solid rgba(57,255,20,0.25); box-shadow: 0 0 12px rgba(57,255,20,0.1);">
-            <span class="text-crt-green">W</span>
-          </div>
+          <img src="/favicon.svg" alt="WikiLink" class="w-9 h-9" />
           <span class="font-pixel text-[9px] text-crt-white/80 tracking-wider hidden sm:block">WIKILINK</span>
         </div>
         <div class="flex items-center gap-2">
