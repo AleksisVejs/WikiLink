@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# WikiLink / WikiGame — deploy on server (e.g. cPanel subdomain alflix.wikilink.com)
+# WikiLink — deploy on server (cPanel subdomain wikilink.fraksis.com, repo folder ~/wikilink)
 #
 # Setup once (SSH):
 #   cd ~
-#   git clone https://github.com/AleksisVejs/WikiLink.git alflix.wikilink.com
-#   cd alflix.wikilink.com
+#   git clone https://github.com/AleksisVejs/WikiLink.git wikilink
+#   cd wikilink
 #   chmod +x deploy.sh
 #
-# In cPanel → Domains → alflix.wikilink.com → set Document Root to:
-#   /home/YOUR_CPANEL_USER/alflix.wikilink.com/dist
+# In cPanel → Domains → wikilink.fraksis.com → set Document Root to:
+#   /home/YOUR_CPANEL_USER/wikilink/dist
 #
 # Then deploy:
 #   ./deploy.sh
 #
-# Optional: cron every 5 minutes (replace USER and path):
-#   */5 * * * * /home/USER/alflix.wikilink.com/deploy.sh >> /home/USER/alflix.wikilink.com/deploy.log 2>&1
+# Optional: cron every 5 minutes (replace USER):
+#   */5 * * * * /home/USER/wikilink/deploy.sh >> /home/USER/wikilink/deploy.log 2>&1
 
 set -euo pipefail
 
