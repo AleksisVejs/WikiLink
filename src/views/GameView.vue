@@ -34,6 +34,21 @@
               <span class="font-mono text-[10px] text-crt-cyan/40 group-hover:text-crt-cyan transition-colors hidden sm:inline">BACK</span>
             </button>
 
+            <!-- Reroll pair -->
+            <button v-if="canReroll && game.isPlaying.value"
+                    @click="rerollPair"
+                    :disabled="rerolling"
+                    class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 group disabled:opacity-40 disabled:cursor-wait"
+                    title="New pair (R)"
+                    style="border: 1px solid rgba(255,191,0,0.15);"
+                    @mouseenter="$event.currentTarget.style.background='rgba(255,191,0,0.08)'; $event.currentTarget.style.borderColor='rgba(255,191,0,0.35)'"
+                    @mouseleave="$event.currentTarget.style.background='transparent'; $event.currentTarget.style.borderColor='rgba(255,191,0,0.15)'">
+              <svg class="w-3.5 h-3.5 text-crt-amber/50 group-hover:text-crt-amber transition-colors" :class="{ 'animate-spin': rerolling }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span class="font-mono text-[10px] text-crt-amber/40 group-hover:text-crt-amber transition-colors hidden sm:inline">REROLL</span>
+            </button>
+
             <!-- Freeplay finish button -->
             <button v-if="currentMode?.noTarget && game.isPlaying.value"
                     @click="finishFreeplay"
@@ -377,7 +392,14 @@ let hoverTimer = null
 let hoveredLink = null
 let previewCache = {}
 
+const rerolling = ref(false)
+
 const currentMode = computed(() => game.currentMode.value)
+
+const canReroll = computed(() => {
+  const m = props.mode
+  return m !== 'daily' && m !== 'custom' && m !== 'freeplay'
+})
 
 const showEndModal = computed(() => game.isGameOver.value || freeplayFinished.value)
 
@@ -594,6 +616,21 @@ function finishFreeplay() {
   freeplayFinished.value = true
 }
 
+async function rerollPair() {
+  if (!canReroll.value || rerolling.value || !game.isPlaying.value) return
+  rerolling.value = true
+  try {
+    const pair = await wiki.getRandomPairByGenre(genre.value)
+    if (!pair) { toast.error('Could not find a new pair'); return }
+    game.initGame(props.mode, pair.start, pair.end, genreId.value, difficulty.value, customLimitsFromRoute.value)
+    previewCache = {}
+    sound.playStart()
+    await loadArticle(pair.start.title)
+  } finally {
+    rerolling.value = false
+  }
+}
+
 function confirmQuit() {
   if (game.isPlaying.value) {
     showQuitConfirm.value = true
@@ -625,6 +662,7 @@ function handleKeydown(e) {
     handleGoBack()
   }
   if (e.key === 'Enter' && showEndModal.value) playAgain()
+  if ((e.key === 'r' || e.key === 'R') && !showEndModal.value && !showQuitConfirm.value) rerollPair()
 }
 
 onMounted(() => {
