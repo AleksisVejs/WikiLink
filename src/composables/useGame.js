@@ -1,5 +1,5 @@
 import { ref, reactive, computed } from 'vue'
-import { utcDateKey, seedHash, seededRandom } from '../utils/dailySeed.js'
+import { utcDateKey } from '../utils/dailySeed.js'
 
 const GENRES = {
   random:     { id: 'random',     name: 'Random',      emoji: '🎲', shortName: 'Random',  description: 'Anything goes',                searchTerms: null },
@@ -148,24 +148,6 @@ function loadHistory() {
 function loadDaily() {
   try { return JSON.parse(localStorage.getItem(DAILY_KEY)) || {} }
   catch { return {} }
-}
-
-function getDailySeed() {
-  return seededRandom(seedHash('wikilink-daily-' + utcDateKey()))
-}
-
-function getDailySearchParams() {
-  const rng = getDailySeed()
-  const genreKeys = Object.keys(GENRES).filter(k => k !== 'random')
-  const genreId = genreKeys[Math.floor(rng() * genreKeys.length)]
-  const genre = GENRES[genreId]
-  const term1 = genre.searchTerms[Math.floor(rng() * genre.searchTerms.length)]
-  const offset1 = Math.floor(rng() * 40)
-  const term2 = genre.searchTerms[Math.floor(rng() * genre.searchTerms.length)]
-  const offset2 = Math.floor(rng() * 40)
-  const pick1 = Math.floor(rng() * 5)
-  const pick2 = Math.floor(rng() * 5)
-  return { genreId, term1, offset1, term2, offset2, pick1, pick2 }
 }
 
 // --- Game composable ---
@@ -391,7 +373,6 @@ export function useGame() {
     getStats,
     getHistory,
     getDailyStatus,
-    getDailySearchParams,
     getEffectiveLimits,
     LIMIT_BOUNDS,
   }

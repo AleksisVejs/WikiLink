@@ -464,8 +464,7 @@ async function initializeGame() {
   setTimeout(() => bootStep.value = 3, 1300)
 
   if (props.mode === 'daily') {
-    const searchParams = game.getDailySearchParams()
-    const pair = await wiki.getDailyPair(searchParams)
+    const pair = await wiki.getDailyPair()
     if (!pair) { toast.error('Failed to load daily challenge'); router.push({ name: 'home' }); return }
     game.initGame('daily', pair.start, pair.end, 'random', 'normal')
     await loadArticle(pair.start.title)
