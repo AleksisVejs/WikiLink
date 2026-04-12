@@ -1,0 +1,604 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(57,255,20,0.15) transparent;
+  }
+  *::-webkit-scrollbar { width: 5px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background-color: rgba(57,255,20,0.15); border-radius: 3px; }
+  *::-webkit-scrollbar-thumb:hover { background-color: rgba(57,255,20,0.3); }
+  ::selection { background-color: rgba(0,229,255,0.25); color: #fff; }
+}
+
+@layer components {
+
+  /* ===== FILM GRAIN OVERLAY ===== */
+  .grain-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 30;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+  }
+
+  /* ===== SCANLINES ===== */
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 29;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 1px,
+      rgba(0,0,0,0.06) 1px,
+      rgba(0,0,0,0.06) 2px
+    );
+    mix-blend-mode: multiply;
+  }
+
+  /* ===== CRT MONITOR FRAME ===== */
+  .crt-monitor {
+    position: relative;
+    background: #0d0e15;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 100px rgba(0,0,0,0.7),
+      0 0 0 3px #1a1b28,
+      0 0 0 5px #252738,
+      0 0 0 8px #12131c,
+      0 12px 40px rgba(0,0,0,0.9),
+      0 0 80px rgba(0,229,255,0.03);
+  }
+
+  /* Monitor scanlines (local) */
+  .crt-monitor::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 1px,
+      rgba(0,0,0,0.12) 1px,
+      rgba(0,0,0,0.12) 2px
+    );
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Monitor vignette */
+  .crt-monitor::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 50%,
+      rgba(0,0,0,0.5) 100%
+    );
+    pointer-events: none;
+    z-index: 11;
+  }
+
+  /* ===== CORNER BRACKETS (decorative) ===== */
+  .corner-brackets {
+    position: relative;
+  }
+  .corner-brackets::before,
+  .corner-brackets::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-color: rgba(0,229,255,0.25);
+    pointer-events: none;
+  }
+  .corner-brackets::before {
+    top: -1px;
+    left: -1px;
+    border-top: 2px solid;
+    border-left: 2px solid;
+  }
+  .corner-brackets::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 2px solid;
+    border-right: 2px solid;
+  }
+
+  /* ===== ARCADE SELECT CARD ===== */
+  .arcade-card {
+    @apply relative rounded-lg p-3 transition-all duration-200 cursor-pointer;
+    background: #12131c;
+    border: 2px solid #252738;
+  }
+
+  .arcade-card:hover {
+    border-color: #3a3c52;
+    background: #161724;
+    transform: translateY(-1px);
+  }
+
+  .arcade-card.selected {
+    border-color: #39ff14;
+    background: linear-gradient(135deg, rgba(57,255,20,0.06), rgba(0,229,255,0.03));
+    box-shadow: 0 0 15px rgba(57,255,20,0.15), inset 0 1px 0 rgba(57,255,20,0.1);
+  }
+
+  /* ===== MODE CARD ===== */
+  .mode-card {
+    @apply relative rounded-xl transition-all duration-200 cursor-pointer overflow-hidden;
+    background: #12131c;
+    border: 2px solid #252738;
+  }
+
+  .mode-card:hover {
+    border-color: #3a3c52;
+    background: #161724;
+    transform: translateY(-1px);
+  }
+
+  .mode-card.selected {
+    background: linear-gradient(135deg, rgba(0,229,255,0.04), rgba(255,46,204,0.02));
+    box-shadow: 0 0 20px rgba(0,229,255,0.1);
+  }
+
+  /* Animated top-edge glow on selected mode */
+  .mode-card.selected::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--mode-color, #00e5ff), transparent);
+    opacity: 0.8;
+  }
+
+  /* ===== RETRO BUTTONS ===== */
+  .btn-retro-primary {
+    @apply px-8 py-3.5 text-[10px] uppercase tracking-[0.2em] rounded-lg transition-all duration-200 active:scale-95;
+    font-family: 'Press Start 2P', monospace;
+    color: #08090e;
+    background: linear-gradient(180deg, #5fff3f, #39ff14);
+    border: none;
+    box-shadow:
+      0 0 15px rgba(57,255,20,0.3),
+      0 0 40px rgba(57,255,20,0.1),
+      0 4px 0 #1a8a0a,
+      inset 0 1px 0 rgba(255,255,255,0.2);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  .btn-retro-primary:hover {
+    background: linear-gradient(180deg, #7fff5f, #50ff30);
+    box-shadow:
+      0 0 25px rgba(57,255,20,0.5),
+      0 0 60px rgba(57,255,20,0.15),
+      0 4px 0 #1a8a0a,
+      inset 0 1px 0 rgba(255,255,255,0.3);
+    transform: translateY(-1px);
+  }
+
+  .btn-retro-primary:active {
+    box-shadow: 0 0 10px rgba(57,255,20,0.3), 0 1px 0 #1a8a0a;
+    transform: translateY(3px) scale(0.98);
+  }
+
+  .btn-retro-secondary {
+    @apply px-6 py-3 text-[9px] uppercase tracking-[0.15em] rounded-lg transition-all duration-200 active:scale-95;
+    font-family: 'Press Start 2P', monospace;
+    color: #00e5ff;
+    background: rgba(0,229,255,0.04);
+    border: 2px solid rgba(0,229,255,0.3);
+    box-shadow: 0 0 10px rgba(0,229,255,0.08);
+  }
+
+  .btn-retro-secondary:hover {
+    background: rgba(0,229,255,0.08);
+    border-color: rgba(0,229,255,0.5);
+    box-shadow: 0 0 20px rgba(0,229,255,0.15);
+  }
+
+  .btn-retro-ghost {
+    @apply px-3 py-2 rounded-lg transition-all duration-200;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    color: #555770;
+    border: 1px solid #252738;
+  }
+
+  .btn-retro-ghost:hover {
+    color: #00e5ff;
+    border-color: rgba(0,229,255,0.25);
+    background: rgba(0,229,255,0.04);
+    box-shadow: 0 0 10px rgba(0,229,255,0.06);
+  }
+
+  /* ===== NEON TEXT ===== */
+  .text-neon-green {
+    color: #39ff14;
+    text-shadow: 0 0 7px #39ff14, 0 0 20px rgba(57,255,20,0.4), 0 0 40px rgba(57,255,20,0.15);
+  }
+
+  .text-neon-cyan {
+    color: #00e5ff;
+    text-shadow: 0 0 7px #00e5ff, 0 0 20px rgba(0,229,255,0.4), 0 0 40px rgba(0,229,255,0.15);
+  }
+
+  .text-neon-amber {
+    color: #ffbf00;
+    text-shadow: 0 0 7px #ffbf00, 0 0 20px rgba(255,191,0,0.4), 0 0 40px rgba(255,191,0,0.15);
+  }
+
+  .text-neon-magenta {
+    color: #ff2ecc;
+    text-shadow: 0 0 7px #ff2ecc, 0 0 20px rgba(255,46,204,0.4), 0 0 40px rgba(255,46,204,0.15);
+  }
+
+  /* ===== SHIMMER TEXT ===== */
+  .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      #39ff14 0%,
+      #00e5ff 25%,
+      #39ff14 50%,
+      #00e5ff 75%,
+      #39ff14 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* ===== DECORATIVE DIVIDER ===== */
+  .retro-divider {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(0,229,255,0.2) 20%,
+      rgba(57,255,20,0.3) 50%,
+      rgba(0,229,255,0.2) 80%,
+      transparent
+    );
+  }
+
+  /* ===== WIKI LINK ===== */
+  .wiki-link {
+    @apply underline transition-all duration-150 cursor-pointer;
+    color: #39ff14;
+    text-decoration-color: rgba(57,255,20,0.25);
+    text-underline-offset: 3px;
+  }
+  .wiki-link:hover {
+    color: #5fff3f;
+    text-decoration-color: rgba(95,255,63,0.5);
+    text-shadow: 0 0 8px rgba(57,255,20,0.3);
+  }
+
+  /* ===== GLASS ===== */
+  .glass {
+    @apply backdrop-blur-sm;
+    background: rgba(13,14,21,0.9);
+    border: 1px solid #252738;
+  }
+
+  /* ===== CARD ===== */
+  .card {
+    @apply rounded-xl;
+    background: #12131c;
+    border: 2px solid #252738;
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 text-lg font-bold rounded-lg transition-all duration-200 active:scale-95;
+    font-family: 'Space Mono', monospace;
+    color: #08090e;
+    background: linear-gradient(180deg, #5fff3f, #39ff14);
+    border: 2px solid #39ff14;
+    box-shadow: 0 0 15px rgba(57,255,20,0.35), 0 3px 0 #1a8a0a, inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .btn-primary:hover {
+    background: linear-gradient(180deg, #7fff5f, #50ff30);
+    box-shadow: 0 0 25px rgba(57,255,20,0.5), 0 3px 0 #1a8a0a;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 text-lg rounded-lg transition-all duration-200 active:scale-95;
+    font-family: 'Space Mono', monospace;
+    color: #d4d4e8;
+    background: #181a25;
+    border: 2px solid #3a3c52;
+  }
+  .btn-secondary:hover {
+    color: #00e5ff;
+    border-color: rgba(0,229,255,0.4);
+    background: #1e2030;
+    box-shadow: 0 0 12px rgba(0,229,255,0.1);
+  }
+
+  .btn-ghost {
+    @apply px-3 py-2 rounded-lg transition-all duration-200;
+    color: #8888a8;
+  }
+  .btn-ghost:hover {
+    color: #39ff14;
+    background: rgba(57,255,20,0.06);
+  }
+}
+
+/* ===== WIKI CONTENT ===== */
+.wiki-content {
+  line-height: 1.85;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.9rem;
+  color: #b8b8d0;
+}
+.wiki-content p { margin-bottom: 1em; }
+
+.wiki-content h2 {
+  font-family: 'VT323', monospace;
+  font-size: 1.7em;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  padding-bottom: 0.4em;
+  border-bottom: 1px solid rgba(0,229,255,0.12);
+  color: #00e5ff;
+  text-shadow: 0 0 10px rgba(0,229,255,0.25);
+}
+
+.wiki-content h3 {
+  font-family: 'VT323', monospace;
+  font-size: 1.4em;
+  font-weight: 600;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+  color: #ffbf00;
+  text-shadow: 0 0 8px rgba(255,191,0,0.2);
+}
+
+.wiki-content ul { list-style: none; padding-left: 1.5em; margin-bottom: 1em; }
+.wiki-content ul li { position: relative; padding-left: 0.2em; }
+.wiki-content ul li::before {
+  content: '\25B8';
+  color: #39ff14;
+  position: absolute;
+  left: -1.2em;
+  opacity: 0.7;
+}
+.wiki-content ol { list-style: decimal; padding-left: 1.5em; margin-bottom: 1em; color: #555770; }
+.wiki-content ol li { color: #b8b8d0; }
+.wiki-content li { margin-bottom: 0.3em; }
+
+.wiki-content table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+  border: 1px solid rgba(0,229,255,0.1);
+}
+.wiki-content th, .wiki-content td {
+  border: 1px solid rgba(0,229,255,0.07);
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+.wiki-content th {
+  background: rgba(0,229,255,0.04);
+  font-weight: 600;
+  color: #00e5ff;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wiki-content img { max-width: 300px; border-radius: 6px; border: 2px solid #252738; margin: 0.5em 0; }
+.wiki-content .thumb { float: right; margin: 0 0 1em 1.5em; max-width: 280px; }
+.wiki-content .thumbcaption { font-size: 0.85em; color: #555770; padding: 0.4em 0; font-style: italic; }
+.wiki-content .infobox, .wiki-content .sidebar {
+  float: right;
+  margin: 0 0 1em 1.5em;
+  max-width: 320px;
+  background: rgba(0,229,255,0.02);
+  border: 1px solid rgba(0,229,255,0.08);
+  border-radius: 8px;
+  padding: 1em;
+  font-size: 0.88em;
+}
+/* Force-override all Wikipedia inline backgrounds/colors */
+.wiki-content th,
+.wiki-content td,
+.wiki-content tr,
+.wiki-content table,
+.wiki-content div,
+.wiki-content span,
+.wiki-content caption,
+.wiki-content tbody,
+.wiki-content thead {
+  background-color: transparent !important;
+  background: transparent !important;
+  color: #b8b8d0 !important;
+  border-color: rgba(0,229,255,0.07) !important;
+}
+
+/* Give infobox / sidebar a visible tinted panel background */
+.wiki-content .infobox,
+.wiki-content .sidebar,
+.wiki-content .vcard,
+.wiki-content .wikitable {
+  background: #141520 !important;
+  border: 1px solid rgba(0,229,255,0.12) !important;
+  border-radius: 8px;
+}
+.wiki-content .infobox th,
+.wiki-content .vcard th,
+.wiki-content .sidebar th {
+  background: rgba(0,229,255,0.06) !important;
+  color: #00e5ff !important;
+}
+.wiki-content .infobox td,
+.wiki-content .vcard td,
+.wiki-content .sidebar td {
+  background: transparent !important;
+}
+
+/* Keep wiki-link colors pinned */
+.wiki-content a.wiki-link {
+  color: #39ff14 !important;
+}
+.wiki-content a.wiki-link:hover {
+  color: #5fff3f !important;
+}
+
+.wiki-content .mw-empty-elt { display: none; }
+.wiki-content sup { font-size: 0.75em; }
+.wiki-content .reference, .wiki-content .mw-ref { font-size: 0.75em; color: #555770; }
+.wiki-content .hatnote, .wiki-content .dablink {
+  font-style: italic;
+  color: #555770;
+  padding: 0.6em 1em;
+  margin-bottom: 1em;
+  border-left: 2px solid rgba(0,229,255,0.15);
+  background: rgba(0,229,255,0.02);
+  border-radius: 0 6px 6px 0;
+}
+
+/* ===== TOAST NOTIFICATIONS ===== */
+.toast-container {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: 340px;
+}
+.toast {
+  pointer-events: auto;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  animation: slideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  backdrop-filter: blur(8px);
+}
+.toast-info {
+  background: rgba(0,229,255,0.08);
+  border: 1px solid rgba(0,229,255,0.25);
+  color: #00e5ff;
+}
+.toast-success {
+  background: rgba(57,255,20,0.08);
+  border: 1px solid rgba(57,255,20,0.25);
+  color: #39ff14;
+}
+.toast-warning {
+  background: rgba(255,191,0,0.08);
+  border: 1px solid rgba(255,191,0,0.25);
+  color: #ffbf00;
+}
+.toast-error {
+  background: rgba(255,68,68,0.08);
+  border: 1px solid rgba(255,68,68,0.25);
+  color: #ff4444;
+}
+
+/* ===== LOADING SKELETON ===== */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #12131c;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(57,255,20,0.03) 40%,
+    rgba(0,229,255,0.04) 60%,
+    transparent 100%
+  );
+  animation: shimmerSlide 1.8s ease-in-out infinite;
+}
+@keyframes shimmerSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ===== ARTICLE PREVIEW TOOLTIP ===== */
+.wiki-preview-tooltip {
+  position: fixed;
+  z-index: 50;
+  max-width: 320px;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: #0d0e15;
+  border: 1px solid rgba(57,255,20,0.2);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(57,255,20,0.05);
+  pointer-events: none;
+  animation: fadeIn 0.15s ease-out;
+}
+.wiki-preview-tooltip .preview-title {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: #00e5ff;
+  margin-bottom: 0.25rem;
+}
+.wiki-preview-tooltip .preview-extract {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: #8888a8;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.wiki-preview-tooltip .preview-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid #252738;
+  flex-shrink: 0;
+}
+
+/* ===== CRT ROUTE TRANSITIONS ===== */
+.crt-enter-active {
+  animation: crtPowerOn 0.4s ease-out;
+}
+.crt-leave-active {
+  animation: crtPowerOff 0.3s ease-in forwards;
+}
+@keyframes crtPowerOn {
+  0% { opacity: 0; filter: brightness(8) saturate(0); transform: scaleY(0.005); }
+  30% { opacity: 1; filter: brightness(3) saturate(0.3); transform: scaleY(0.005); }
+  50% { filter: brightness(2) saturate(0.6); transform: scaleY(1) scaleX(0.98); }
+  100% { filter: brightness(1) saturate(1); transform: scaleY(1) scaleX(1); }
+}
+@keyframes crtPowerOff {
+  0% { opacity: 1; filter: brightness(1); transform: scale(1); }
+  40% { opacity: 1; filter: brightness(2) saturate(0.5); transform: scaleY(0.005) scaleX(1.1); }
+  100% { opacity: 0; filter: brightness(0); transform: scaleY(0) scaleX(0); }
+}
+
+/* ===== VUE TRANSITIONS ===== */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.scale-enter-active, .scale-leave-active { transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.scale-enter-from, .scale-leave-to { opacity: 0; transform: scale(0.93); }

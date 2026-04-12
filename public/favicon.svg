@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#08090e"/>
+  <rect x="2" y="2" width="60" height="60" rx="10" fill="none" stroke="#39ff14" stroke-width="2" opacity="0.3"/>
+  <text x="32" y="33" font-family="monospace" font-size="30" font-weight="bold" text-anchor="middle" dominant-baseline="central" letter-spacing="-1">
+    <tspan fill="#39ff14">W</tspan><tspan fill="#00e5ff">L</tspan>
+  </text>
+  <line x1="6" y1="16" x2="58" y2="16" stroke="#39ff14" stroke-width="0.5" opacity="0.12"/>
+  <line x1="6" y1="32" x2="58" y2="32" stroke="#00e5ff" stroke-width="0.5" opacity="0.1"/>
+  <line x1="6" y1="48" x2="58" y2="48" stroke="#39ff14" stroke-width="0.5" opacity="0.12"/>
+  <circle cx="8" cy="8" r="1.5" fill="#39ff14" opacity="0.5"/>
+  <circle cx="56" cy="8" r="1.5" fill="#00e5ff" opacity="0.5"/>
+  <circle cx="8" cy="56" r="1.5" fill="#00e5ff" opacity="0.5"/>
+  <circle cx="56" cy="56" r="1.5" fill="#39ff14" opacity="0.5"/>
+</svg>
