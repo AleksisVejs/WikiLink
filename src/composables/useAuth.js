@@ -25,9 +25,11 @@ async function init() {
     user.value = data.user
     streak.value = data.streak || 0
     hydrateLocalStats(data.stats)
-  } catch {
-    localStorage.removeItem(TOKEN_KEY)
-    user.value = null
+  } catch (e) {
+    if (e.status === 401 || e.status === 403) {
+      localStorage.removeItem(TOKEN_KEY)
+      user.value = null
+    }
   }
 }
 

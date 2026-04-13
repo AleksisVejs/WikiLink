@@ -23,6 +23,9 @@ require_once __DIR__ . '/daily.php';
 require_once __DIR__ . '/challenge.php';
 require_once __DIR__ . '/stats.php';
 require_once __DIR__ . '/user_stats.php';
+require_once __DIR__ . '/trending.php';
+require_once __DIR__ . '/match.php';
+require_once __DIR__ . '/friends.php';
 
 $uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
 $uri = parse_url($uri, PHP_URL_PATH);
@@ -150,6 +153,7 @@ if ($method === 'GET' && $uri === '/daily') {
 
 // POST /daily
 if ($method === 'POST' && $uri === '/daily') {
+    requireAuth();
     requireRateLimit('daily_set', 3, 60);
     $body = jsonInput();
     $date = gmdate('Y-m-d');
@@ -239,6 +243,121 @@ if ($method === 'POST' && $uri === '/stats/increment') {
         !empty($body['won'])
     );
     jsonResponse(['ok' => true]);
+}
+
+// GET /trending
+if ($method === 'GET' && $uri === '/trending') {
+    $articles = getTrendingArticles();
+    if ($articles) {
+        jsonResponse(['articles' => $articles]);
+    }
+    jsonResponse(['articles' => [], 'error' => 'Could not fetch trending articles.']);
+}
+
+// POST /match/create
+if ($method === 'POST' && $uri === '/match/create') {
+    $user = requireAuth();
+    requireRateLimit('match_create', 10, 60);
+    $body = jsonInput();
+    $result = createMatch(
+        isset($body['startTitle']) ? $body['startTitle'] : '',
+        isset($body['endTitle']) ? $body['endTitle'] : '',
+        $user['id']
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /match/join/:code
+if ($method === 'POST' && preg_match('#^/match/join/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    jsonResponse(joinMatch($m[1], $user['id']));
+}
+
+// POST /match/submit/:code
+if ($method === 'POST' && preg_match('#^/match/submit/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = submitMatchResult(
+        $m[1],
+        $user['id'],
+        (int)(isset($body['clicks']) ? $body['clicks'] : 0),
+        (int)(isset($body['time']) ? $body['time'] : 0),
+        isset($body['path']) ? $body['path'] : []
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// GET /match/:code
+if ($method === 'GET' && preg_match('#^/match/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = getMatchStatus($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 404 : 200);
+}
+
+// GET /user/search?q=...
+if ($method === 'GET' && $uri === '/user/search') {
+    $user = requireAuth();
+    $q = isset($_GET['q']) ? $_GET['q'] : '';
+    jsonResponse(['users' => searchUsers($q, $user['id'])]);
+}
+
+// GET /user/:username
+if ($method === 'GET' && preg_match('#^/user/([^/]+)$#', $uri, $m)) {
+    $profile = getPublicProfile(urldecode($m[1]));
+    if (!$profile) jsonResponse(['error' => 'User not found.'], 404);
+    $authedUser = authenticateRequest();
+    if ($authedUser) {
+        $profile['friendship'] = getFriendshipStatus($authedUser['id'], $profile['id']);
+    }
+    jsonResponse($profile);
+}
+
+// GET /friends
+if ($method === 'GET' && $uri === '/friends') {
+    $user = requireAuth();
+    jsonResponse(['friends' => getFriendsList($user['id'])]);
+}
+
+// GET /friends/requests
+if ($method === 'GET' && $uri === '/friends/requests') {
+    $user = requireAuth();
+    jsonResponse([
+        'incoming' => getPendingRequests($user['id']),
+        'sent' => getSentRequests($user['id']),
+    ]);
+}
+
+// POST /friends/request
+if ($method === 'POST' && $uri === '/friends/request') {
+    $user = requireAuth();
+    requireRateLimit('friend_request', 20, 300);
+    $body = jsonInput();
+    $result = sendFriendRequest($user['id'], isset($body['username']) ? $body['username'] : '');
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /friends/accept
+if ($method === 'POST' && $uri === '/friends/accept') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = acceptFriendRequest($user['id'], (int)(isset($body['requestId']) ? $body['requestId'] : 0));
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /friends/decline
+if ($method === 'POST' && $uri === '/friends/decline') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = declineFriendRequest($user['id'], (int)(isset($body['requestId']) ? $body['requestId'] : 0));
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /friends/remove
+if ($method === 'POST' && $uri === '/friends/remove') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = removeFriend($user['id'], (int)(isset($body['friendshipId']) ? $body['friendshipId'] : 0));
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
 }
 
 // 404 catch-all

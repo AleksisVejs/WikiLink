@@ -126,6 +126,10 @@ export function useWikipedia() {
         pool = DAILY_ARTICLES
       }
 
+      if (pool.length < 2) {
+        error.value = 'Not enough articles for daily pair'
+        return null
+      }
       const idx1 = Math.floor(rng() * pool.length)
       let idx2 = Math.floor(rng() * (pool.length - 1))
       if (idx2 >= idx1) idx2++

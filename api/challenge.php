@@ -1,15 +1,6 @@
 <?php
 require_once __DIR__ . '/db.php';
 
-function generateChallengeCode() {
-    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    $code = '';
-    for ($i = 0; $i < 6; $i++) {
-        $code .= $chars[random_int(0, strlen($chars) - 1)];
-    }
-    return $code;
-}
-
 function createChallenge($startTitle, $endTitle, $createdBy) {
     $startTitle = trim($startTitle);
     $endTitle = trim($endTitle);
@@ -30,7 +21,7 @@ function createChallenge($startTitle, $endTitle, $createdBy) {
     }
 
     for ($i = 0; $i < 10; $i++) {
-        $code = generateChallengeCode();
+        $code = generateUniqueCode();
         try {
             $stmt = $db->prepare('INSERT INTO shared_challenges (code, start_title, end_title, created_by) VALUES (?, ?, ?, ?)');
             $stmt->execute([$code, $startTitle, $endTitle, $createdBy]);
