@@ -35,9 +35,16 @@ const GAME_MODES = {
     id: 'challenge',
     emoji: '🎯',
     name: 'Click limit',
-    description: 'Reach the target within a maximum number of link clicks. Limit is set by difficulty or custom.',
-    rules: 'Reach the target within your click budget. Each link counts.',
+    description: 'Reach the target within a limited number of clicks. No going back!',
+    rules: 'Reach the target within your click budget. Each click counts. No undo!',
     clickLimit: 6,
+  },
+  trending: {
+    id: 'trending',
+    emoji: '🔥',
+    name: 'Trending',
+    description: "Navigate between today's hottest Wikipedia articles. What's the world reading?",
+    rules: 'Same as Classic, but both articles are trending on Wikipedia right now.',
   },
   custom: {
     id: 'custom',
@@ -58,9 +65,16 @@ const GAME_MODES = {
     id: 'daily',
     emoji: '📅',
     name: 'Daily',
-    description: "Today's challenge. Same pair for everyone.",
-    rules: 'Complete the daily challenge. One pair per day!',
+    description: "Today's challenge. Same pair for everyone. No going back!",
+    rules: 'Complete the daily challenge. One pair per day! Going back is disabled.',
   },
+}
+
+const MODIFIERS = {
+  fog:       { id: 'fog',       name: 'Fog of War',   icon: '&#127787;', description: 'Links hidden until hovered' },
+  blackout:  { id: 'blackout',  name: 'Blackout',      icon: '&#9899;',   description: '30% of links randomly disabled' },
+  noback:    { id: 'noback',    name: 'No Back',       icon: '&#128683;', description: 'Back button is disabled' },
+  speedDecay:{ id: 'speedDecay',name: 'Speed Decay',   icon: '&#9203;',   description: 'Timer speeds up with each click (Sprint only)' },
 }
 
 const DIFFICULTIES = {
@@ -169,15 +183,26 @@ export function useGame() {
     timeRemaining: null,
     effectiveTimeLimit: null,
     effectiveClickLimit: null,
+    speedDecayPenalty: 0,
+    modifiers: [],
+    hints: 3,
+    hintsUsed: 0,
+    combo: 0,
+    lastClickTime: null,
   })
 
   const timerInterval = ref(null)
+
+  const NO_BACK_MODES = ['daily', 'challenge']
 
   const currentMode = computed(() => state.mode ? GAME_MODES[state.mode] : null)
   const isPlaying = computed(() => state.status === 'playing')
   const isWon = computed(() => state.status === 'won')
   const isLost = computed(() => state.status === 'lost')
   const isGameOver = computed(() => state.status === 'won' || state.status === 'lost')
+  const backDisabled = computed(() =>
+    state.modifiers.includes('noback') || NO_BACK_MODES.includes(state.mode)
+  )
 
   const formattedTime = computed(() => {
     const s = state.elapsed
@@ -195,7 +220,7 @@ export function useGame() {
     timerInterval.value = setInterval(() => {
       state.elapsed = Math.floor((Date.now() - state.startTime) / 1000)
       if (state.effectiveTimeLimit) {
-        state.timeRemaining = Math.max(0, state.effectiveTimeLimit - state.elapsed)
+        state.timeRemaining = Math.max(0, state.effectiveTimeLimit - state.elapsed - state.speedDecayPenalty)
         if (state.timeRemaining <= 0) endGame('lost')
       }
     }, 100)
@@ -205,9 +230,10 @@ export function useGame() {
     if (timerInterval.value) { clearInterval(timerInterval.value); timerInterval.value = null }
   }
 
-  function initGame(mode, startArticle, targetArticle, genre = 'random', difficulty = 'normal', customLimits = {}) {
+  function initGame(mode, startArticle, targetArticle, genre = 'random', difficulty = 'normal', customLimits = {}, modifiers = []) {
     stopTimer()
     const limits = getEffectiveLimits(mode, difficulty, customLimits)
+
     state.mode = mode
     state.genre = genre
     state.difficulty = difficulty
@@ -221,15 +247,33 @@ export function useGame() {
     state.effectiveTimeLimit = limits.timeLimit || null
     state.effectiveClickLimit = limits.clickLimit || null
     state.timeRemaining = limits.timeLimit || null
+    state.speedDecayPenalty = 0
+    state.modifiers = modifiers
+    state.hints = modifiers.includes('noback') ? 2 : 3
+    state.hintsUsed = 0
+    state.combo = 0
+    state.lastClickTime = null
     startTimer()
   }
 
   function navigateTo(title) {
     if (!isPlaying.value) return false
 
+    const now = Date.now()
+    if (state.lastClickTime && (now - state.lastClickTime) < 3000) {
+      state.combo++
+    } else {
+      state.combo = 1
+    }
+    state.lastClickTime = now
+
     state.clicks++
     state.currentArticle = title
     state.path.push(title)
+
+    if (state.modifiers.includes('speedDecay') && state.effectiveTimeLimit) {
+      state.speedDecayPenalty += Math.floor(state.clicks * 2)
+    }
 
     if (state.effectiveClickLimit && state.clicks >= state.effectiveClickLimit) {
       if (state.targetArticle && title === state.targetArticle.title) {
@@ -336,7 +380,7 @@ export function useGame() {
   function getDailyStatus() { return loadDaily()[utcDateKey()] || null }
 
   function goBack() {
-    if (!isPlaying.value || state.path.length <= 1) return null
+    if (!isPlaying.value || state.path.length <= 1 || backDisabled.value) return null
     state.path.pop()
     state.clicks = Math.max(0, state.clicks - 1)
     state.currentArticle = state.path[state.path.length - 1]
@@ -352,6 +396,13 @@ export function useGame() {
     }
   }
 
+  function useHint() {
+    if (state.hints <= 0 || !isPlaying.value) return false
+    state.hints--
+    state.hintsUsed++
+    return true
+  }
+
   function resetGame() {
     stopTimer()
     state.status = 'idle'
@@ -363,26 +414,36 @@ export function useGame() {
     state.path = []
     state.clicks = 0
     state.elapsed = 0
+    state.startTime = null
     state.timeRemaining = null
     state.effectiveTimeLimit = null
     state.effectiveClickLimit = null
+    state.speedDecayPenalty = 0
+    state.modifiers = []
+    state.hints = 3
+    state.hintsUsed = 0
+    state.combo = 0
+    state.lastClickTime = null
   }
 
   return {
     state,
     GAME_MODES,
     GENRES,
+    MODIFIERS,
     DIFFICULTIES,
     currentMode,
     isPlaying,
     isWon,
     isLost,
     isGameOver,
+    backDisabled,
     formattedTime,
     formattedRemaining,
     initGame,
     navigateTo,
     goBack,
+    useHint,
     endGame,
     endFreeplay,
     resetGame,

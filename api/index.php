@@ -23,6 +23,8 @@ require_once __DIR__ . '/daily.php';
 require_once __DIR__ . '/challenge.php';
 require_once __DIR__ . '/stats.php';
 require_once __DIR__ . '/user_stats.php';
+require_once __DIR__ . '/trending.php';
+require_once __DIR__ . '/match.php';
 
 $uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
 $uri = parse_url($uri, PHP_URL_PATH);
@@ -239,6 +241,55 @@ if ($method === 'POST' && $uri === '/stats/increment') {
         !empty($body['won'])
     );
     jsonResponse(['ok' => true]);
+}
+
+// GET /trending
+if ($method === 'GET' && $uri === '/trending') {
+    $articles = getTrendingArticles();
+    if ($articles) {
+        jsonResponse(['articles' => $articles]);
+    }
+    jsonResponse(['articles' => [], 'error' => 'Could not fetch trending articles.']);
+}
+
+// POST /match/create
+if ($method === 'POST' && $uri === '/match/create') {
+    $user = requireAuth();
+    requireRateLimit('match_create', 10, 60);
+    $body = jsonInput();
+    $result = createMatch(
+        isset($body['startTitle']) ? $body['startTitle'] : '',
+        isset($body['endTitle']) ? $body['endTitle'] : '',
+        $user['id']
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /match/join/:code
+if ($method === 'POST' && preg_match('#^/match/join/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    jsonResponse(joinMatch($m[1], $user['id']));
+}
+
+// POST /match/submit/:code
+if ($method === 'POST' && preg_match('#^/match/submit/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = submitMatchResult(
+        $m[1],
+        $user['id'],
+        (int)(isset($body['clicks']) ? $body['clicks'] : 0),
+        (int)(isset($body['time']) ? $body['time'] : 0),
+        isset($body['path']) ? $body['path'] : []
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// GET /match/:code
+if ($method === 'GET' && preg_match('#^/match/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = getMatchStatus($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 404 : 200);
 }
 
 // 404 catch-all

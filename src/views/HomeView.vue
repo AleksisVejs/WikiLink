@@ -39,6 +39,11 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
             </svg>
           </button>
+          <!-- Level badge -->
+          <div class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg" style="border: 1px solid rgba(57,255,20,0.2); background: rgba(57,255,20,0.04);" title="Your level">
+            <span class="font-pixel text-[8px] text-crt-green">LV</span>
+            <span class="font-terminal text-sm text-crt-green">{{ progression.level.value }}</span>
+          </div>
           <button @click="showStats = true" class="btn-retro-ghost flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -53,6 +58,17 @@
         </div>
       </div>
     </header>
+
+    <!-- XP Progress Bar -->
+    <div class="relative z-20 px-4 sm:px-5 max-w-6xl mx-auto w-full">
+      <div class="xp-bar mt-1">
+        <div class="xp-bar-fill" :style="{ width: (progression.progress.value * 100) + '%' }"></div>
+      </div>
+      <div class="flex items-center justify-between mt-0.5 mb-0">
+        <span class="font-mono text-[8px] text-retro-muted">{{ progression.currentXp.value }} / {{ progression.nextLevelXp.value }} XP</span>
+        <span class="font-mono text-[8px] text-crt-green">Level {{ progression.level.value }}</span>
+      </div>
+    </div>
 
     <!-- Main -->
     <main class="flex-1 flex flex-col items-center justify-center min-h-0 px-3 sm:px-4 py-3 sm:py-5 md:py-6 relative z-10">
@@ -83,6 +99,31 @@
           <div class="text-center">
             <div class="font-terminal text-sm text-crt-amber">{{ globalStats.totalClicks }}</div>
             <div class="font-mono text-[8px] text-retro-muted">CLICKS</div>
+          </div>
+        </div>
+
+        <!-- Trending ticker -->
+        <div v-if="trending.trendingArticles.value.length > 0" class="mb-3 sm:mb-4 animate-fade-in">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-pixel text-[7px] text-arcade-orange tracking-[0.15em]" v-html="'&#128293; TRENDING NOW'"></span>
+          </div>
+          <div class="trending-ticker rounded-lg py-1.5" style="background: rgba(255,92,58,0.04); border: 1px solid rgba(255,92,58,0.15);">
+            <div class="trending-ticker-track">
+              <div class="trending-ticker-set">
+                <span v-for="(article, idx) in trending.trendingArticles.value.slice(0, 20)" :key="`a-${idx}`"
+                      class="trending-ticker-item font-mono text-[11px] text-retro-light/70">
+                  {{ article.title }}
+                  <span class="text-arcade-orange/60 ml-1">{{ trending.formatViews(article.views) }}</span>
+                </span>
+              </div>
+              <div class="trending-ticker-set">
+                <span v-for="(article, idx) in trending.trendingArticles.value.slice(0, 20)" :key="`b-${idx}`"
+                      class="trending-ticker-item font-mono text-[11px] text-retro-light/70">
+                  {{ article.title }}
+                  <span class="text-arcade-orange/60 ml-1">{{ trending.formatViews(article.views) }}</span>
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -125,6 +166,84 @@
               <span class="hidden sm:inline">SHARE</span>
             </button>
           </div>
+        </div>
+
+        <!-- Daily Leaderboard -->
+        <div v-if="dailyLeaderboard.length > 0" class="mb-3 sm:mb-4 animate-slide-up">
+          <button @click="showDailyLeaderboard = !showDailyLeaderboard"
+                  class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-t-xl transition-all duration-200"
+                  :class="showDailyLeaderboard ? 'rounded-b-none' : 'rounded-b-xl'"
+                  style="background: rgba(255,191,0,0.04); border: 1.5px solid rgba(255,191,0,0.2);"
+                  :style="showDailyLeaderboard ? 'border-bottom: none;' : ''">
+            <div class="flex items-center gap-2.5">
+              <svg class="w-4 h-4 text-crt-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span class="font-pixel text-[8px] text-crt-amber tracking-[0.15em]">DAILY LEADERBOARD</span>
+              <span class="font-mono text-[10px] text-retro-muted">{{ dailyLeaderboard.length }} player{{ dailyLeaderboard.length !== 1 ? 's' : '' }}</span>
+            </div>
+            <svg class="w-4 h-4 text-crt-amber/50 transition-transform duration-200" :class="{ 'rotate-180': showDailyLeaderboard }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <transition name="scale">
+            <div v-if="showDailyLeaderboard" class="rounded-b-xl overflow-hidden"
+                 style="background: rgba(255,191,0,0.02); border: 1.5px solid rgba(255,191,0,0.2); border-top: none;">
+              <div class="px-4 py-1.5 flex items-center gap-2 font-mono text-[9px] text-retro-muted/60 uppercase tracking-wider border-b border-retro-border/20">
+                <span class="w-7 text-right">#</span>
+                <span class="flex-1">Player</span>
+                <span class="w-14 text-right">Clicks</span>
+                <span class="w-14 text-right">Time</span>
+              </div>
+              <div class="max-h-[280px] overflow-y-auto">
+                <div v-for="entry in dailyLeaderboard.slice(0, 20)" :key="entry.rank"
+                     class="px-4 py-2 flex items-center gap-2 transition-colors hover:bg-retro-surface/20"
+                     :class="{
+                       'border-l-2 border-l-crt-green bg-crt-green/[0.02]': auth.user.value && entry.username === auth.user.value.username
+                     }">
+                  <span class="w-7 text-right font-terminal text-sm shrink-0"
+                        :class="entry.rank === 1 ? 'text-arcade-gold' : entry.rank === 2 ? 'text-retro-light' : entry.rank === 3 ? 'text-arcade-orange' : 'text-retro-muted'">
+                    <template v-if="entry.rank === 1" v-html="'&#128081;'"></template>
+                    <template v-else-if="entry.rank === 2" v-html="'&#129352;'"></template>
+                    <template v-else-if="entry.rank === 3" v-html="'&#129353;'"></template>
+                    <template v-else>{{ entry.rank }}</template>
+                  </span>
+                  <span class="flex-1 font-mono text-[12px] truncate"
+                        :class="auth.user.value && entry.username === auth.user.value.username ? 'text-crt-green' : 'text-crt-white'">
+                    {{ entry.username }}
+                    <span v-if="auth.user.value && entry.username === auth.user.value.username" class="text-[9px] text-crt-green/50 ml-1">(you)</span>
+                  </span>
+                  <span class="w-14 text-right font-terminal text-sm text-crt-green tabular-nums">{{ entry.clicks }}</span>
+                  <span class="w-14 text-right font-mono text-[11px] text-retro-muted tabular-nums">{{ formatTime(entry.time) }}</span>
+                </div>
+              </div>
+              <div v-if="!auth.user.value" class="px-4 py-2.5 border-t border-retro-border/20 text-center">
+                <button @click="showAuthModal = true" class="font-mono text-[10px] text-crt-cyan hover:text-crt-cyan/80 transition-colors">
+                  Login to appear on the leaderboard
+                </button>
+              </div>
+            </div>
+          </transition>
+        </div>
+
+        <!-- 1v1 Match banner -->
+        <div class="mb-3 sm:mb-4 animate-slide-up">
+          <button @click="showMatchModal = true"
+                  class="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-200 group touch-manipulation"
+                  style="background: linear-gradient(135deg, rgba(180,76,255,0.06), rgba(76,159,255,0.04)); border: 1.5px solid rgba(180,76,255,0.25);"
+                  @mouseenter="$event.currentTarget.style.borderColor='rgba(180,76,255,0.45)'; $event.currentTarget.style.boxShadow='0 0 20px rgba(180,76,255,0.1)'"
+                  @mouseleave="$event.currentTarget.style.borderColor='rgba(180,76,255,0.25)'; $event.currentTarget.style.boxShadow='none'">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="text-xl shrink-0" v-html="'&#9876;'"></span>
+              <div class="text-left min-w-0">
+                <div class="font-pixel text-[8px] text-arcade-purple tracking-[0.15em]">1v1 MATCH</div>
+                <p class="font-mono text-[10px] sm:text-[11px] text-retro-muted truncate">Challenge a friend to the same pair. Who wins?</p>
+              </div>
+            </div>
+            <svg class="w-4 h-4 text-arcade-purple/50 group-hover:text-arcade-purple transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
 
         <!-- Display frame (game config) -->
@@ -230,6 +349,29 @@
             </div>
           </template>
 
+          <!-- Modifiers section -->
+          <template v-if="showModifiers">
+            <div class="mx-3 sm:mx-5"><div class="retro-divider"></div></div>
+            <div class="p-3 sm:p-4 md:p-5">
+              <div class="flex items-center gap-2.5 mb-2.5 sm:mb-3">
+                <div class="w-1 h-4 rounded-full bg-crt-amber"></div>
+                <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">MODIFIERS</span>
+                <span v-if="activeModifiers.length > 0" class="font-mono text-[9px] text-crt-green ml-1">{{ (Math.pow(1.25, activeModifiers.length)).toFixed(2) }}x XP</span>
+              </div>
+              <div class="flex flex-wrap gap-1.5 sm:gap-2">
+                <button v-for="mod in filteredModifiers" :key="mod.id"
+                  @click="toggleModifier(mod.id)"
+                  class="modifier-chip"
+                  :class="{ active: activeModifiers.includes(mod.id) }"
+                  :title="mod.description">
+                  <span v-html="mod.icon"></span>
+                  <span>{{ mod.name }}</span>
+                </button>
+              </div>
+              <p class="font-mono text-[9px] text-retro-muted/50 mt-2">Each modifier adds a 1.25x XP multiplier</p>
+            </div>
+          </template>
+
           <!-- Custom route: start / target articles -->
           <template v-if="selectedModeId === 'custom'">
             <div class="mx-3 sm:mx-5"><div class="retro-divider"></div></div>
@@ -306,6 +448,10 @@
                         :class="statsTab === 'modes' ? 'text-crt-cyan bg-crt-cyan/10' : 'text-retro-muted hover:text-crt-white'">Modes</button>
                 <button @click="statsTab = 'genres'" class="font-mono text-[10px] px-2 py-1 rounded transition-all"
                         :class="statsTab === 'genres' ? 'text-crt-cyan bg-crt-cyan/10' : 'text-retro-muted hover:text-crt-white'">Genres</button>
+                <button @click="statsTab = 'badges'" class="font-mono text-[10px] px-2 py-1 rounded transition-all"
+                        :class="statsTab === 'badges' ? 'text-arcade-gold bg-arcade-gold/10' : 'text-retro-muted hover:text-crt-white'">
+                  Badges <span class="text-[8px] opacity-60">{{ achievements.unlockedCount.value }}/{{ achievements.totalCount.value }}</span>
+                </button>
                 <button @click="statsTab = 'history'" class="font-mono text-[10px] px-2 py-1 rounded transition-all"
                         :class="statsTab === 'history' ? 'text-crt-cyan bg-crt-cyan/10' : 'text-retro-muted hover:text-crt-white'">History</button>
                 <button @click="showStats = false" class="btn-ghost p-1.5 ml-1">
@@ -378,6 +524,23 @@
               <div v-else class="text-center py-10">
                 <div class="font-pixel text-[8px] text-retro-muted/50 mb-2">NO GENRE DATA</div>
                 <p class="font-mono text-xs text-retro-muted/30">Play games with different genres to see stats here</p>
+              </div>
+            </div>
+
+            <!-- Badges tab -->
+            <div v-if="statsTab === 'badges'">
+              <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                <div v-for="badge in achievements.getAllAchievements()" :key="badge.id"
+                     class="achievement-badge" :class="badge.unlocked ? 'unlocked' : 'locked'"
+                     :title="badge.unlocked ? badge.description : '???'">
+                  <span class="badge-icon" v-html="badge.icon"></span>
+                  <div class="font-pixel text-[6px] tracking-wider" :class="badge.unlocked ? 'text-arcade-gold' : 'text-retro-muted/40'">{{ badge.unlocked ? badge.name : '???' }}</div>
+                  <div v-if="badge.unlocked" class="font-mono text-[8px] text-crt-green mt-0.5">+{{ badge.xp }} XP</div>
+                </div>
+              </div>
+              <div class="mt-3 text-center">
+                <div class="font-terminal text-lg text-arcade-gold">{{ achievements.unlockedCount.value }} / {{ achievements.totalCount.value }}</div>
+                <div class="font-mono text-[9px] text-retro-muted">achievements unlocked</div>
               </div>
             </div>
 
@@ -481,6 +644,91 @@
       </transition>
     </Teleport>
 
+    <!-- 1v1 Match Modal -->
+    <Teleport to="body">
+      <transition name="fade">
+        <div v-if="showMatchModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="showMatchModal = false"></div>
+          <div class="relative rounded-xl p-6 max-w-sm w-full animate-scale-in"
+               style="background: #0d0e15; border: 2px solid rgba(180,76,255,0.35); box-shadow: 0 0 60px rgba(0,0,0,0.8);">
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-1 h-4 rounded-full bg-arcade-purple"></div>
+                <h2 class="font-pixel text-[9px] text-arcade-purple tracking-[0.2em]">1v1 MATCH</h2>
+              </div>
+              <button @click="showMatchModal = false" class="btn-ghost p-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <template v-if="matchTab === 'waiting'">
+              <div class="text-center py-4">
+                <div class="font-pixel text-[8px] mb-3 tracking-wider"
+                     :class="matchStatus === 'ready' ? 'text-crt-green' : 'text-crt-amber'">
+                  {{ matchStatus === 'ready' ? 'OPPONENT JOINED!' : 'WAITING FOR OPPONENT' }}
+                </div>
+                <div class="font-terminal text-4xl text-arcade-purple mb-3 tracking-[0.3em]">{{ matchCode }}</div>
+                <p class="font-mono text-xs text-retro-muted mb-2">Share this code with your opponent</p>
+
+                <!-- Waiting indicator -->
+                <div v-if="matchStatus !== 'ready'" class="flex items-center justify-center gap-2 mb-4 py-2">
+                  <span class="w-2 h-2 rounded-full bg-crt-amber animate-blink"></span>
+                  <span class="font-mono text-[11px] text-crt-amber/70 animate-blink-slow">Scanning for opponent...</span>
+                </div>
+
+                <!-- Ready indicator -->
+                <div v-else class="flex items-center justify-center gap-2 mb-4 py-2">
+                  <span class="w-2 h-2 rounded-full bg-crt-green" style="box-shadow: 0 0 6px rgba(57,255,20,0.5);"></span>
+                  <span class="font-mono text-[11px] text-crt-green">Opponent is ready!</span>
+                </div>
+
+                <div class="flex gap-2">
+                  <button @click="copyMatchCode" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-2 text-[10px]">
+                    COPY CODE
+                  </button>
+                  <button @click="startCreatedMatch"
+                          :disabled="matchStatus !== 'ready'"
+                          class="flex-1 !py-2 !px-4 !text-[9px]"
+                          :class="matchStatus === 'ready' ? 'btn-retro-primary' : 'btn-retro-ghost opacity-40 cursor-not-allowed'">
+                    {{ matchStatus === 'ready' ? 'START' : 'WAITING...' }}
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="flex gap-1 mb-4">
+                <button @click="matchTab = 'create'" class="font-pixel text-[8px] px-3 py-1.5 rounded transition-all"
+                        :class="matchTab === 'create' ? 'text-arcade-purple bg-arcade-purple/10' : 'text-retro-muted'">CREATE</button>
+                <button @click="matchTab = 'join'" class="font-pixel text-[8px] px-3 py-1.5 rounded transition-all"
+                        :class="matchTab === 'join' ? 'text-crt-cyan bg-crt-cyan/10' : 'text-retro-muted'">JOIN</button>
+              </div>
+
+              <div v-if="matchTab === 'create'" class="space-y-3">
+                <p class="font-mono text-xs text-retro-muted">Create a match with a random article pair. Share the code with a friend.</p>
+                <button @click="createMatch" :disabled="matchLoading" class="btn-retro-primary w-full !py-2.5">
+                  {{ matchLoading ? 'CREATING...' : 'CREATE MATCH' }}
+                </button>
+              </div>
+
+              <div v-if="matchTab === 'join'" class="space-y-3">
+                <p class="font-mono text-xs text-retro-muted">Enter a match code from your opponent.</p>
+                <input v-model="joinCode" type="text" placeholder="ABCD12" maxlength="6"
+                       class="w-full px-3 py-2 rounded-lg font-terminal text-xl text-center tracking-[0.3em] bg-[#12131c] border border-retro-border text-crt-white focus:border-arcade-purple focus:outline-none uppercase" />
+                <button @click="joinMatch" :disabled="matchLoading" class="btn-retro-primary w-full !py-2.5">
+                  {{ matchLoading ? 'JOINING...' : 'JOIN MATCH' }}
+                </button>
+              </div>
+
+              <div v-if="matchError" class="font-mono text-[11px] text-crt-red mt-3">{{ matchError }}</div>
+            </template>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
+
     <!-- How to Play Modal -->
     <Teleport to="body">
       <transition name="fade">
@@ -510,6 +758,7 @@
                   <li><span class="text-crt-blue">Classic</span> -- fewest clicks, no timer</li>
                   <li><span class="text-arcade-orange">Sprint</span> -- beat the clock</li>
                   <li><span class="text-crt-magenta">Click Limit</span> -- limited number of clicks</li>
+                  <li><span style="color:#ff5c3a">Trending</span> -- navigate between trending articles</li>
                   <li><span class="text-arcade-gold">Custom</span> -- choose your own articles</li>
                   <li><span class="text-crt-green">Freeplay</span> -- explore with no target</li>
                   <li><span class="text-crt-amber">Daily</span> -- same pair for everyone, once per day</li>
@@ -545,15 +794,22 @@ import { useSound } from '../composables/useSound'
 import { useToast } from '../composables/useToast'
 import { useAuth } from '../composables/useAuth'
 import { useApi } from '../composables/useApi'
+import { useTrending } from '../composables/useTrending'
+import { useProgression } from '../composables/useProgression'
+import { useAchievements } from '../composables/useAchievements'
+import { useWikipedia } from '../composables/useWikipedia'
 import WikiTitleInput from '../components/WikiTitleInput.vue'
 import { APP_VERSION } from '../version.js'
 
 const router = useRouter()
 const toast = useToast()
-const { GAME_MODES, GENRES, DIFFICULTIES, getStats, getHistory, getDailyStatus, LIMIT_BOUNDS } = useGame()
+const { GAME_MODES, GENRES, MODIFIERS, DIFFICULTIES, getStats, getHistory, getDailyStatus, LIMIT_BOUNDS } = useGame()
 const sound = useSound()
 const auth = useAuth()
 const api = useApi()
+const trending = useTrending()
+const progression = useProgression()
+const achievements = useAchievements()
 
 const showStats = ref(false)
 const showAuthModal = ref(false)
@@ -567,6 +823,8 @@ const authError = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const globalStats = ref(null)
+const dailyLeaderboard = ref([])
+const showDailyLeaderboard = ref(false)
 
 const selectedGenreId = ref('random')
 const selectedModeId = ref('classic')
@@ -575,8 +833,18 @@ const customTimeLimit = ref(120)
 const customClickLimit = ref(6)
 const customStartTitle = ref('')
 const customEndTitle = ref('')
+const activeModifiers = ref([])
+const matchCode = ref('')
+const showMatchModal = ref(false)
+const matchTab = ref('create')
+const joinCode = ref('')
+const matchLoading = ref(false)
+const matchError = ref('')
+const matchStatus = ref(null)
+let matchPollTimer = null
 
 const genres = Object.values(GENRES)
+const modifierList = Object.values(MODIFIERS)
 
 function formatLimitMss(totalSec) {
   const s = Math.max(0, Math.floor(Number(totalSec) || 0))
@@ -589,6 +857,7 @@ const modePalette = {
   classic:   { uiColor: '#4c9fff', borderHex: 'rgba(76,159,255,0.35)',  bgGlow: 'rgba(76,159,255,0.1)',   shadowColor: 'rgba(76,159,255,0.2)',  tagBg: 'rgba(76,159,255,0.08)',  tagBorder: 'rgba(76,159,255,0.2)' },
   sprint:    { uiColor: '#ff6b2b', borderHex: 'rgba(255,107,43,0.35)',  bgGlow: 'rgba(255,107,43,0.1)',   shadowColor: 'rgba(255,107,43,0.2)',  tagBg: 'rgba(255,107,43,0.08)',  tagBorder: 'rgba(255,107,43,0.2)' },
   challenge: { uiColor: '#ff2ecc', borderHex: 'rgba(255,46,204,0.35)',  bgGlow: 'rgba(255,46,204,0.1)',   shadowColor: 'rgba(255,46,204,0.2)',  tagBg: 'rgba(255,46,204,0.08)',  tagBorder: 'rgba(255,46,204,0.2)' },
+  trending:  { uiColor: '#ff5c3a', borderHex: 'rgba(255,92,58,0.35)',   bgGlow: 'rgba(255,92,58,0.1)',    shadowColor: 'rgba(255,92,58,0.2)',   tagBg: 'rgba(255,92,58,0.08)',   tagBorder: 'rgba(255,92,58,0.2)' },
   freeplay:  { uiColor: '#39ff14', borderHex: 'rgba(57,255,20,0.35)',   bgGlow: 'rgba(57,255,20,0.1)',    shadowColor: 'rgba(57,255,20,0.2)',   tagBg: 'rgba(57,255,20,0.08)',   tagBorder: 'rgba(57,255,20,0.2)' },
   custom:    { uiColor: '#c9a227', borderHex: 'rgba(201,162,39,0.35)',  bgGlow: 'rgba(201,162,39,0.1)',   shadowColor: 'rgba(201,162,39,0.2)',  tagBg: 'rgba(201,162,39,0.08)',  tagBorder: 'rgba(201,162,39,0.2)' },
 }
@@ -597,13 +866,31 @@ const displayModes = Object.values(GAME_MODES)
   .filter(m => m.id !== 'daily')
   .map(m => {
     const p = modePalette[m.id] || modePalette.classic
-    const tag = m.id === 'sprint' ? 'TIMER' : m.id === 'challenge' ? 'CLICK CAP' : null
+    const tag = m.id === 'sprint' ? 'TIMER' : m.id === 'challenge' ? 'CLICK CAP' : m.id === 'trending' ? 'HOT' : null
     return { ...m, ...p, tag }
   })
 
 const selectedGenre = computed(() => genres.find(g => g.id === selectedGenreId.value))
 const selectedMode = computed(() => displayModes.find(m => m.id === selectedModeId.value))
 const showDifficulty = computed(() => ['sprint', 'challenge'].includes(selectedModeId.value))
+const showModifiers = computed(() => !['freeplay'].includes(selectedModeId.value))
+
+function toggleModifier(id) {
+  const idx = activeModifiers.value.indexOf(id)
+  if (idx >= 0) activeModifiers.value.splice(idx, 1)
+  else activeModifiers.value.push(id)
+  sound.playClick()
+}
+
+const noBackModes = ['daily', 'challenge']
+
+const filteredModifiers = computed(() => {
+  return modifierList.filter(m => {
+    if (m.id === 'speedDecay' && selectedModeId.value !== 'sprint') return false
+    if (m.id === 'noback' && noBackModes.includes(selectedModeId.value)) return false
+    return true
+  })
+})
 
 const difficulties = computed(() => {
   const mode = selectedModeId.value
@@ -670,7 +957,7 @@ function startGame() {
   }
   sound.playStart()
   const query = {}
-  if (selectedModeId.value !== 'custom' && selectedGenreId.value !== 'random') query.genre = selectedGenreId.value
+  if (selectedModeId.value !== 'custom' && selectedModeId.value !== 'trending' && selectedGenreId.value !== 'random') query.genre = selectedGenreId.value
   if (showDifficulty.value) {
     if (selectedDifficulty.value !== 'normal') query.difficulty = selectedDifficulty.value
     if (selectedDifficulty.value === 'custom') {
@@ -679,10 +966,86 @@ function startGame() {
     }
   }
   if (selectedModeId.value === 'custom') { query.from = customStartTitle.value.trim(); query.to = customEndTitle.value.trim() }
+  if (activeModifiers.value.length > 0) query.modifiers = activeModifiers.value.join(',')
   router.push({ name: 'game', params: { mode: selectedModeId.value }, query })
 }
 
 function startDaily() { sound.playStart(); router.push({ name: 'game', params: { mode: 'daily' } }) }
+
+async function createMatch() {
+  if (!auth.user.value) { toast.warn('Login required for 1v1 matches'); showAuthModal.value = true; return }
+  matchLoading.value = true
+  matchError.value = ''
+  try {
+    const wiki = useWikipedia()
+    const pair = await wiki.getRandomPairByGenre(genres.find(g => g.id === selectedGenreId.value))
+    if (!pair) { matchError.value = 'Could not generate articles'; return }
+    const result = await api.post('/match/create', { startTitle: pair.start.title, endTitle: pair.end.title })
+    if (result.error) { matchError.value = result.error; return }
+    matchCode.value = result.code
+    matchStatus.value = 'waiting'
+    matchTab.value = 'waiting'
+    toast.success(`Match created! Code: ${result.code}`)
+    startMatchPolling()
+  } catch (e) {
+    matchError.value = e.message || 'Failed to create match'
+  } finally {
+    matchLoading.value = false
+  }
+}
+
+function startMatchPolling() {
+  stopMatchPolling()
+  matchPollTimer = setInterval(async () => {
+    if (!matchCode.value) { stopMatchPolling(); return }
+    try {
+      const result = await api.get(`/match/${matchCode.value}`)
+      if (result.status === 'active' || result.status === 'finished') {
+        matchStatus.value = 'ready'
+        stopMatchPolling()
+        sound.playStart()
+        toast.success('Opponent joined! Ready to start.')
+      }
+    } catch { /* ignore */ }
+  }, 3000)
+}
+
+function stopMatchPolling() {
+  if (matchPollTimer) { clearInterval(matchPollTimer); matchPollTimer = null }
+}
+
+async function joinMatch() {
+  if (!auth.user.value) { toast.warn('Login required for 1v1 matches'); showAuthModal.value = true; return }
+  const code = joinCode.value.trim().toUpperCase()
+  if (!code || code.length < 4) { matchError.value = 'Enter a valid match code'; return }
+  matchLoading.value = true
+  matchError.value = ''
+  try {
+    const result = await api.post(`/match/join/${code}`)
+    if (result.error) { matchError.value = result.error; return }
+    sound.playStart()
+    showMatchModal.value = false
+    router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, match: code } })
+  } catch (e) {
+    matchError.value = e.message || 'Failed to join match'
+  } finally {
+    matchLoading.value = false
+  }
+}
+
+function startCreatedMatch() {
+  if (!matchCode.value || matchStatus.value !== 'ready') return
+  sound.playStart()
+  showMatchModal.value = false
+  api.get(`/match/${matchCode.value}`).then(match => {
+    router.push({ name: 'game', params: { mode: 'custom' }, query: { from: match.start_title, to: match.end_title, match: matchCode.value } })
+  }).catch(() => toast.error('Failed to start match'))
+}
+
+function copyMatchCode() {
+  if (!matchCode.value) return
+  navigator.clipboard.writeText(matchCode.value).then(() => toast.success('Code copied!')).catch(() => {})
+}
 
 function formatTime(seconds) {
   if (seconds === null || seconds === undefined) return '-'
@@ -698,20 +1061,41 @@ function formatDate(isoString) {
 }
 
 function handleKeydown(e) {
-  if (e.key === 'Enter' && !showStats.value && !showAuthModal.value && !showHowTo.value) startGame()
+  if (e.key === 'Enter' && !showStats.value && !showAuthModal.value && !showHowTo.value && !showMatchModal.value) startGame()
   if (e.key === 'Escape') {
-    if (showStats.value) showStats.value = false
+    if (showMatchModal.value) showMatchModal.value = false
+    else if (showStats.value) showStats.value = false
     else if (showAuthModal.value) showAuthModal.value = false
     else if (showHowTo.value) showHowTo.value = false
   }
 }
 
-watch(selectedModeId, (id) => { if (id === 'custom') selectedDifficulty.value = 'normal' })
+watch(selectedModeId, (id) => {
+  if (id === 'custom') selectedDifficulty.value = 'normal'
+  if (noBackModes.includes(id)) activeModifiers.value = activeModifiers.value.filter(m => m !== 'noback')
+  if (id !== 'sprint') activeModifiers.value = activeModifiers.value.filter(m => m !== 'speedDecay')
+})
+watch(showMatchModal, (val) => {
+  if (!val) {
+    stopMatchPolling()
+    if (matchStatus.value !== 'ready') {
+      matchCode.value = ''
+      matchStatus.value = null
+      matchTab.value = 'create'
+      matchError.value = ''
+    }
+  }
+})
 watch(authMode, () => { authError.value = ''; authConfirmPassword.value = ''; showPassword.value = false; showConfirmPassword.value = false })
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
   api.get('/stats').then(d => globalStats.value = d).catch(() => {})
+  api.get('/daily/leaderboard').then(d => dailyLeaderboard.value = d.scores || []).catch(() => {})
+  trending.fetchTrending()
 })
-onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  stopMatchPolling()
+})
 </script>

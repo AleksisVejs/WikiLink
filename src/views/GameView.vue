@@ -22,7 +22,7 @@
             </button>
 
             <button @click="handleGoBack"
-                    :disabled="game.state.path.length <= 1 || !game.isPlaying.value"
+                    :disabled="game.state.path.length <= 1 || !game.isPlaying.value || game.backDisabled.value"
                     class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 group disabled:opacity-25 disabled:cursor-not-allowed"
                     title="Go back (Backspace)"
                     style="border: 1px solid rgba(0,229,255,0.15);"
@@ -88,8 +88,30 @@
             </div>
           </div>
 
-          <!-- Right: stats + mute -->
+          <!-- Right: hints + stats + mute -->
           <div class="flex items-center gap-3 sm:gap-5 shrink-0">
+            <!-- Hint button -->
+            <div v-if="game.state.targetArticle && game.isPlaying.value" class="relative">
+              <button @click="showHintMenu = !showHintMenu"
+                      :disabled="game.state.hints <= 0"
+                      class="flex items-center gap-1 px-2 py-1 rounded-lg transition-all duration-200 disabled:opacity-25"
+                      style="border: 1px solid rgba(255,191,0,0.2);"
+                      title="Use a hint">
+                <svg class="w-3.5 h-3.5 text-crt-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                <span class="font-terminal text-sm text-crt-amber">{{ game.state.hints }}</span>
+              </button>
+              <div v-if="showHintMenu" class="absolute right-0 top-full mt-1 z-50 rounded-lg p-2 min-w-[160px]"
+                   style="background: #0d0e15; border: 1px solid rgba(255,191,0,0.3); box-shadow: 0 8px 24px rgba(0,0,0,0.6);">
+                <button @click="useHintAction('category')" class="w-full text-left px-2 py-1.5 rounded font-mono text-[11px] text-retro-light hover:bg-retro-surface/50 transition-colors">
+                  <span class="text-crt-amber mr-1" v-html="'&#128194;'"></span> Category Reveal
+                </button>
+                <button @click="useHintAction('hotcold')" class="w-full text-left px-2 py-1.5 rounded font-mono text-[11px] text-retro-light hover:bg-retro-surface/50 transition-colors">
+                  <span class="text-crt-red mr-1" v-html="'&#127777;'"></span> Hot / Cold
+                </button>
+              </div>
+            </div>
             <div class="flex items-center gap-1.5">
               <span class="font-mono text-[10px] text-retro-muted uppercase tracking-wider hidden sm:inline">Clicks</span>
               <span class="font-terminal text-lg font-bold" :class="clickLimitClass">
@@ -121,6 +143,14 @@
                     :style="game.isPlaying.value
                       ? 'background: #39ff14; box-shadow: 0 0 6px rgba(57,255,20,0.5);'
                       : 'background: #555770;'"></span>
+            </div>
+            <!-- Active modifiers -->
+            <div v-if="game.state.modifiers.length > 0" class="hidden sm:flex items-center gap-1">
+              <span v-for="modId in game.state.modifiers" :key="modId"
+                    class="px-1.5 py-0.5 rounded text-[9px] font-mono"
+                    style="background: rgba(255,191,0,0.08); border: 1px solid rgba(255,191,0,0.2); color: #ffbf00;"
+                    :title="game.MODIFIERS[modId]?.name"
+                    v-html="game.MODIFIERS[modId]?.icon"></span>
             </div>
           </div>
         </div>
@@ -158,8 +188,22 @@
       </div>
     </nav>
 
+    <!-- Hint result banner -->
+    <transition name="fade">
+      <div v-if="hintResult" class="sticky top-12 z-30 mx-auto max-w-4xl px-4">
+        <div class="rounded-lg px-4 py-2.5 mt-2 flex items-center gap-2 animate-slide-up"
+             style="background: rgba(255,191,0,0.06); border: 1px solid rgba(255,191,0,0.25);">
+          <svg class="w-4 h-4 text-crt-amber shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          <span class="font-mono text-[12px] text-crt-amber">{{ hintResult.text }}</span>
+        </div>
+      </div>
+    </transition>
+
     <!-- Content area -->
-    <main class="flex-1">
+    <main class="flex-1" :class="{ 'screen-shake': showScreenShake }"
+          @click.self="showHintMenu = false">
 
       <!-- Boot sequence -->
       <div v-if="initialLoading" class="flex items-center justify-center" style="min-height: calc(100vh - 3rem);">
@@ -174,7 +218,7 @@
             </p>
             <p v-if="bootStep >= 3" class="animate-fade-in flex items-center gap-2">
               <span class="text-crt-amber">></span>
-              {{ props.mode === 'daily' ? 'Loading daily challenge' : genreId !== 'random' ? `Scanning ${genre.name} topics` : 'Randomizing challenge' }}...
+              {{ props.mode === 'daily' ? 'Loading daily challenge' : props.mode === 'trending' ? 'Fetching trending articles' : genreId !== 'random' ? `Scanning ${genre.name} topics` : 'Randomizing challenge' }}...
             </p>
           </div>
           <div class="mt-6 retro-divider"></div>
@@ -217,6 +261,7 @@
               style="text-shadow: 0 0 12px rgba(0,229,255,0.3); border-bottom: 1px solid rgba(0,229,255,0.12);"
               v-html="articleData.displayTitle"></h1>
           <div class="wiki-content"
+               :class="{ 'fog-mode': game.state.modifiers.includes('fog') }"
                ref="contentRef"
                @click="handleLinkClick"
                @mouseover="handleLinkHover"
@@ -299,11 +344,41 @@
               </div>
             </div>
 
-            <!-- Path log -->
-            <div class="mb-6 rounded-lg p-3 max-h-40 overflow-y-auto text-left"
-                 style="background: #12131c; border: 1px solid #252738;">
-              <div class="font-pixel text-[7px] text-retro-muted tracking-[0.15em] mb-2">PATH LOG</div>
-              <div class="space-y-0.5 font-mono text-xs">
+            <!-- XP Reward -->
+            <div v-if="xpRewardData" class="mb-4 rounded-lg p-3 text-left"
+                 style="background: rgba(57,255,20,0.03); border: 1px solid rgba(57,255,20,0.15);">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-pixel text-[7px] text-crt-green tracking-[0.15em]">XP EARNED</span>
+                <span class="font-terminal text-lg text-crt-green">+{{ xpRewardData.totalReward }}</span>
+              </div>
+              <div class="space-y-0.5">
+                <div v-for="(r, i) in xpRewardData.rewards" :key="i" class="flex items-center justify-between font-mono text-[10px]">
+                  <span class="text-retro-muted">{{ r.label }}</span>
+                  <span class="text-crt-green">+{{ r.xp }}</span>
+                </div>
+              </div>
+              <div v-if="game.state.modifiers.length > 0" class="mt-1 pt-1 border-t border-retro-border/20">
+                <span class="font-mono text-[9px] text-crt-amber">{{ game.state.modifiers.length }} modifier(s) active = {{ (Math.pow(1.25, game.state.modifiers.length)).toFixed(2) }}x bonus</span>
+              </div>
+            </div>
+
+            <!-- Path Replay -->
+            <div class="mb-4 rounded-lg p-3 text-left" style="background: #12131c; border: 1px solid #252738;">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-pixel text-[7px] text-retro-muted tracking-[0.15em]">PATH</span>
+                <button v-if="!showPathReplay" @click="startPathReplay" class="font-mono text-[9px] text-crt-cyan hover:text-crt-cyan/80 transition-colors">
+                  <span v-html="'&#9654;'"></span> REPLAY
+                </button>
+              </div>
+              <div v-if="showPathReplay" class="flex flex-wrap items-center gap-1 mb-2">
+                <template v-for="(article, idx) in game.state.path" :key="idx">
+                  <div class="path-node" :class="{ active: idx <= pathReplayIndex }" :title="article.replace(/_/g, ' ')">
+                    {{ idx + 1 }}
+                  </div>
+                  <div v-if="idx < game.state.path.length - 1" class="path-edge" :class="{ active: idx < pathReplayIndex }"></div>
+                </template>
+              </div>
+              <div class="space-y-0.5 font-mono text-xs max-h-32 overflow-y-auto">
                 <div v-for="(article, idx) in game.state.path" :key="idx" class="flex items-center gap-2">
                   <span class="text-retro-muted w-5 text-right shrink-0 tabular-nums">{{ String(idx + 1).padStart(2, '0') }}</span>
                   <span style="color: #252738;">|</span>
@@ -314,13 +389,38 @@
               </div>
             </div>
 
+            <!-- Post-game stats -->
+            <div class="mb-4 rounded-lg p-3 text-left" style="background: #12131c; border: 1px solid #252738;">
+              <div class="font-pixel text-[7px] text-retro-muted tracking-[0.15em] mb-2">GAME DETAILS</div>
+              <div class="grid grid-cols-2 gap-2 font-mono text-[11px]">
+                <div class="flex justify-between">
+                  <span class="text-retro-muted">Hints used</span>
+                  <span :class="game.state.hintsUsed > 0 ? 'text-crt-amber' : 'text-crt-green'">{{ game.state.hintsUsed }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-retro-muted">Max combo</span>
+                  <span class="text-crt-cyan">{{ game.state.combo }}x</span>
+                </div>
+                <div v-if="game.state.modifiers.length > 0" class="flex justify-between col-span-2">
+                  <span class="text-retro-muted">Modifiers</span>
+                  <span class="text-crt-amber">{{ game.state.modifiers.map(m => game.MODIFIERS[m]?.name).join(', ') }}</span>
+                </div>
+              </div>
+            </div>
+
             <!-- Share / challenge buttons -->
             <div v-if="!freeplayFinished && game.state.targetArticle" class="flex gap-2 mb-4">
+              <button @click="copyShareCard" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-2 text-[10px]">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg>
+                SHARE RESULT
+              </button>
               <button @click="shareChallenge" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-2 text-[10px]">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
-                SHARE CHALLENGE
+                CHALLENGE
               </button>
             </div>
 
@@ -337,6 +437,34 @@
               </div>
             </div>
 
+            <!-- Match result -->
+            <div v-if="matchResult" class="mb-4 rounded-lg p-3 text-left" style="background: #12131c; border: 1px solid rgba(180,76,255,0.3);">
+              <div class="font-pixel text-[7px] text-arcade-purple tracking-[0.15em] mb-2">1v1 MATCH</div>
+              <div v-if="matchResult.status === 'finished'" class="space-y-2">
+                <div class="text-center mb-2">
+                  <span class="font-pixel text-sm" :class="matchResult.winner === 'you' ? 'text-crt-green' : matchResult.winner === 'tie' ? 'text-crt-amber' : 'text-crt-red'">
+                    {{ matchResult.winner === 'you' ? 'YOU WIN!' : matchResult.winner === 'tie' ? 'TIE!' : 'OPPONENT WINS' }}
+                  </span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-center">
+                  <div class="rounded-lg p-2" style="background: rgba(57,255,20,0.04); border: 1px solid rgba(57,255,20,0.15);">
+                    <div class="font-pixel text-[6px] text-crt-green mb-1">YOU</div>
+                    <div class="font-terminal text-lg text-crt-white">{{ matchResult.you?.clicks }}</div>
+                    <div class="font-mono text-[9px] text-retro-muted">{{ formatLeaderboardTime(matchResult.you?.time || 0) }}</div>
+                  </div>
+                  <div class="rounded-lg p-2" style="background: rgba(180,76,255,0.04); border: 1px solid rgba(180,76,255,0.15);">
+                    <div class="font-pixel text-[6px] text-arcade-purple mb-1">OPPONENT</div>
+                    <div class="font-terminal text-lg text-crt-white">{{ matchResult.opponent?.clicks }}</div>
+                    <div class="font-mono text-[9px] text-retro-muted">{{ formatLeaderboardTime(matchResult.opponent?.time || 0) }}</div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-center py-3">
+                <div class="font-mono text-xs text-retro-muted animate-blink">Waiting for opponent...</div>
+                <div class="font-terminal text-sm text-arcade-purple mt-1">{{ matchResult.code }}</div>
+              </div>
+            </div>
+
             <div class="flex gap-3">
               <button @click="goHome" class="btn-secondary flex-1">HOME</button>
               <button @click="playAgain" class="btn-primary flex-1">PLAY AGAIN</button>
@@ -350,6 +478,41 @@
         </div>
       </transition>
     </Teleport>
+
+    <!-- Combo counter -->
+    <transition name="fade">
+      <div v-if="comboDisplay" :key="comboDisplay.key" class="combo-float"
+           style="right: 120px; top: 60px;"
+           :style="{ color: comboDisplay.count >= 5 ? '#ff2ecc' : comboDisplay.count >= 3 ? '#ffbf00' : '#00e5ff' }">
+        COMBO x{{ comboDisplay.count }}
+      </div>
+    </transition>
+
+    <!-- Red vignette on loss -->
+    <div v-if="showRedVignette" class="red-vignette"></div>
+
+    <!-- Level up overlay -->
+    <transition name="fade">
+      <div v-if="showLevelUp" class="level-up-overlay">
+        <div class="text-center animate-scale-in">
+          <div class="font-pixel text-[9px] text-crt-green tracking-[0.3em] mb-2">LEVEL UP!</div>
+          <div class="font-pixel text-4xl text-neon-green mb-1">{{ progression.level.value }}</div>
+          <div class="font-mono text-sm text-retro-light">Keep playing to unlock more</div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Achievement unlock toasts -->
+    <TransitionGroup name="fade" tag="div" class="fixed top-4 left-1/2 -translate-x-1/2 z-[75] flex flex-col gap-2">
+      <div v-for="a in achievementToasts" :key="a.key" class="achievement-toast">
+        <span class="text-xl" v-html="a.icon"></span>
+        <div>
+          <div class="font-pixel text-[7px] text-arcade-gold tracking-wider">ACHIEVEMENT UNLOCKED</div>
+          <div class="font-mono text-[12px] text-crt-white">{{ a.name }}</div>
+          <div class="font-mono text-[9px] text-crt-green">+{{ a.xp }} XP</div>
+        </div>
+      </div>
+    </TransitionGroup>
 
     <!-- Quit Confirm Modal -->
     <Teleport to="body">
@@ -382,6 +545,9 @@ import { useSound } from '../composables/useSound'
 import { useToast } from '../composables/useToast'
 import { useAuth } from '../composables/useAuth'
 import { useApi } from '../composables/useApi'
+import { useTrending } from '../composables/useTrending'
+import { useProgression } from '../composables/useProgression'
+import { useAchievements } from '../composables/useAchievements'
 
 const props = defineProps({
   mode: { type: String, required: true }
@@ -424,16 +590,36 @@ let previewCache = {}
 
 const auth = useAuth()
 const api = useApi()
+const trending = useTrending()
+const progression = useProgression()
+const achievements = useAchievements()
 
 const rerolling = ref(false)
 const showConfetti = ref(false)
 const dailyLeaderboard = ref([])
+const matchCode = computed(() => route.query.match || null)
+const matchResult = ref(null)
+const matchPolling = ref(false)
+const showScreenShake = ref(false)
+const showRedVignette = ref(false)
+const comboDisplay = ref(null)
+const xpRewardData = ref(null)
+const achievementToasts = ref([])
+const showLevelUp = ref(false)
+const showHintMenu = ref(false)
+const hintResult = ref(null)
+const showPathReplay = ref(false)
+const pathReplayIndex = ref(0)
+const activeModifiers = computed(() => {
+  const modParam = route.query.modifiers
+  return modParam ? modParam.split(',').filter(Boolean) : []
+})
 
 const currentMode = computed(() => game.currentMode.value)
 
 const canReroll = computed(() => {
   const m = props.mode
-  return m !== 'daily' && m !== 'custom' && m !== 'freeplay'
+  return m !== 'daily' && m !== 'custom' && m !== 'freeplay' && m !== 'trending'
 })
 
 const showEndModal = computed(() => game.isGameOver.value || freeplayFinished.value)
@@ -455,24 +641,91 @@ const clickLimitClass = computed(() => {
 
 const timerClass = computed(() => {
   if (game.state.timeRemaining === null) return ''
-  if (game.state.timeRemaining <= 10) return 'text-crt-red animate-blink'
+  if (game.state.timeRemaining <= 5) return 'text-crt-red timer-critical'
+  if (game.state.timeRemaining <= 15) return 'text-crt-red timer-urgent'
   if (game.state.timeRemaining <= 30) return 'text-crt-amber'
   return 'text-crt-white'
 })
 
-// Play sounds on game state changes; submit daily score; show confetti
+// Play sounds on game state changes; submit daily score; show confetti; award XP; check achievements
 watch(() => game.state.status, (val) => {
   if (val === 'won') {
     sound.playWin()
     showConfetti.value = true
     setTimeout(() => showConfetti.value = false, 3500)
     submitDailyScore()
+    submitMatchResult()
     loadDailyLeaderboard()
+    processPostGame(true)
   } else if (val === 'lost') {
     sound.playLose()
+    showScreenShake.value = true
+    showRedVignette.value = true
+    setTimeout(() => { showScreenShake.value = false; showRedVignette.value = false }, 600)
+    submitMatchResult()
     loadDailyLeaderboard()
+    processPostGame(false)
   }
 })
+
+watch(() => game.state.combo, (val) => {
+  if (val >= 2) {
+    sound.playCombo(val)
+    comboDisplay.value = { count: val, key: Date.now() }
+    setTimeout(() => { if (comboDisplay.value?.count === val) comboDisplay.value = null }, 1000)
+  }
+})
+
+function processPostGame(won) {
+  const stats = game.getStats()
+
+  const xpResult = progression.awardXp({
+    won,
+    mode: game.state.mode,
+    clicks: game.state.clicks,
+    elapsed: game.state.elapsed,
+    streak: auth.streak?.value || 0,
+    hintsUsed: game.state.hintsUsed,
+    modifiers: game.state.modifiers,
+  })
+  xpRewardData.value = xpResult
+
+  if (xpResult.leveledUp) {
+    showLevelUp.value = true
+    sound.playLevelUp()
+    setTimeout(() => showLevelUp.value = false, 2500)
+  }
+
+  const dailyData = game.getDailyStatus()
+  let dailyCompletions = 0
+  try {
+    const allDaily = JSON.parse(localStorage.getItem('wikilink_daily') || '{}')
+    dailyCompletions = Object.values(allDaily).filter(d => d.completed).length
+  } catch { /* ignore */ }
+
+  const newUnlocks = achievements.checkAchievements({
+    won,
+    mode: game.state.mode,
+    clicks: game.state.clicks,
+    elapsed: game.state.elapsed,
+    timeRemaining: game.state.timeRemaining,
+    stats,
+    hintsUsed: game.state.hintsUsed,
+    modifiers: game.state.modifiers,
+    dailyCompletions,
+  })
+
+  if (newUnlocks.length > 0) {
+    const unlocked = achievements.consumeRecentUnlocks()
+    unlocked.forEach((a, i) => {
+      setTimeout(() => {
+        sound.playAchievement()
+        achievementToasts.value.push({ ...a, key: Date.now() })
+        setTimeout(() => achievementToasts.value.shift(), 3500)
+      }, i * 800)
+    })
+  }
+}
 
 const processedHtml = computed(() => {
   if (!articleData.value?.html) return ''
@@ -514,6 +767,18 @@ const processedHtml = computed(() => {
       link.style.cursor = 'default'
     }
   })
+
+  if (game.state.modifiers.includes('blackout')) {
+    const wikiLinks = doc.querySelectorAll('.wiki-link')
+    const seed = game.state.clicks + game.state.path.length
+    wikiLinks.forEach((link, idx) => {
+      const hash = (idx * 2654435761 + seed * 131) >>> 0
+      if ((hash % 100) < 30) {
+        link.classList.add('blackout-disabled')
+        link.removeAttribute('data-wiki-title')
+      }
+    })
+  }
 
   return doc.body.innerHTML
 })
@@ -584,15 +849,27 @@ async function initializeGame() {
     }
     game.initGame('custom', startArticle, targetArticle, 'random', 'normal')
     await loadArticle(startArticle.title)
+  } else if (props.mode === 'trending') {
+    const pair = await trending.getTrendingPair()
+    if (!pair) {
+      toast.warn('Trending data unavailable, falling back to random')
+      const fallback = await wiki.getRandomPairByGenre(genre.value)
+      if (!fallback) { toast.error('Could not find article pair'); router.push({ name: 'home' }); return }
+      game.initGame('trending', fallback.start, fallback.end, 'random', 'normal', {}, activeModifiers.value)
+      await loadArticle(fallback.start.title)
+    } else {
+      game.initGame('trending', pair.start, pair.end, 'random', 'normal', {}, activeModifiers.value)
+      await loadArticle(pair.start.title)
+    }
   } else if (game.GAME_MODES[props.mode]?.noTarget) {
     const startArticle = await wiki.getRandomArticleByGenre(genre.value)
     if (!startArticle) { toast.error('Failed to load article'); router.push({ name: 'home' }); return }
-    game.initGame(props.mode, startArticle, null, genreId.value, difficulty.value, customLimitsFromRoute.value)
+    game.initGame(props.mode, startArticle, null, genreId.value, difficulty.value, customLimitsFromRoute.value, activeModifiers.value)
     await loadArticle(startArticle.title)
   } else {
     const pair = await wiki.getRandomPairByGenre(genre.value)
     if (!pair) { toast.error('Could not find article pair'); router.push({ name: 'home' }); return }
-    game.initGame(props.mode, pair.start, pair.end, genreId.value, difficulty.value, customLimitsFromRoute.value)
+    game.initGame(props.mode, pair.start, pair.end, genreId.value, difficulty.value, customLimitsFromRoute.value, activeModifiers.value)
     await loadArticle(pair.start.title)
   }
 
@@ -617,6 +894,7 @@ function dismissPreview() {
 
 function handleLinkClick(event) {
   dismissPreview()
+  showHintMenu.value = false
   const link = event.target.closest('[data-wiki-title]')
   if (!link || game.isGameOver.value) return
 
@@ -633,7 +911,6 @@ function handleLinkClick(event) {
 function handleLinkHover(event) {
   const link = event.target.closest('[data-wiki-title]')
   if (!link || link === hoveredLink) return
-  if (!link) { dismissPreview(); return }
 
   hoveredLink = link
   clearTimeout(hoverTimer)
@@ -673,11 +950,85 @@ function handleLinkHoverEnd(event) {
 }
 
 async function handleGoBack() {
+  if (game.backDisabled.value) {
+    const reason = game.state.modifiers.includes('noback')
+      ? 'No Back modifier is active!'
+      : `Back is disabled in ${game.GAME_MODES[game.state.mode]?.name || 'this'} mode!`
+    toast.warn(reason)
+    return
+  }
   const title = game.goBack()
   if (title) {
     sound.playBack()
     toast.info('Went back one page')
     await loadArticle(title)
+  }
+}
+
+function useHintAction(type) {
+  if (!game.useHint()) return
+  sound.playHint()
+  showHintMenu.value = false
+
+  if (type === 'category' && game.state.targetArticle) {
+    hintResult.value = { type: 'category', text: `Target category: ${game.state.targetArticle.description || 'Unknown'}` }
+  } else if (type === 'hotcold') {
+    const target = (game.state.targetArticle?.title || '').toLowerCase()
+    const current = (game.state.currentArticle || '').toLowerCase()
+    const prev = game.state.path.length >= 2 ? game.state.path[game.state.path.length - 2].toLowerCase() : ''
+    const currentMatch = target.split(' ').filter(w => current.includes(w)).length
+    const prevMatch = prev ? target.split(' ').filter(w => prev.includes(w)).length : 0
+    if (currentMatch > prevMatch) hintResult.value = { type: 'hotcold', text: 'Getting warmer! You seem to be heading the right way.' }
+    else if (currentMatch < prevMatch) hintResult.value = { type: 'hotcold', text: 'Getting colder... Try a different direction.' }
+    else hintResult.value = { type: 'hotcold', text: 'Neutral -- hard to tell from here.' }
+  }
+  setTimeout(() => hintResult.value = null, 8000)
+}
+
+let pathReplayInterval = null
+function startPathReplay() {
+  if (pathReplayInterval) clearInterval(pathReplayInterval)
+  showPathReplay.value = true
+  pathReplayIndex.value = 0
+  if (game.state.path.length <= 1) return
+  pathReplayInterval = setInterval(() => {
+    if (pathReplayIndex.value < game.state.path.length - 1) {
+      pathReplayIndex.value++
+    } else {
+      clearInterval(pathReplayInterval)
+      pathReplayInterval = null
+    }
+  }, 500)
+}
+
+function generateShareText() {
+  const mode = game.GAME_MODES[game.state.mode]?.name || game.state.mode
+  const won = game.isWon.value
+  const clicks = game.state.clicks
+  const time = game.formattedTime.value
+  const path = game.state.path
+  const bars = path.map((_, i) => {
+    if (i === 0) return '\u{1F7E2}'
+    if (i === path.length - 1 && won) return '\u{1F3C1}'
+    return '\u{1F7E8}'
+  }).join('')
+
+  return [
+    `WikiLink ${mode} ${won ? 'WIN' : 'LOSS'}`,
+    `${clicks} clicks | ${time}`,
+    bars,
+    '',
+    'https://wikilink.fraksis.com',
+  ].join('\n')
+}
+
+async function copyShareCard() {
+  const text = generateShareText()
+  try {
+    await navigator.clipboard.writeText(text)
+    toast.success('Result copied to clipboard!')
+  } catch {
+    toast.warn('Could not copy to clipboard')
   }
 }
 
@@ -718,6 +1069,35 @@ async function shareChallenge() {
   }
 }
 
+async function submitMatchResult() {
+  if (!matchCode.value || !auth.isLoggedIn()) return
+  try {
+    const result = await api.post(`/match/submit/${matchCode.value}`, {
+      clicks: game.state.clicks,
+      time: game.state.elapsed,
+      path: [...game.state.path],
+    })
+    matchResult.value = result
+    if (result.status !== 'finished') {
+      matchPolling.value = true
+      pollMatchResult()
+    }
+  } catch { /* ignore */ }
+}
+
+async function pollMatchResult() {
+  if (!matchCode.value || !matchPolling.value) return
+  try {
+    const result = await api.get(`/match/${matchCode.value}`)
+    matchResult.value = result
+    if (result.status === 'finished') {
+      matchPolling.value = false
+      return
+    }
+  } catch { /* ignore */ }
+  setTimeout(pollMatchResult, 3000)
+}
+
 async function submitDailyScore() {
   if (props.mode !== 'daily' || !auth.isLoggedIn()) return
   try {
@@ -745,7 +1125,7 @@ async function rerollPair() {
   try {
     const pair = await wiki.getRandomPairByGenre(genre.value)
     if (!pair) { toast.error('Could not find a new pair'); return }
-    game.initGame(props.mode, pair.start, pair.end, genreId.value, difficulty.value, customLimitsFromRoute.value)
+    game.initGame(props.mode, pair.start, pair.end, genreId.value, difficulty.value, customLimitsFromRoute.value, activeModifiers.value)
     previewCache = {}
     sound.playStart()
     await loadArticle(pair.start.title)
@@ -801,6 +1181,8 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   clearTimeout(hoverTimer)
+  if (pathReplayInterval) clearInterval(pathReplayInterval)
+  matchPolling.value = false
   game.resetGame()
 })
 </script>

@@ -627,6 +627,253 @@
 .scale-enter-active, .scale-leave-active { transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
 .scale-enter-from, .scale-leave-to { opacity: 0; transform: scale(0.93); }
 
+/* ===== XP BAR ===== */
+.xp-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: #12131c;
+  border: 1px solid #252738;
+  overflow: hidden;
+}
+.xp-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #39ff14, #00e5ff);
+  box-shadow: 0 0 8px rgba(57,255,20,0.4);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ===== ACHIEVEMENT BADGE ===== */
+.achievement-badge {
+  position: relative;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: #12131c;
+  border: 1px solid #252738;
+  transition: all 0.2s;
+  text-align: center;
+}
+.achievement-badge.unlocked {
+  border-color: rgba(57,255,20,0.3);
+  box-shadow: 0 0 15px rgba(57,255,20,0.08);
+}
+.achievement-badge.locked {
+  opacity: 0.4;
+  filter: grayscale(0.8);
+}
+.achievement-badge .badge-icon {
+  font-size: 1.5rem;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+/* ===== COMBO COUNTER ===== */
+.combo-float {
+  position: fixed;
+  z-index: 55;
+  pointer-events: none;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  animation: comboFloat 1s ease-out forwards;
+}
+@keyframes comboFloat {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  50% { opacity: 1; transform: translateY(-30px) scale(1.2); }
+  100% { opacity: 0; transform: translateY(-60px) scale(0.8); }
+}
+
+/* ===== SCREEN SHAKE ===== */
+.screen-shake {
+  animation: screenShake 0.4s ease-out;
+}
+@keyframes screenShake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-4px) translateY(2px); }
+  30% { transform: translateX(4px) translateY(-2px); }
+  45% { transform: translateX(-3px) translateY(1px); }
+  60% { transform: translateX(3px); }
+  75% { transform: translateX(-1px); }
+}
+
+/* ===== RED VIGNETTE ===== */
+.red-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 28;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(255,68,68,0.25) 100%);
+  animation: vignetteFlash 0.6s ease-out forwards;
+}
+@keyframes vignetteFlash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ===== TIMER URGENCY ===== */
+.timer-urgent {
+  animation: timerPulse 0.5s ease-in-out infinite;
+}
+.timer-critical {
+  animation: timerPulse 0.25s ease-in-out infinite;
+}
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ===== LEVEL UP OVERLAY ===== */
+.level-up-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: levelUpFlash 2s ease-out forwards;
+}
+@keyframes levelUpFlash {
+  0% { background: rgba(57,255,20,0.15); }
+  20% { background: rgba(57,255,20,0.05); }
+  100% { background: transparent; }
+}
+
+/* ===== FOG OF WAR MODIFIER ===== */
+.fog-mode .wiki-link {
+  color: transparent !important;
+  text-decoration-color: transparent !important;
+  background: #252738;
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+.fog-mode .wiki-link:hover {
+  color: #39ff14 !important;
+  text-decoration-color: rgba(57,255,20,0.25) !important;
+  background: transparent;
+  text-shadow: 0 0 8px rgba(57,255,20,0.3);
+}
+
+/* ===== BLACKOUT MODIFIER ===== */
+.wiki-link.blackout-disabled {
+  color: #333 !important;
+  text-decoration: line-through !important;
+  text-decoration-color: rgba(255,68,68,0.4) !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+/* ===== MODIFIER CHIP ===== */
+.modifier-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-family: 'Space Mono', monospace;
+  border: 1px solid #252738;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.modifier-chip.active {
+  border-color: rgba(255,191,0,0.4);
+  background: rgba(255,191,0,0.06);
+  color: #ffbf00;
+  box-shadow: 0 0 10px rgba(255,191,0,0.1);
+}
+.modifier-chip:not(.active) {
+  color: #555770;
+}
+.modifier-chip:hover:not(.active) {
+  border-color: #3a3c52;
+  color: #8888a8;
+}
+
+/* ===== ACHIEVEMENT UNLOCK TOAST ===== */
+.achievement-toast {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 75;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  background: #0d0e15;
+  border: 2px solid rgba(255,215,0,0.4);
+  box-shadow: 0 0 30px rgba(255,215,0,0.15), 0 8px 32px rgba(0,0,0,0.6);
+  animation: achievementSlide 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+@keyframes achievementSlide {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-20px) scale(0.9); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* ===== PATH NODE GRAPH ===== */
+.path-node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-family: 'VT323', monospace;
+  border: 2px solid #252738;
+  background: #12131c;
+  transition: all 0.3s;
+}
+.path-node.active {
+  border-color: rgba(57,255,20,0.5);
+  background: rgba(57,255,20,0.1);
+  color: #39ff14;
+  box-shadow: 0 0 10px rgba(57,255,20,0.2);
+}
+.path-edge {
+  width: 20px;
+  height: 2px;
+  background: #252738;
+  transition: background 0.3s;
+}
+.path-edge.active {
+  background: linear-gradient(90deg, #39ff14, #00e5ff);
+  box-shadow: 0 0 6px rgba(57,255,20,0.3);
+}
+
+/* ===== TRENDING TICKER ===== */
+.trending-ticker {
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+}
+@keyframes tickerScroll {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+.trending-ticker-track {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  animation: tickerScroll 35s linear infinite;
+  will-change: transform;
+}
+.trending-ticker:hover .trending-ticker-track {
+  animation-play-state: paused;
+}
+.trending-ticker-set {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+.trending-ticker-item {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 0 1rem;
+}
+
 /* ===== REDUCED MOTION ===== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
