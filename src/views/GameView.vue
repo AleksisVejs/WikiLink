@@ -537,17 +537,60 @@
                   <div class="grid grid-cols-2 gap-2 text-center">
                     <div class="rounded px-2 py-1.5" style="background: rgba(57,255,20,0.03); border: 1px solid rgba(57,255,20,0.1);">
                       <div class="font-pixel text-[6px] text-crt-green/60">YOU</div>
+                      <div v-if="matchResult.you?.username" class="font-mono text-[9px] text-retro-muted truncate mb-0.5">{{ matchResult.you.username }}</div>
                       <div class="font-terminal text-base text-crt-white">{{ matchResult.you?.clicks }} <span class="text-retro-muted text-xs">/ {{ formatLeaderboardTime(matchResult.you?.time || 0) }}</span></div>
                     </div>
                     <div class="rounded px-2 py-1.5" style="background: rgba(180,76,255,0.03); border: 1px solid rgba(180,76,255,0.1);">
                       <div class="font-pixel text-[6px] text-arcade-purple/60">OPP</div>
+                      <div v-if="matchResult.opponent?.username" class="font-mono text-[9px] text-arcade-purple/70 truncate mb-0.5">{{ matchResult.opponent.username }}</div>
                       <div class="font-terminal text-base text-crt-white">{{ matchResult.opponent?.clicks }} <span class="text-retro-muted text-xs">/ {{ formatLeaderboardTime(matchResult.opponent?.time || 0) }}</span></div>
                     </div>
                   </div>
                 </div>
                 <div v-else class="text-center py-1">
-                  <span class="font-mono text-[11px] text-retro-muted animate-blink">Waiting for opponent...</span>
+                  <span class="font-mono text-[11px] text-retro-muted animate-blink">Waiting for {{ matchResult.opponent?.username || 'opponent' }}...</span>
                   <span class="font-terminal text-sm text-arcade-purple ml-2">{{ matchResult.code }}</span>
+                </div>
+              </div>
+
+              <!-- Group lobby result -->
+              <div v-if="lobbyResult" class="rounded-lg px-3 py-2" style="background: #12131c; border: 1px solid rgba(0,229,255,0.2);">
+                <template v-if="lobbyResult.status === 'finished' && lobbyResult.leaderboard?.length">
+                  <div class="flex items-center justify-between gap-2 mb-1.5">
+                    <div class="font-pixel text-[6px] text-crt-cyan tracking-[0.15em]">GROUP LEADERBOARD</div>
+                    <span v-if="lobbyYourRank != null" class="font-mono text-[9px] text-crt-green">You: #{{ lobbyYourRank }}</span>
+                  </div>
+                  <div class="space-y-0.5 font-mono text-[11px] max-h-[220px] overflow-y-auto">
+                    <div v-for="row in lobbyResult.leaderboard" :key="row.user_id"
+                         class="flex items-center gap-2 py-1 rounded px-1"
+                         :class="{ 'bg-crt-green/[0.04] border-l-2 border-l-crt-green': auth.user.value && row.user_id === auth.user.value.id }">
+                      <span class="text-retro-muted w-7 text-right shrink-0 flex items-center justify-end">
+                        <template v-if="row.rank === 1">
+                          <svg class="w-4 h-4 text-arcade-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                          </svg>
+                        </template>
+                        <template v-else-if="row.rank === 2">
+                          <svg class="w-4 h-4 text-retro-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                          </svg>
+                        </template>
+                        <template v-else-if="row.rank === 3">
+                          <svg class="w-4 h-4 text-arcade-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                          </svg>
+                        </template>
+                        <span v-else class="font-terminal text-sm text-retro-muted">#{{ row.rank }}</span>
+                      </span>
+                      <span class="flex-1 truncate" :class="auth.user.value && row.user_id === auth.user.value.id ? 'text-crt-green' : 'text-crt-white'">{{ row.username }}</span>
+                      <span class="text-crt-green shrink-0 tabular-nums">{{ row.clicks }}</span>
+                      <span class="text-retro-muted shrink-0 tabular-nums w-12 text-right">{{ formatLeaderboardTime(row.time) }}</span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center py-1">
+                  <span class="font-mono text-[11px] text-retro-muted animate-blink">Waiting for other players...</span>
+                  <span class="font-terminal text-sm text-crt-cyan ml-2">{{ lobbyResult.code }}</span>
                 </div>
               </div>
             </div>
@@ -716,9 +759,21 @@ const rerolling = ref(false)
 const showConfetti = ref(false)
 const dailyLeaderboard = ref([])
 const matchCode = computed(() => route.query.match || null)
+const lobbyCode = computed(() => route.query.lobby || null)
 const matchResult = ref(null)
 const matchPolling = ref(false)
 let matchPollTimerId = null
+const lobbyResult = ref(null)
+const lobbyPolling = ref(false)
+let lobbyPollTimerId = null
+
+const lobbyYourRank = computed(() => {
+  const lb = lobbyResult.value?.leaderboard
+  const uid = auth.user.value?.id
+  if (!lb || uid == null) return null
+  const row = lb.find(r => r.user_id === uid)
+  return row ? row.rank : null
+})
 const showScreenShake = ref(false)
 const showRedVignette = ref(false)
 const comboDisplay = ref(null)
@@ -823,6 +878,7 @@ watch(() => game.state.status, (val) => {
     setTimeout(() => showConfetti.value = false, 3500)
     submitDailyScore()
     submitMatchResult()
+    submitLobbyResult()
     loadDailyLeaderboard()
     processPostGame(true)
   } else if (val === 'lost') {
@@ -831,6 +887,7 @@ watch(() => game.state.status, (val) => {
     showRedVignette.value = true
     setTimeout(() => { showScreenShake.value = false; showRedVignette.value = false }, 600)
     submitMatchResult()
+    submitLobbyResult()
     loadDailyLeaderboard()
     processPostGame(false)
   }
@@ -1332,6 +1389,35 @@ async function pollMatchResult() {
   matchPollTimerId = setTimeout(pollMatchResult, 3000)
 }
 
+async function submitLobbyResult() {
+  if (!lobbyCode.value || !auth.isLoggedIn()) return
+  try {
+    const result = await api.post(`/lobby/submit/${lobbyCode.value}`, {
+      clicks: game.state.clicks,
+      time: game.state.elapsed,
+      path: [...game.state.path],
+    })
+    lobbyResult.value = result
+    if (result.status !== 'finished') {
+      lobbyPolling.value = true
+      pollLobbyResult()
+    }
+  } catch { /* ignore */ }
+}
+
+async function pollLobbyResult() {
+  if (!lobbyCode.value || !lobbyPolling.value) return
+  try {
+    const result = await api.get(`/lobby/${lobbyCode.value}`)
+    lobbyResult.value = result
+    if (result.status === 'finished') {
+      lobbyPolling.value = false
+      return
+    }
+  } catch { /* ignore */ }
+  lobbyPollTimerId = setTimeout(pollLobbyResult, 3000)
+}
+
 async function submitDailyScore() {
   if (props.mode !== 'daily' || !auth.isLoggedIn()) return
   try {
@@ -1377,6 +1463,10 @@ function confirmQuit() {
 }
 
 function goHome() {
+  matchPolling.value = false
+  if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
+  lobbyPolling.value = false
+  if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
   game.resetGame()
   router.push({ name: 'home' })
 }
@@ -1385,6 +1475,18 @@ async function playAgain() {
   game.resetGame()
   freeplayFinished.value = false
   articleData.value = null
+  matchResult.value = null
+  matchPolling.value = false
+  if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
+  lobbyResult.value = null
+  lobbyPolling.value = false
+  if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
+  const q = { ...route.query }
+  if ('match' in q || 'lobby' in q) {
+    delete q.match
+    delete q.lobby
+    await router.replace({ name: 'game', params: { mode: props.mode }, query: q })
+  }
   await initializeGame()
 }
 
@@ -1417,6 +1519,8 @@ onUnmounted(() => {
   clearTimeout(hoverTimer)
   matchPolling.value = false
   if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
+  lobbyPolling.value = false
+  if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
   game.resetGame()
 })
 </script>

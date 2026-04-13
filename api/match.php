@@ -131,6 +131,19 @@ function submitMatchResult($code, $userId, $clicks, $time, $path) {
     return formatMatchResult($updated, $userId);
 }
 
+function getUsernamesByIds($db, $ids) {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+    if (empty($ids)) return [];
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $db->prepare("SELECT id, username FROM users WHERE id IN ($placeholders)");
+    $stmt->execute($ids);
+    $map = [];
+    while ($row = $stmt->fetch()) {
+        $map[(int)$row['id']] = $row['username'];
+    }
+    return $map;
+}
+
 function getMatchStatus($code, $userId) {
     $code = strtoupper(trim($code));
     ensureMatchTable();
@@ -150,6 +163,9 @@ function getMatchStatus($code, $userId) {
 
 function formatMatchResult($match, $userId) {
     $isP1 = ($match['player1_id'] == $userId);
+    $db = getDb();
+    $names = getUsernamesByIds($db, [$match['player1_id'], $match['player2_id']]);
+    $oppId = $isP1 ? (int)$match['player2_id'] : (int)$match['player1_id'];
 
     $result = [
         'code' => $match['code'],
@@ -158,7 +174,9 @@ function formatMatchResult($match, $userId) {
         'end_title' => $match['end_title'],
     ];
 
+    $uid = (int)$userId;
     $result['you'] = [
+        'username' => isset($names[$uid]) ? $names[$uid] : null,
         'clicks' => $isP1 ? $match['p1_clicks'] : $match['p2_clicks'],
         'time' => $isP1 ? $match['p1_time'] : $match['p2_time'],
         'path' => json_decode($isP1 ? ($match['p1_path'] ?: '[]') : ($match['p2_path'] ?: '[]'), true),
@@ -166,6 +184,7 @@ function formatMatchResult($match, $userId) {
     ];
 
     $result['opponent'] = [
+        'username' => $oppId ? (isset($names[$oppId]) ? $names[$oppId] : null) : null,
         'clicks' => $isP1 ? $match['p2_clicks'] : $match['p1_clicks'],
         'time' => $isP1 ? $match['p2_time'] : $match['p1_time'],
         'submitted' => ($isP1 ? $match['p2_clicks'] : $match['p1_clicks']) !== null,
