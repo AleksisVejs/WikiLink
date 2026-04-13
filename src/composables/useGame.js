@@ -1,5 +1,6 @@
 import { ref, reactive, computed } from 'vue'
 import { utcDateKey } from '../utils/dailySeed.js'
+import { useApi } from './useApi.js'
 
 const GENRES = {
   random:     { id: 'random',     name: 'Random',      emoji: '🎲', shortName: 'Random',  description: 'Anything goes',                searchTerms: null },
@@ -254,6 +255,10 @@ export function useGame() {
     saveStats(result)
     saveHistory(result)
     if (state.mode === 'daily' && result === 'won') saveDailyResult()
+    try {
+      const api = useApi()
+      api.post('/stats/increment', { clicks: state.clicks, won: result === 'won' }).catch(() => {})
+    } catch { /* ignore */ }
   }
 
   function saveStats(result) {
