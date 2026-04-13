@@ -358,7 +358,7 @@
                 </div>
               </div>
               <div v-if="game.state.modifiers.length > 0" class="mt-1 pt-1 border-t border-retro-border/20">
-                <span class="font-mono text-[9px] text-crt-amber">{{ game.state.modifiers.length }} modifier(s) active = {{ (Math.pow(1.25, game.state.modifiers.length)).toFixed(2) }}x bonus</span>
+                <span class="font-mono text-[9px] text-crt-amber">{{ game.state.modifiers.length }} modifier(s) active = {{ (1 + 0.25 * game.state.modifiers.length).toFixed(2) }}x bonus</span>
               </div>
             </div>
 
@@ -609,6 +609,7 @@ const achievementToasts = ref([])
 const showLevelUp = ref(false)
 const showHintMenu = ref(false)
 const hintResult = ref(null)
+const targetCategoriesCache = ref(null)
 const showPathReplay = ref(false)
 const pathReplayIndex = ref(0)
 const activeModifiers = computed(() => {
@@ -800,6 +801,7 @@ async function initializeGame() {
   freeplayFinished.value = false
   bootStep.value = 0
   previewCache = {}
+  targetCategoriesCache.value = null
 
   setTimeout(() => bootStep.value = 1, 300)
   setTimeout(() => bootStep.value = 2, 800)
@@ -973,7 +975,24 @@ async function handleGoBack() {
   }
 }
 
-function useHintAction(type) {
+async function fetchArticleCategories(title) {
+  try {
+    const params = new URLSearchParams({
+      action: 'query', titles: title, prop: 'categories',
+      cllimit: '50', clshow: '!hidden',
+      format: 'json', origin: '*',
+    })
+    const res = await fetch(`https://en.wikipedia.org/w/api.php?${params}`)
+    if (!res.ok) return []
+    const data = await res.json()
+    const page = Object.values(data.query?.pages || {})[0]
+    return (page?.categories || []).map(c => c.title.replace('Category:', ''))
+  } catch {
+    return []
+  }
+}
+
+async function useHintAction(type) {
   if (!game.useHint()) return
   sound.playHint()
   showHintMenu.value = false
@@ -981,14 +1000,32 @@ function useHintAction(type) {
   if (type === 'category' && game.state.targetArticle) {
     hintResult.value = { type: 'category', text: `Target category: ${game.state.targetArticle.description || 'Unknown'}` }
   } else if (type === 'hotcold') {
-    const target = (game.state.targetArticle?.title || '').toLowerCase()
-    const current = (game.state.currentArticle || '').toLowerCase()
-    const prev = game.state.path.length >= 2 ? game.state.path[game.state.path.length - 2].toLowerCase() : ''
-    const currentMatch = target.split(' ').filter(w => current.includes(w)).length
-    const prevMatch = prev ? target.split(' ').filter(w => prev.includes(w)).length : 0
-    if (currentMatch > prevMatch) hintResult.value = { type: 'hotcold', text: 'Getting warmer! You seem to be heading the right way.' }
-    else if (currentMatch < prevMatch) hintResult.value = { type: 'hotcold', text: 'Getting colder... Try a different direction.' }
-    else hintResult.value = { type: 'hotcold', text: 'Neutral -- hard to tell from here.' }
+    const targetTitle = game.state.targetArticle?.title
+    if (!targetTitle) return
+
+    const currentLinks = articleData.value?.links || []
+    const targetNorm = targetTitle.replace(/_/g, ' ').toLowerCase()
+
+    if (currentLinks.some(l => l.replace(/_/g, ' ').toLowerCase() === targetNorm)) {
+      hintResult.value = { type: 'hotcold', text: 'BURNING HOT! The target is linked on this page!' }
+    } else {
+      hintResult.value = { type: 'hotcold', text: 'Checking temperature...' }
+      try {
+        if (!targetCategoriesCache.value) {
+          targetCategoriesCache.value = await fetchArticleCategories(targetTitle)
+        }
+        const currentCats = await fetchArticleCategories(game.state.currentArticle)
+        const targetSet = new Set(targetCategoriesCache.value.map(c => c.toLowerCase()))
+        const overlap = currentCats.filter(c => targetSet.has(c.toLowerCase())).length
+
+        if (overlap >= 5) hintResult.value = { type: 'hotcold', text: `Hot! You share ${overlap} categories with the target.` }
+        else if (overlap >= 3) hintResult.value = { type: 'hotcold', text: `Warm. You share ${overlap} categories with the target.` }
+        else if (overlap >= 1) hintResult.value = { type: 'hotcold', text: `Lukewarm. You share ${overlap} categor${overlap === 1 ? 'y' : 'ies'} with the target.` }
+        else hintResult.value = { type: 'hotcold', text: 'Cold. No shared categories with the target.' }
+      } catch {
+        hintResult.value = { type: 'hotcold', text: 'Could not determine temperature.' }
+      }
+    }
   }
   setTimeout(() => hintResult.value = null, 8000)
 }

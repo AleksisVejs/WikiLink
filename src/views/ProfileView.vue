@@ -13,184 +13,617 @@
         <div class="flex items-center gap-2">
           <router-link to="/" class="btn-retro-ghost flex items-center gap-1.5 px-2.5">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" />
             </svg>
-            <span class="hidden sm:inline font-mono text-[10px]">BACK</span>
+            <span class="hidden sm:inline font-mono text-[10px]">HOME</span>
           </router-link>
-          <button @click="handleLogout" class="btn-retro-ghost flex items-center gap-1.5 px-2.5" title="Logout">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
+          <template v-if="isOwnProfile && auth.user.value">
+            <button @click="handleLogout" class="btn-retro-ghost flex items-center gap-1.5 px-2.5" title="Logout">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          </template>
         </div>
       </div>
     </header>
 
-    <main class="flex-1 flex flex-col items-center px-3 sm:px-4 py-6 sm:py-10 relative z-10">
-      <div class="max-w-lg w-full space-y-5">
+    <!-- Loading state -->
+    <div v-if="pageLoading" class="flex-1 flex items-center justify-center">
+      <div class="text-center">
+        <div class="w-8 h-8 border-2 border-crt-green/30 border-t-crt-green rounded-full animate-spin mx-auto mb-3"></div>
+        <span class="font-mono text-xs text-retro-muted">Loading profile...</span>
+      </div>
+    </div>
 
-        <!-- Profile header -->
-        <div class="rounded-xl p-5 sm:p-6 animate-fade-in" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
-          <div class="flex items-center gap-4 mb-4">
-            <div class="w-14 h-14 rounded-xl flex items-center justify-center text-2xl" style="background: rgba(57,255,20,0.08); border: 1.5px solid rgba(57,255,20,0.25);">
-              <svg class="w-7 h-7 text-crt-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+    <!-- Not found state -->
+    <div v-else-if="notFound" class="flex-1 flex items-center justify-center px-4">
+      <div class="text-center">
+        <div class="font-terminal text-6xl text-retro-muted/20 mb-3">404</div>
+        <div class="font-pixel text-[9px] text-retro-muted tracking-wider mb-4">USER NOT FOUND</div>
+        <router-link to="/" class="btn-retro-ghost inline-flex items-center gap-1.5 px-4 py-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span class="font-mono text-[10px]">BACK TO HOME</span>
+        </router-link>
+      </div>
+    </div>
+
+    <!-- Main profile content -->
+    <main v-else class="flex-1 flex flex-col items-center px-3 sm:px-4 py-6 sm:py-10 relative z-10">
+      <div class="max-w-2xl w-full space-y-4">
+
+        <!-- Profile header card -->
+        <div class="rounded-xl p-5 sm:p-6 animate-fade-in"
+             style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+          <div class="flex items-start gap-4 mb-5">
+            <!-- Avatar -->
+            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl flex items-center justify-center shrink-0"
+                 style="background: rgba(57,255,20,0.08); border: 1.5px solid rgba(57,255,20,0.25);">
+              <span class="font-pixel text-2xl sm:text-3xl text-crt-green">{{ profileInitial }}</span>
             </div>
-            <div>
-              <h1 class="font-pixel text-sm sm:text-base text-crt-green tracking-wider">{{ auth.user.value?.username }}</h1>
-              <p v-if="memberSince" class="font-mono text-[10px] text-retro-muted mt-0.5">Member since {{ memberSince }}</p>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h1 class="font-pixel text-sm sm:text-base text-crt-green tracking-wider">{{ profileData.username }}</h1>
+                <span v-if="isOwnProfile" class="font-mono text-[9px] text-crt-cyan/60 px-1.5 py-0.5 rounded border border-crt-cyan/20 bg-crt-cyan/5">YOU</span>
+              </div>
+              <p v-if="profileMemberSince" class="font-mono text-[10px] text-retro-muted mt-0.5">Member since {{ profileMemberSince }}</p>
+
+              <!-- XP / Level (own profile only) -->
+              <div v-if="isOwnProfile" class="mt-2">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="font-pixel text-[8px] text-crt-green tracking-wider">LV {{ progression.level.value }}</span>
+                  <span class="font-mono text-[9px] text-retro-muted">{{ progression.currentXp.value }} / {{ progression.nextLevelXp.value }} XP</span>
+                </div>
+                <div class="xp-bar">
+                  <div class="xp-bar-fill" :style="{ width: (progression.progress.value * 100) + '%' }"></div>
+                </div>
+              </div>
+
+              <!-- Friend action (other profile) -->
+              <div v-if="!isOwnProfile && auth.user.value" class="mt-2.5 flex items-center gap-2">
+                <template v-if="friendshipStatus === 'accepted'">
+                  <span class="font-mono text-[10px] text-crt-green flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                    Friends
+                  </span>
+                  <button @click="handleRemoveFriend" class="btn-retro-ghost px-2 py-1 font-mono text-[9px] text-crt-red/70 hover:text-crt-red">Remove</button>
+                </template>
+                <template v-else-if="friendshipStatus === 'pending' && friendshipDirection === 'sent'">
+                  <span class="font-mono text-[10px] text-crt-amber flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Request sent
+                  </span>
+                </template>
+                <template v-else-if="friendshipStatus === 'pending' && friendshipDirection === 'received'">
+                  <button @click="handleAcceptFromProfile" class="btn-retro-primary px-3 py-1.5 font-pixel text-[7px]">ACCEPT REQUEST</button>
+                </template>
+                <template v-else>
+                  <button @click="handleAddFriend" :disabled="friendActionLoading" class="btn-retro-primary px-3 py-1.5 font-pixel text-[7px]">
+                    {{ friendActionLoading ? 'SENDING...' : 'ADD FRIEND' }}
+                  </button>
+                </template>
+                <!-- Invite to 1v1 button -->
+                <button v-if="friendshipStatus === 'accepted'" @click="inviteTo1v1"
+                        class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-pixel text-[7px] tracking-wider transition-all duration-200"
+                        style="border: 1.5px solid rgba(180,76,255,0.4); color: #b44cff; background: rgba(180,76,255,0.06);"
+                        @mouseenter="$event.currentTarget.style.background='rgba(180,76,255,0.12)'"
+                        @mouseleave="$event.currentTarget.style.background='rgba(180,76,255,0.06)'">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  1v1
+                </button>
+              </div>
             </div>
           </div>
-          <div class="flex items-center gap-6">
-            <div class="text-center">
-              <div class="font-terminal text-xl text-crt-amber">{{ auth.streak.value }}</div>
-              <div class="font-mono text-[8px] text-retro-muted">DAILY STREAK</div>
+
+          <!-- Stats row -->
+          <div class="flex items-center gap-4 sm:gap-6 pt-4 border-t border-retro-border/20">
+            <div class="text-center flex-1">
+              <div class="font-terminal text-xl sm:text-2xl text-crt-amber">{{ profileStats.streak }}</div>
+              <div class="font-mono text-[8px] text-retro-muted tracking-wider">DAILY STREAK</div>
             </div>
-            <div class="w-px h-8 bg-retro-border/30"></div>
-            <div class="text-center">
-              <div class="font-terminal text-xl text-crt-cyan">{{ totalGamesPlayed }}</div>
-              <div class="font-mono text-[8px] text-retro-muted">GAMES PLAYED</div>
+            <div class="w-px h-10 bg-retro-border/20"></div>
+            <div class="text-center flex-1">
+              <div class="font-terminal text-xl sm:text-2xl text-crt-cyan">{{ profileStats.totalGames }}</div>
+              <div class="font-mono text-[8px] text-retro-muted tracking-wider">GAMES PLAYED</div>
             </div>
-            <div class="w-px h-8 bg-retro-border/30"></div>
-            <div class="text-center">
-              <div class="font-terminal text-xl text-crt-green">{{ totalWins }}</div>
-              <div class="font-mono text-[8px] text-retro-muted">WINS</div>
+            <div class="w-px h-10 bg-retro-border/20"></div>
+            <div class="text-center flex-1">
+              <div class="font-terminal text-xl sm:text-2xl text-crt-green">{{ profileStats.totalWins }}</div>
+              <div class="font-mono text-[8px] text-retro-muted tracking-wider">WINS</div>
+            </div>
+            <div class="w-px h-10 bg-retro-border/20"></div>
+            <div class="text-center flex-1">
+              <div class="font-terminal text-xl sm:text-2xl" :class="winRate > 60 ? 'text-crt-green' : winRate > 40 ? 'text-crt-amber' : 'text-crt-red'">{{ winRate }}%</div>
+              <div class="font-mono text-[8px] text-retro-muted tracking-wider">WIN RATE</div>
             </div>
           </div>
         </div>
 
-        <!-- Change Password -->
-        <div class="rounded-xl overflow-hidden animate-slide-up" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
-          <button @click="showChangePassword = !showChangePassword"
-                  class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-retro-surface/30 transition-colors">
-            <div class="flex items-center gap-2.5">
+        <!-- Tab navigation -->
+        <div class="flex items-center gap-1 px-1 animate-fade-in">
+          <button v-for="tab in availableTabs" :key="tab.id"
+                  @click="activeTab = tab.id"
+                  class="flex items-center gap-1.5 px-3 py-2 rounded-lg font-pixel text-[7px] sm:text-[8px] tracking-wider transition-all duration-200"
+                  :class="activeTab === tab.id
+                    ? 'text-crt-green bg-crt-green/8 border border-crt-green/25'
+                    : 'text-retro-muted hover:text-crt-white border border-transparent'">
+            <span v-html="tab.icon" class="text-sm"></span>
+            <span class="hidden sm:inline">{{ tab.label }}</span>
+            <span v-if="tab.badge" class="font-mono text-[8px] px-1 py-0.5 rounded bg-crt-red/20 text-crt-red ml-0.5">{{ tab.badge }}</span>
+          </button>
+        </div>
+
+        <!-- Tab: Game Stats -->
+        <div v-if="activeTab === 'stats'" class="space-y-3 animate-fade-in">
+          <!-- Mode stats -->
+          <div v-if="hasDetailedStats" class="space-y-3">
+            <div v-for="(modeStats, modeId) in profileDetailedStats.modes" :key="modeId"
+                 class="rounded-xl p-4 sm:p-5" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+              <h3 class="font-pixel text-[8px] text-crt-cyan mb-3 tracking-[0.2em]">{{ getModeLabel(modeId) }}</h3>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="text-center">
+                  <div class="font-terminal text-xl text-crt-green tabular-nums">{{ modeStats.gamesWon }}</div>
+                  <div class="font-mono text-[9px] text-retro-muted">WON</div>
+                </div>
+                <div class="text-center">
+                  <div class="font-terminal text-xl text-crt-red tabular-nums">{{ modeStats.gamesLost || 0 }}</div>
+                  <div class="font-mono text-[9px] text-retro-muted">LOST</div>
+                </div>
+                <div class="text-center">
+                  <div class="font-terminal text-xl text-crt-amber tabular-nums">{{ modeStats.bestClicks ?? '-' }}</div>
+                  <div class="font-mono text-[9px] text-retro-muted">BEST CLICKS</div>
+                </div>
+                <div class="text-center">
+                  <div class="font-terminal text-xl text-crt-cyan tabular-nums">{{ formatTime(modeStats.bestTime) }}</div>
+                  <div class="font-mono text-[9px] text-retro-muted">BEST TIME</div>
+                </div>
+              </div>
+              <div v-if="modeStats.bestStreak" class="mt-3 pt-3 border-t border-retro-border/20 flex items-center justify-center gap-1.5">
+                <span class="font-mono text-[9px] text-retro-muted">BEST STREAK:</span>
+                <span class="font-terminal text-sm text-arcade-gold">{{ modeStats.bestStreak }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Genre stats -->
+          <div v-if="hasGenreStats" class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+            <div class="px-4 sm:px-5 py-3 border-b border-retro-border/20">
+              <h3 class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">GENRE BREAKDOWN</h3>
+            </div>
+            <div class="divide-y divide-retro-border/10">
+              <div v-for="(gs, gId) in profileDetailedStats.genres" :key="gId"
+                   class="px-4 sm:px-5 py-3 flex items-center justify-between hover:bg-retro-surface/10 transition-colors">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-base">{{ getGenreEmoji(gId) }}</span>
+                  <span class="font-mono text-[11px] text-crt-white">{{ getGenreLabel(gId) }}</span>
+                </div>
+                <div class="flex items-center gap-4 text-center">
+                  <div>
+                    <div class="font-terminal text-sm text-crt-green tabular-nums">{{ gs.gamesWon }}</div>
+                    <div class="font-mono text-[8px] text-retro-muted">W</div>
+                  </div>
+                  <div>
+                    <div class="font-terminal text-sm text-crt-red tabular-nums">{{ gs.gamesLost || 0 }}</div>
+                    <div class="font-mono text-[8px] text-retro-muted">L</div>
+                  </div>
+                  <div>
+                    <div class="font-terminal text-sm text-crt-cyan tabular-nums">{{ gs.gamesPlayed }}</div>
+                    <div class="font-mono text-[8px] text-retro-muted">GP</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Achievements (own profile) -->
+          <div v-if="isOwnProfile" class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+            <div class="px-4 sm:px-5 py-3 border-b border-retro-border/20 flex items-center justify-between">
+              <h3 class="font-pixel text-[8px] text-arcade-gold tracking-[0.2em]">ACHIEVEMENTS</h3>
+              <span class="font-terminal text-sm text-arcade-gold">{{ achievements.unlockedCount.value }} / {{ achievements.totalCount.value }}</span>
+            </div>
+            <div class="p-4 sm:p-5 grid grid-cols-3 sm:grid-cols-4 gap-2">
+              <div v-for="badge in achievements.getAllAchievements()" :key="badge.id"
+                   class="achievement-badge" :class="badge.unlocked ? 'unlocked' : 'locked'"
+                   :title="badge.unlocked ? badge.description : '???'">
+                <span class="badge-icon" v-html="badge.icon"></span>
+                <div class="font-pixel text-[6px] tracking-wider" :class="badge.unlocked ? 'text-arcade-gold' : 'text-retro-muted/40'">{{ badge.unlocked ? badge.name : '???' }}</div>
+                <div v-if="badge.unlocked" class="font-mono text-[8px] text-crt-green mt-0.5">+{{ badge.xp }} XP</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div v-if="!hasDetailedStats && !hasGenreStats" class="text-center py-12">
+            <div class="font-pixel text-[8px] text-retro-muted/50 mb-2">NO STATS YET</div>
+            <p class="font-mono text-xs text-retro-muted/30">{{ isOwnProfile ? 'Play some games to see your stats here' : 'This player hasn\'t played any games yet' }}</p>
+          </div>
+        </div>
+
+        <!-- Tab: Game History (own profile only) -->
+        <div v-if="activeTab === 'history'" class="animate-fade-in">
+          <div v-if="history.length" class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+            <div class="divide-y divide-retro-border/10">
+              <div v-for="(entry, idx) in history" :key="idx"
+                   class="px-4 sm:px-5 py-3 flex items-center gap-3 hover:bg-retro-surface/10 transition-colors">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
+                     :style="entry.result === 'won' ? 'background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.2);' : entry.result === 'finished' ? 'background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.2);' : 'background: rgba(255,68,68,0.08); border: 1px solid rgba(255,68,68,0.2);'">
+                  <span v-html="entry.result === 'won' ? '&#10003;' : entry.result === 'finished' ? '&#10148;' : '&#10007;'"></span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <span class="font-pixel text-[6px] tracking-wider"
+                          :class="entry.result === 'won' ? 'text-crt-green' : entry.result === 'finished' ? 'text-crt-cyan' : 'text-crt-red'">{{ getModeLabel(entry.mode) }}</span>
+                    <span class="font-mono text-[9px] text-retro-muted/50">{{ formatDate(entry.date) }}</span>
+                  </div>
+                  <p class="font-mono text-[10px] text-retro-muted truncate">{{ entry.start }}{{ entry.target ? ' -> ' + entry.target : '' }}</p>
+                </div>
+                <div class="text-right shrink-0">
+                  <div class="font-terminal text-sm text-crt-white tabular-nums">{{ entry.clicks }} clicks</div>
+                  <div class="font-mono text-[9px] text-retro-muted">{{ formatTime(entry.time) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-center py-12">
+            <div class="font-pixel text-[8px] text-retro-muted/50 mb-2">NO HISTORY</div>
+            <p class="font-mono text-xs text-retro-muted/30">Your recent games will appear here</p>
+          </div>
+        </div>
+
+        <!-- Tab: Friends -->
+        <div v-if="activeTab === 'friends'" class="space-y-3 animate-fade-in">
+          <!-- Add friend form (own profile) -->
+          <div v-if="isOwnProfile" class="rounded-xl p-4 sm:p-5" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+            <div class="flex items-center gap-2.5 mb-3">
               <div class="w-1 h-4 rounded-full bg-crt-cyan"></div>
-              <span class="font-pixel text-[8px] text-crt-cyan tracking-[0.2em]">CHANGE PASSWORD</span>
+              <span class="font-pixel text-[8px] text-crt-cyan tracking-[0.2em]">ADD FRIEND</span>
             </div>
-            <svg class="w-4 h-4 text-retro-muted transition-transform" :class="{ 'rotate-180': showChangePassword }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <form v-if="showChangePassword" @submit.prevent="handleChangePassword" class="px-5 pb-5 space-y-3 border-t border-retro-border/20 pt-4">
-            <div>
-              <label class="font-mono text-[10px] text-retro-muted block mb-1">Current Password</label>
-              <div class="relative">
-                <input v-model="currentPassword" :type="showCurrentPw ? 'text' : 'password'" required autocomplete="current-password"
-                       class="w-full px-3 py-2 pr-10 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
-                <button type="button" @click="showCurrentPw = !showCurrentPw" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-retro-muted hover:text-crt-white transition-colors" tabindex="-1">
-                  <svg v-if="!showCurrentPw" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div>
-              <label class="font-mono text-[10px] text-retro-muted block mb-1">New Password</label>
-              <div class="relative">
-                <input v-model="newPassword" :type="showNewPw ? 'text' : 'password'" required minlength="6" autocomplete="new-password"
-                       class="w-full px-3 py-2 pr-10 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
-                <button type="button" @click="showNewPw = !showNewPw" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-retro-muted hover:text-crt-white transition-colors" tabindex="-1">
-                  <svg v-if="!showNewPw" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div>
-              <label class="font-mono text-[10px] text-retro-muted block mb-1">Confirm New Password</label>
-              <div class="relative">
-                <input v-model="confirmNewPassword" :type="showConfirmNewPw ? 'text' : 'password'" required minlength="6" autocomplete="new-password"
-                       class="w-full px-3 py-2 pr-10 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
-                <button type="button" @click="showConfirmNewPw = !showConfirmNewPw" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-retro-muted hover:text-crt-white transition-colors" tabindex="-1">
-                  <svg v-if="!showConfirmNewPw" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div v-if="changePasswordError" class="font-mono text-[11px] text-crt-red">{{ changePasswordError }}</div>
-            <div v-if="changePasswordSuccess" class="font-mono text-[11px] text-crt-green">{{ changePasswordSuccess }}</div>
-            <button type="submit" :disabled="changingPassword" class="btn-retro-primary w-full !py-2.5">
-              {{ changingPassword ? 'SAVING...' : 'UPDATE PASSWORD' }}
-            </button>
-          </form>
-        </div>
-
-        <!-- Danger Zone -->
-        <div class="rounded-xl overflow-hidden animate-slide-up" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid rgba(255,68,68,0.2);">
-          <button @click="showDeleteSection = !showDeleteSection"
-                  class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-crt-red/5 transition-colors">
-            <div class="flex items-center gap-2.5">
-              <div class="w-1 h-4 rounded-full bg-crt-red"></div>
-              <span class="font-pixel text-[8px] text-crt-red tracking-[0.2em]">DELETE ACCOUNT</span>
-            </div>
-            <svg class="w-4 h-4 text-crt-red/50 transition-transform" :class="{ 'rotate-180': showDeleteSection }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <div v-if="showDeleteSection" class="px-5 pb-5 border-t border-crt-red/10 pt-4">
-            <p class="font-mono text-[11px] text-retro-muted mb-4 leading-relaxed">
-              This will permanently delete your account, all your daily scores, and leaderboard entries. This action cannot be undone.
-            </p>
-            <form @submit.prevent="handleDeleteAccount" class="space-y-3">
-              <div>
-                <label class="font-mono text-[10px] text-retro-muted block mb-1">Enter your password to confirm</label>
-                <div class="relative">
-                  <input v-model="deletePassword" :type="showDeletePw ? 'text' : 'password'" required autocomplete="current-password"
-                         class="w-full px-3 py-2 pr-10 rounded-lg font-mono text-sm bg-[#12131c] border border-crt-red/20 text-crt-white focus:border-crt-red focus:outline-none" />
-                  <button type="button" @click="showDeletePw = !showDeletePw" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-retro-muted hover:text-crt-white transition-colors" tabindex="-1">
-                    <svg v-if="!showDeletePw" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+            <div class="flex gap-2">
+              <div class="flex-1 relative">
+                <input v-model="friendSearchQuery" type="text" placeholder="Search by username..."
+                       @input="debouncedSearch" @focus="showSearchResults = true"
+                       class="w-full px-3 py-2 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
+                <!-- Search results dropdown -->
+                <div v-if="showSearchResults && searchResults.length > 0"
+                     class="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-hidden z-30"
+                     style="background: #12131c; border: 1.5px solid #252738; box-shadow: 0 8px 24px rgba(0,0,0,0.6);">
+                  <button v-for="u in searchResults" :key="u.id"
+                          @click="sendFriendRequest(u.username)"
+                          class="w-full px-3 py-2.5 flex items-center justify-between hover:bg-retro-surface/20 transition-colors text-left">
+                    <div class="flex items-center gap-2">
+                      <div class="w-7 h-7 rounded-lg flex items-center justify-center font-pixel text-[9px] text-crt-green"
+                           style="background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.2);">
+                        {{ u.username.charAt(0).toUpperCase() }}
+                      </div>
+                      <span class="font-mono text-[11px] text-crt-white">{{ u.username }}</span>
+                    </div>
+                    <svg class="w-4 h-4 text-crt-cyan/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                     </svg>
                   </button>
                 </div>
               </div>
-              <div v-if="deleteError" class="font-mono text-[11px] text-crt-red">{{ deleteError }}</div>
-              <button type="submit" :disabled="deleting"
-                      class="w-full py-2.5 rounded-lg font-pixel text-[8px] tracking-wider transition-all duration-200"
-                      style="background: linear-gradient(180deg, #ff4444, #cc2222); border: 1.5px solid #ff4444; color: white; box-shadow: 0 0 15px rgba(255,68,68,0.2);">
-                {{ deleting ? 'DELETING...' : 'PERMANENTLY DELETE ACCOUNT' }}
+              <button @click="sendFriendRequest(friendSearchQuery)" :disabled="!friendSearchQuery.trim() || friendsComposable.loading.value"
+                      class="btn-retro-primary px-4 py-2 font-pixel text-[7px] shrink-0">
+                {{ friendsComposable.loading.value ? '...' : 'ADD' }}
+              </button>
+            </div>
+            <div v-if="friendError" class="font-mono text-[11px] text-crt-red mt-2">{{ friendError }}</div>
+            <div v-if="friendSuccess" class="font-mono text-[11px] text-crt-green mt-2">{{ friendSuccess }}</div>
+          </div>
+
+          <!-- Pending requests (own profile) -->
+          <div v-if="isOwnProfile && friendsComposable.incomingRequests.value.length > 0"
+               class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid rgba(255,191,0,0.25);">
+            <div class="px-4 sm:px-5 py-3 border-b border-retro-border/20 flex items-center gap-2.5">
+              <div class="w-1 h-4 rounded-full bg-crt-amber"></div>
+              <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">PENDING REQUESTS</span>
+              <span class="font-mono text-[9px] text-crt-amber/60">{{ friendsComposable.incomingRequests.value.length }}</span>
+            </div>
+            <div class="divide-y divide-retro-border/10">
+              <div v-for="req in friendsComposable.incomingRequests.value" :key="req.request_id"
+                   class="px-4 sm:px-5 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center font-pixel text-[9px] text-crt-amber"
+                       style="background: rgba(255,191,0,0.08); border: 1px solid rgba(255,191,0,0.2);">
+                    {{ req.username.charAt(0).toUpperCase() }}
+                  </div>
+                  <router-link :to="`/profile/${req.username}`" class="font-mono text-[11px] text-crt-white hover:text-crt-cyan transition-colors">
+                    {{ req.username }}
+                  </router-link>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <button @click="handleAcceptRequest(req.request_id)"
+                          class="px-2.5 py-1.5 rounded-lg font-pixel text-[7px] text-crt-green tracking-wider transition-all"
+                          style="border: 1px solid rgba(57,255,20,0.3); background: rgba(57,255,20,0.06);">ACCEPT</button>
+                  <button @click="handleDeclineRequest(req.request_id)"
+                          class="px-2.5 py-1.5 rounded-lg font-pixel text-[7px] text-crt-red/70 tracking-wider transition-all"
+                          style="border: 1px solid rgba(255,68,68,0.2); background: rgba(255,68,68,0.04);">DECLINE</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Friends list -->
+          <div class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+            <div class="px-4 sm:px-5 py-3 border-b border-retro-border/20 flex items-center gap-2.5">
+              <div class="w-1 h-4 rounded-full bg-crt-green"></div>
+              <span class="font-pixel text-[8px] text-crt-green tracking-[0.2em]">FRIENDS</span>
+              <span class="font-mono text-[9px] text-retro-muted">{{ friendsComposable.friends.value.length }}</span>
+            </div>
+            <div v-if="friendsComposable.friends.value.length > 0" class="divide-y divide-retro-border/10">
+              <div v-for="friend in friendsComposable.friends.value" :key="friend.friendship_id"
+                   class="px-4 sm:px-5 py-3 flex items-center justify-between hover:bg-retro-surface/10 transition-colors">
+                <router-link :to="`/profile/${friend.username}`" class="flex items-center gap-3 min-w-0 flex-1">
+                  <div class="w-9 h-9 rounded-lg flex items-center justify-center font-pixel text-[10px] text-crt-green shrink-0"
+                       style="background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.2);">
+                    {{ friend.username.charAt(0).toUpperCase() }}
+                  </div>
+                  <div class="min-w-0">
+                    <div class="font-mono text-[11px] text-crt-white truncate hover:text-crt-cyan transition-colors">{{ friend.username }}</div>
+                    <div class="font-mono text-[9px] text-retro-muted">
+                      {{ friend.total_wins }}W / {{ friend.total_games }}G
+                    </div>
+                  </div>
+                </router-link>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button @click="inviteFriendTo1v1(friend.username)" title="Invite to 1v1"
+                          class="p-1.5 rounded-lg transition-all"
+                          style="border: 1px solid rgba(180,76,255,0.3); background: rgba(180,76,255,0.06);"
+                          @mouseenter="$event.currentTarget.style.background='rgba(180,76,255,0.15)'"
+                          @mouseleave="$event.currentTarget.style.background='rgba(180,76,255,0.06)'">
+                    <svg class="w-3.5 h-3.5 text-arcade-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </button>
+                  <button v-if="isOwnProfile" @click="handleRemoveFriendById(friend.friendship_id)" title="Remove friend"
+                          class="p-1.5 rounded-lg transition-all"
+                          style="border: 1px solid rgba(255,68,68,0.2); background: rgba(255,68,68,0.04);"
+                          @mouseenter="$event.currentTarget.style.background='rgba(255,68,68,0.12)'"
+                          @mouseleave="$event.currentTarget.style.background='rgba(255,68,68,0.04)'">
+                    <svg class="w-3.5 h-3.5 text-crt-red/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div v-else class="px-4 sm:px-5 py-8 text-center">
+              <div class="font-pixel text-[8px] text-retro-muted/50 mb-2">NO FRIENDS YET</div>
+              <p class="font-mono text-xs text-retro-muted/30">{{ isOwnProfile ? 'Search for players above to add friends' : 'This player hasn\'t added any friends yet' }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Settings (own profile only) -->
+        <div v-if="activeTab === 'settings'" class="space-y-3 animate-fade-in">
+          <!-- Change Password -->
+          <div class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+            <button @click="showChangePassword = !showChangePassword"
+                    class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-retro-surface/30 transition-colors">
+              <div class="flex items-center gap-2.5">
+                <div class="w-1 h-4 rounded-full bg-crt-cyan"></div>
+                <span class="font-pixel text-[8px] text-crt-cyan tracking-[0.2em]">CHANGE PASSWORD</span>
+              </div>
+              <svg class="w-4 h-4 text-retro-muted transition-transform" :class="{ 'rotate-180': showChangePassword }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <form v-if="showChangePassword" @submit.prevent="handleChangePassword" class="px-5 pb-5 space-y-3 border-t border-retro-border/20 pt-4">
+              <div>
+                <label class="font-mono text-[10px] text-retro-muted block mb-1">Current Password</label>
+                <input v-model="currentPassword" type="password" required autocomplete="current-password"
+                       class="w-full px-3 py-2 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
+              </div>
+              <div>
+                <label class="font-mono text-[10px] text-retro-muted block mb-1">New Password</label>
+                <input v-model="newPassword" type="password" required minlength="6" autocomplete="new-password"
+                       class="w-full px-3 py-2 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
+              </div>
+              <div>
+                <label class="font-mono text-[10px] text-retro-muted block mb-1">Confirm New Password</label>
+                <input v-model="confirmNewPassword" type="password" required minlength="6" autocomplete="new-password"
+                       class="w-full px-3 py-2 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
+              </div>
+              <div v-if="changePasswordError" class="font-mono text-[11px] text-crt-red">{{ changePasswordError }}</div>
+              <div v-if="changePasswordSuccess" class="font-mono text-[11px] text-crt-green">{{ changePasswordSuccess }}</div>
+              <button type="submit" :disabled="changingPassword" class="btn-retro-primary w-full !py-2.5">
+                {{ changingPassword ? 'SAVING...' : 'UPDATE PASSWORD' }}
               </button>
             </form>
+          </div>
+
+          <!-- Danger Zone -->
+          <div class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid rgba(255,68,68,0.2);">
+            <button @click="showDeleteSection = !showDeleteSection"
+                    class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-crt-red/5 transition-colors">
+              <div class="flex items-center gap-2.5">
+                <div class="w-1 h-4 rounded-full bg-crt-red"></div>
+                <span class="font-pixel text-[8px] text-crt-red tracking-[0.2em]">DELETE ACCOUNT</span>
+              </div>
+              <svg class="w-4 h-4 text-crt-red/50 transition-transform" :class="{ 'rotate-180': showDeleteSection }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div v-if="showDeleteSection" class="px-5 pb-5 border-t border-crt-red/10 pt-4">
+              <p class="font-mono text-[11px] text-retro-muted mb-4 leading-relaxed">
+                This will permanently delete your account, all your daily scores, and leaderboard entries. This action cannot be undone.
+              </p>
+              <form @submit.prevent="handleDeleteAccount" class="space-y-3">
+                <div>
+                  <label class="font-mono text-[10px] text-retro-muted block mb-1">Enter your password to confirm</label>
+                  <input v-model="deletePassword" type="password" required autocomplete="current-password"
+                         class="w-full px-3 py-2 rounded-lg font-mono text-sm bg-[#12131c] border border-crt-red/20 text-crt-white focus:border-crt-red focus:outline-none" />
+                </div>
+                <div v-if="deleteError" class="font-mono text-[11px] text-crt-red">{{ deleteError }}</div>
+                <button type="submit" :disabled="deleting"
+                        class="w-full py-2.5 rounded-lg font-pixel text-[8px] tracking-wider transition-all duration-200"
+                        style="background: linear-gradient(180deg, #ff4444, #cc2222); border: 1.5px solid #ff4444; color: white; box-shadow: 0 0 15px rgba(255,68,68,0.2);">
+                  {{ deleting ? 'DELETING...' : 'PERMANENTLY DELETE ACCOUNT' }}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
 
       </div>
     </main>
+
+    <!-- 1v1 Invite Modal -->
+    <Teleport to="body">
+      <transition name="fade">
+        <div v-if="showInviteModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="showInviteModal = false"></div>
+          <div class="relative rounded-xl p-6 max-w-sm w-full animate-scale-in"
+               style="background: #0d0e15; border: 2px solid rgba(180,76,255,0.35); box-shadow: 0 0 60px rgba(0,0,0,0.8);">
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-1 h-4 rounded-full bg-arcade-purple"></div>
+                <h2 class="font-pixel text-[9px] text-arcade-purple tracking-[0.2em]">1v1 INVITE</h2>
+              </div>
+              <button @click="showInviteModal = false" class="btn-ghost p-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <template v-if="inviteStep === 'creating'">
+              <div class="text-center py-6">
+                <div class="w-8 h-8 border-2 border-arcade-purple/30 border-t-arcade-purple rounded-full animate-spin mx-auto mb-3"></div>
+                <span class="font-mono text-xs text-retro-muted">Creating match...</span>
+              </div>
+            </template>
+
+            <template v-else-if="inviteStep === 'created'">
+              <div class="text-center py-2">
+                <p class="font-mono text-xs text-retro-muted mb-3">Match created! Share the code with <span class="text-crt-cyan">{{ inviteTargetUser }}</span>:</p>
+                <div class="font-terminal text-4xl text-arcade-purple mb-4 tracking-[0.3em]">{{ inviteMatchCode }}</div>
+                <div class="flex gap-2">
+                  <button @click="copyInviteCode" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-2 text-[10px]">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    COPY CODE
+                  </button>
+                  <button @click="startInviteMatch" class="btn-retro-primary flex-1 !py-2 !text-[9px]">
+                    START PLAYING
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            <template v-else-if="inviteStep === 'error'">
+              <div class="text-center py-4">
+                <div class="font-mono text-[11px] text-crt-red mb-3">{{ inviteError }}</div>
+                <button @click="showInviteModal = false" class="btn-retro-ghost px-4 py-2">CLOSE</button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useApi } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { useGame } from '../composables/useGame'
+import { useProgression } from '../composables/useProgression'
+import { useAchievements } from '../composables/useAchievements'
+import { useFriends } from '../composables/useFriends'
+import { useWikipedia } from '../composables/useWikipedia'
+
+const props = defineProps({ username: String })
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuth()
 const api = useApi()
 const toast = useToast()
-const { getStats } = useGame()
+const { GAME_MODES, GENRES, getStats, getHistory } = useGame()
+const progression = useProgression()
+const achievements = useAchievements()
+const friendsComposable = useFriends()
+const wiki = useWikipedia()
 
+const pageLoading = ref(true)
+const notFound = ref(false)
+const activeTab = ref('stats')
+
+const profileData = ref({ username: '', created_at: '' })
+const profileServerStats = ref({ modes: {}, genres: {} })
+const profileStreak = ref(0)
+const friendshipStatus = ref('none')
+const friendshipDirection = ref(null)
+const friendshipId = ref(null)
+const friendActionLoading = ref(false)
+
+const isOwnProfile = computed(() => {
+  if (!props.username) return true
+  return auth.user.value && auth.user.value.username.toLowerCase() === props.username.toLowerCase()
+})
+
+const profileInitial = computed(() => (profileData.value.username || '?').charAt(0).toUpperCase())
+
+const profileMemberSince = computed(() => {
+  const createdAt = profileData.value.created_at
+  if (!createdAt) return null
+  const d = new Date(createdAt.endsWith('Z') || createdAt.includes('+') ? createdAt : createdAt + 'Z')
+  if (isNaN(d.getTime())) return null
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+})
+
+const profileDetailedStats = computed(() => {
+  if (isOwnProfile.value) return getStats()
+  return profileServerStats.value
+})
+
+const profileStats = computed(() => {
+  const stats = profileDetailedStats.value
+  const modes = stats.modes || {}
+  const totalGames = Object.values(modes).reduce((s, m) => s + (m.gamesPlayed || 0), 0)
+  const totalWins = Object.values(modes).reduce((s, m) => s + (m.gamesWon || 0), 0)
+  return {
+    totalGames,
+    totalWins,
+    streak: isOwnProfile.value ? auth.streak.value : profileStreak.value,
+  }
+})
+
+const winRate = computed(() => {
+  if (profileStats.value.totalGames === 0) return 0
+  return Math.round((profileStats.value.totalWins / profileStats.value.totalGames) * 100)
+})
+
+const hasDetailedStats = computed(() => Object.keys(profileDetailedStats.value.modes || {}).length > 0)
+const hasGenreStats = computed(() => Object.keys(profileDetailedStats.value.genres || {}).length > 0)
+const history = computed(() => isOwnProfile.value ? getHistory() : [])
+
+const availableTabs = computed(() => {
+  const tabs = [
+    { id: 'stats', label: 'STATS', icon: '&#128200;' },
+  ]
+  if (isOwnProfile.value) {
+    tabs.push({ id: 'history', label: 'HISTORY', icon: '&#128214;' })
+  }
+  tabs.push({
+    id: 'friends',
+    label: 'FRIENDS',
+    icon: '&#128101;',
+    badge: isOwnProfile.value ? friendsComposable.incomingRequests.value.length || null : null,
+  })
+  if (isOwnProfile.value) {
+    tabs.push({ id: 'settings', label: 'SETTINGS', icon: '&#9881;' })
+  }
+  return tabs
+})
+
+// Password change state
 const showChangePassword = ref(false)
 const currentPassword = ref('')
 const newPassword = ref('')
@@ -198,45 +631,105 @@ const confirmNewPassword = ref('')
 const changePasswordError = ref('')
 const changePasswordSuccess = ref('')
 const changingPassword = ref(false)
-const showCurrentPw = ref(false)
-const showNewPw = ref(false)
-const showConfirmNewPw = ref(false)
 
+// Delete account state
 const showDeleteSection = ref(false)
 const deletePassword = ref('')
 const deleteError = ref('')
 const deleting = ref(false)
-const showDeletePw = ref(false)
 
-const memberSince = computed(() => {
-  const createdAt = auth.user.value?.created_at
-  if (!createdAt) return null
-  const d = new Date(createdAt.endsWith('Z') || createdAt.includes('+') ? createdAt : createdAt + 'Z')
-  if (isNaN(d.getTime())) return null
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-})
+// Friend search state
+const friendSearchQuery = ref('')
+const searchResults = ref([])
+const showSearchResults = ref(false)
+const friendError = ref('')
+const friendSuccess = ref('')
+let searchTimeout = null
 
-const stats = computed(() => getStats())
+// 1v1 invite state
+const showInviteModal = ref(false)
+const inviteStep = ref('creating')
+const inviteTargetUser = ref('')
+const inviteMatchCode = ref('')
+const inviteError = ref('')
 
-const totalGamesPlayed = computed(() => {
-  const modes = stats.value.modes || {}
-  return Object.values(modes).reduce((sum, m) => sum + (m.gamesPlayed || 0), 0)
-})
+function getModeLabel(modeId) {
+  return GAME_MODES[modeId]?.name?.toUpperCase() || modeId?.toUpperCase() || 'UNKNOWN'
+}
 
-const totalWins = computed(() => {
-  const modes = stats.value.modes || {}
-  return Object.values(modes).reduce((sum, m) => sum + (m.gamesWon || 0), 0)
-})
+function getGenreLabel(genreId) {
+  return GENRES[genreId]?.name || genreId || 'Unknown'
+}
+
+function getGenreEmoji(genreId) {
+  return GENRES[genreId]?.emoji || '?'
+}
+
+function formatTime(seconds) {
+  if (seconds === null || seconds === undefined) return '-'
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function formatDate(isoString) {
+  if (!isoString) return ''
+  const d = new Date(isoString)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+async function loadProfile() {
+  pageLoading.value = true
+  notFound.value = false
+
+  if (isOwnProfile.value) {
+    if (!auth.user.value) {
+      router.push({ name: 'home' })
+      return
+    }
+    profileData.value = {
+      username: auth.user.value.username,
+      created_at: auth.user.value.created_at,
+    }
+    await Promise.all([
+      friendsComposable.fetchFriends(),
+      friendsComposable.fetchRequests(),
+    ])
+    pageLoading.value = false
+    return
+  }
+
+  const data = await friendsComposable.getPublicProfile(props.username)
+  if (data.error) {
+    notFound.value = true
+    pageLoading.value = false
+    return
+  }
+
+  profileData.value = { username: data.username, created_at: data.created_at }
+  profileServerStats.value = data.stats || { modes: {}, genres: {} }
+  profileStreak.value = data.streak || 0
+
+  if (data.friendship) {
+    friendshipStatus.value = data.friendship.status
+    friendshipDirection.value = data.friendship.direction || null
+    friendshipId.value = data.friendship.friendship_id || null
+  }
+
+  if (auth.user.value) {
+    await friendsComposable.fetchFriends()
+  }
+
+  pageLoading.value = false
+}
 
 async function handleChangePassword() {
   changePasswordError.value = ''
   changePasswordSuccess.value = ''
-
   if (newPassword.value !== confirmNewPassword.value) {
     changePasswordError.value = 'New passwords do not match.'
     return
   }
-
   changingPassword.value = true
   try {
     await api.post('/change-password', {
@@ -280,9 +773,145 @@ function handleLogout() {
   router.push({ name: 'home' })
 }
 
+function debouncedSearch() {
+  clearTimeout(searchTimeout)
+  friendError.value = ''
+  friendSuccess.value = ''
+  const q = friendSearchQuery.value.trim()
+  if (q.length < 2) { searchResults.value = []; return }
+  searchTimeout = setTimeout(async () => {
+    searchResults.value = await friendsComposable.searchUsers(q)
+    showSearchResults.value = true
+  }, 300)
+}
+
+async function sendFriendRequest(username) {
+  friendError.value = ''
+  friendSuccess.value = ''
+  showSearchResults.value = false
+  if (!username || !username.trim()) return
+  const result = await friendsComposable.sendRequest(username.trim())
+  if (result.error) {
+    friendError.value = result.error
+  } else {
+    friendSuccess.value = result.message || 'Request sent!'
+    friendSearchQuery.value = ''
+    searchResults.value = []
+    toast.success(result.message || 'Friend request sent!')
+  }
+}
+
+async function handleAcceptRequest(requestId) {
+  const result = await friendsComposable.acceptRequest(requestId)
+  if (result.ok) toast.success('Friend request accepted!')
+  else toast.error(result.error || 'Failed to accept request')
+}
+
+async function handleDeclineRequest(requestId) {
+  const result = await friendsComposable.declineRequest(requestId)
+  if (result.ok) toast.info('Request declined')
+  else toast.error(result.error || 'Failed to decline request')
+}
+
+async function handleRemoveFriendById(friendshipIdVal) {
+  if (!confirm('Remove this friend?')) return
+  const result = await friendsComposable.removeFriend(friendshipIdVal)
+  if (result.ok) toast.info('Friend removed')
+  else toast.error(result.error || 'Failed to remove friend')
+}
+
+async function handleAddFriend() {
+  friendActionLoading.value = true
+  const result = await friendsComposable.sendRequest(profileData.value.username)
+  friendActionLoading.value = false
+  if (result.error) {
+    toast.error(result.error)
+  } else {
+    toast.success(result.message || 'Friend request sent!')
+    friendshipStatus.value = result.status || 'pending'
+    friendshipDirection.value = 'sent'
+  }
+}
+
+async function handleAcceptFromProfile() {
+  if (!friendshipId.value) return
+  const result = await friendsComposable.acceptRequest(friendshipId.value)
+  if (result.ok) {
+    friendshipStatus.value = 'accepted'
+    toast.success('Friend request accepted!')
+  }
+}
+
+async function handleRemoveFriend() {
+  if (!friendshipId.value || !confirm('Remove this friend?')) return
+  const result = await friendsComposable.removeFriend(friendshipId.value)
+  if (result.ok) {
+    friendshipStatus.value = 'none'
+    friendshipId.value = null
+    toast.info('Friend removed')
+  }
+}
+
+async function inviteTo1v1() {
+  inviteFriendTo1v1(profileData.value.username)
+}
+
+async function inviteFriendTo1v1(username) {
+  inviteTargetUser.value = username
+  inviteStep.value = 'creating'
+  inviteError.value = ''
+  showInviteModal.value = true
+
+  try {
+    const pair = await wiki.getRandomPairByGenre(null)
+    if (!pair) throw new Error('Could not generate articles')
+    const result = await api.post('/match/create', { startTitle: pair.start.title, endTitle: pair.end.title })
+    if (result.error) throw new Error(result.error)
+    inviteMatchCode.value = result.code
+    inviteStep.value = 'created'
+    toast.success(`Match created! Share code ${result.code} with ${username}`)
+  } catch (e) {
+    inviteError.value = e.message || 'Failed to create match'
+    inviteStep.value = 'error'
+  }
+}
+
+function copyInviteCode() {
+  if (!inviteMatchCode.value) return
+  navigator.clipboard.writeText(inviteMatchCode.value)
+    .then(() => toast.success('Code copied!'))
+    .catch(() => toast.warn('Could not copy'))
+}
+
+function startInviteMatch() {
+  if (!inviteMatchCode.value) return
+  showInviteModal.value = false
+  api.get(`/match/${inviteMatchCode.value}`).then(match => {
+    router.push({ name: 'game', params: { mode: 'custom' }, query: { from: match.start_title, to: match.end_title, match: inviteMatchCode.value } })
+  }).catch(() => toast.error('Failed to start match'))
+}
+
+// Close search results when clicking outside
+function handleGlobalClick(e) {
+  if (!e.target.closest('.relative')) {
+    showSearchResults.value = false
+  }
+}
+
 onMounted(() => {
-  if (!auth.user.value) {
-    router.push({ name: 'home' })
+  loadProfile()
+  document.addEventListener('click', handleGlobalClick)
+})
+
+watch(() => props.username, () => {
+  activeTab.value = 'stats'
+  loadProfile()
+})
+
+watch(() => route.name, () => {
+  if (route.name === 'profile' || route.name === 'public-profile') {
+    activeTab.value = 'stats'
+    loadProfile()
   }
 })
 </script>

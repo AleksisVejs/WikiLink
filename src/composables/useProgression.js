@@ -90,7 +90,7 @@ export function useProgression() {
 
   function applyModifierBonus(rewards, modifiers) {
     if (modifiers.length > 0) {
-      const multiplier = Math.pow(1.25, modifiers.length)
+      const multiplier = 1 + 0.25 * modifiers.length
       const baseTotal = rewards.reduce((sum, r) => sum + r.xp, 0)
       const bonus = Math.round(baseTotal * (multiplier - 1))
       if (bonus > 0) {

@@ -208,11 +208,11 @@
                     <template v-else-if="entry.rank === 3" v-html="'&#129353;'"></template>
                     <template v-else>{{ entry.rank }}</template>
                   </span>
-                  <span class="flex-1 font-mono text-[12px] truncate"
+                  <router-link :to="`/profile/${entry.username}`" class="flex-1 font-mono text-[12px] truncate hover:underline"
                         :class="auth.user.value && entry.username === auth.user.value.username ? 'text-crt-green' : 'text-crt-white'">
                     {{ entry.username }}
                     <span v-if="auth.user.value && entry.username === auth.user.value.username" class="text-[9px] text-crt-green/50 ml-1">(you)</span>
-                  </span>
+                  </router-link>
                   <span class="w-14 text-right font-terminal text-sm text-crt-green tabular-nums">{{ entry.clicks }}</span>
                   <span class="w-14 text-right font-mono text-[11px] text-retro-muted tabular-nums">{{ formatTime(entry.time) }}</span>
                 </div>
@@ -356,7 +356,7 @@
               <div class="flex items-center gap-2.5 mb-2.5 sm:mb-3">
                 <div class="w-1 h-4 rounded-full bg-crt-amber"></div>
                 <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">MODIFIERS</span>
-                <span v-if="activeModifiers.length > 0" class="font-mono text-[9px] text-crt-green ml-1">{{ (Math.pow(1.25, activeModifiers.length)).toFixed(2) }}x XP</span>
+                <span v-if="activeModifiers.length > 0" class="font-mono text-[9px] text-crt-green ml-1">{{ (1 + 0.25 * activeModifiers.length).toFixed(2) }}x XP</span>
               </div>
               <div class="flex flex-wrap gap-1.5 sm:gap-2">
                 <button v-for="mod in filteredModifiers" :key="mod.id"

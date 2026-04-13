@@ -15,6 +15,12 @@ const routes = [
       if (!localStorage.getItem('wikilink_token')) return { name: 'home' }
     },
   },
+  {
+    path: '/profile/:username',
+    name: 'public-profile',
+    component: ProfileView,
+    props: true,
+  },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundView },
 ]
 

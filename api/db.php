@@ -83,6 +83,17 @@ function initSchema($db) {
             created_at TEXT    NOT NULL DEFAULT (datetime('now'))
         )",
         "CREATE INDEX IF NOT EXISTS idx_rate_limits_lookup ON rate_limits(ip, action, created_at)",
+
+        "CREATE TABLE IF NOT EXISTS friendships (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            friend_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            status     TEXT    NOT NULL DEFAULT 'pending',
+            created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(user_id, friend_id)
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id, status)",
+        "CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id, status)",
     ];
 
     foreach ($statements as $sql) {
