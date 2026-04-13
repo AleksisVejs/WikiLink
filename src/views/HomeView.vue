@@ -11,7 +11,12 @@
         <div class="flex items-center gap-2">
           <!-- Auth -->
           <template v-if="auth.user.value">
-            <span class="font-mono text-[10px] text-crt-green hidden sm:inline">{{ auth.user.value.username }}</span>
+            <router-link to="/profile" class="btn-retro-ghost flex items-center gap-1.5 px-2.5" title="Profile">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span class="font-mono text-[10px] text-crt-green hidden sm:inline">{{ auth.user.value.username }}</span>
+            </router-link>
             <button @click="auth.logout()" class="btn-retro-ghost flex items-center gap-1.5 px-2.5" title="Logout">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -60,9 +65,6 @@
             WIKI<span class="text-neon-cyan">LINK</span>
           </h1>
           <p class="font-terminal text-base sm:text-lg text-crt-white/60 tracking-[0.15em] mb-1.5 sm:mb-2">The Wiki Game</p>
-          <p class="font-mono text-[11px] sm:text-xs text-retro-muted max-w-sm mx-auto leading-snug px-1">
-            Navigate the labyrinth of Wikipedia. Reach the target. Beat the game.
-          </p>
           <div class="retro-divider max-w-[200px] sm:max-w-xs mx-auto mt-2 sm:mt-3"></div>
         </div>
 
@@ -439,8 +441,35 @@
               </div>
               <div>
                 <label class="font-mono text-[10px] text-retro-muted block mb-1">Password</label>
-                <input v-model="authPassword" type="password" autocomplete="current-password" required minlength="4"
-                       class="w-full px-3 py-2 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
+                <div class="relative">
+                  <input v-model="authPassword" :type="showPassword ? 'text' : 'password'" :autocomplete="authMode === 'login' ? 'current-password' : 'new-password'" required minlength="6"
+                         class="w-full px-3 py-2 pr-10 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
+                  <button type="button" @click="showPassword = !showPassword" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-retro-muted hover:text-crt-white transition-colors" tabindex="-1">
+                    <svg v-if="!showPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div v-if="authMode === 'register'">
+                <label class="font-mono text-[10px] text-retro-muted block mb-1">Confirm Password</label>
+                <div class="relative">
+                  <input v-model="authConfirmPassword" :type="showConfirmPassword ? 'text' : 'password'" autocomplete="new-password" required minlength="6"
+                         class="w-full px-3 py-2 pr-10 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
+                  <button type="button" @click="showConfirmPassword = !showConfirmPassword" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-retro-muted hover:text-crt-white transition-colors" tabindex="-1">
+                    <svg v-if="!showConfirmPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div v-if="authError" class="font-mono text-[11px] text-crt-red">{{ authError }}</div>
               <button type="submit" :disabled="auth.loading.value" class="btn-retro-primary w-full !py-2.5">
@@ -533,7 +562,10 @@ const statsTab = ref('modes')
 const authMode = ref('login')
 const authUsername = ref('')
 const authPassword = ref('')
+const authConfirmPassword = ref('')
 const authError = ref('')
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
 const globalStats = ref(null)
 
 const selectedGenreId = ref('random')
@@ -599,10 +631,21 @@ const dailyCompleted = computed(() => !!dailyStatus.value?.completed)
 
 async function handleAuth() {
   authError.value = ''
+  if (authMode.value === 'register' && authPassword.value !== authConfirmPassword.value) {
+    authError.value = 'Passwords do not match.'
+    return
+  }
   const fn = authMode.value === 'login' ? auth.login : auth.register
   const err = await fn(authUsername.value, authPassword.value)
   if (err) { authError.value = err }
-  else { showAuthModal.value = false; authUsername.value = ''; authPassword.value = '' }
+  else {
+    showAuthModal.value = false
+    authUsername.value = ''
+    authPassword.value = ''
+    authConfirmPassword.value = ''
+    showPassword.value = false
+    showConfirmPassword.value = false
+  }
 }
 
 function shareDailyResult() {
@@ -664,6 +707,7 @@ function handleKeydown(e) {
 }
 
 watch(selectedModeId, (id) => { if (id === 'custom') selectedDifficulty.value = 'normal' })
+watch(authMode, () => { authError.value = ''; authConfirmPassword.value = ''; showPassword.value = false; showConfirmPassword.value = false })
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)

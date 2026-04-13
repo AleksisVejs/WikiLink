@@ -21,10 +21,21 @@ function saveDailyPair($date, $start, $end) {
 }
 
 function submitDailyScore($userId, $date, $clicks, $time, $path) {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        return ['error' => 'Invalid date format.'];
+    }
+    $today = gmdate('Y-m-d');
+    if ($date !== $today) {
+        return ['error' => 'Can only submit scores for today.'];
+    }
+
     $db = getDb();
 
     $pair = getDailyPair($date);
     if (!$pair) return ['error' => 'No daily challenge found for this date.'];
+
+    $clicks = max(0, min((int)$clicks, 999));
+    $time = max(0, min((int)$time, 86400));
 
     $existing = $db->prepare('SELECT clicks, time_seconds FROM daily_scores WHERE user_id = ? AND date = ?');
     $existing->execute([$userId, $date]);
@@ -40,8 +51,6 @@ function submitDailyScore($userId, $date, $clicks, $time, $path) {
     } else {
         $stmt = $db->prepare('INSERT INTO daily_scores (user_id, date, clicks, time_seconds, path) VALUES (?, ?, ?, ?, ?)');
         $stmt->execute([$userId, $date, $clicks, $time, json_encode($path)]);
-
-        $db->exec('UPDATE global_stats SET total_games = total_games + 1, total_wins = total_wins + 1, total_clicks = total_clicks + ' . (int)$clicks . ' WHERE id = 1');
     }
 
     return ['ok' => true];

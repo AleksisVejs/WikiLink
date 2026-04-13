@@ -14,8 +14,10 @@ function getGlobalStats() {
 }
 
 function incrementGlobalGame($clicks, $won) {
-    $db = getDb();
+    $clicks = max(0, min((int)$clicks, 999));
     $wonInc = $won ? 1 : 0;
-    $clicks = (int)$clicks;
-    $db->exec("UPDATE global_stats SET total_games = total_games + 1, total_wins = total_wins + $wonInc, total_clicks = total_clicks + $clicks WHERE id = 1");
+
+    $db = getDb();
+    $stmt = $db->prepare('UPDATE global_stats SET total_games = total_games + 1, total_wins = total_wins + ?, total_clicks = total_clicks + ? WHERE id = 1');
+    $stmt->execute([$wonInc, $clicks]);
 }

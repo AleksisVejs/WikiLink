@@ -5,7 +5,6 @@ function getDb() {
     static $db = null;
     if ($db) return $db;
 
-    $isNew = !file_exists(DB_PATH);
     $db = new PDO('sqlite:' . DB_PATH, null, null, [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -13,7 +12,7 @@ function getDb() {
     $db->exec('PRAGMA journal_mode=WAL');
     $db->exec('PRAGMA foreign_keys=ON');
 
-    if ($isNew) initSchema($db);
+    initSchema($db);
     return $db;
 }
 
@@ -71,9 +70,41 @@ function initSchema($db) {
             total_clicks INTEGER NOT NULL DEFAULT 0
         )",
         "INSERT OR IGNORE INTO global_stats (id) VALUES (1)",
+
+        "CREATE TABLE IF NOT EXISTS user_stats (
+            user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            stats_json TEXT NOT NULL DEFAULT '{\"modes\":{},\"genres\":{}}'
+        )",
+
+        "CREATE TABLE IF NOT EXISTS rate_limits (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip         TEXT    NOT NULL,
+            action     TEXT    NOT NULL,
+            created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_rate_limits_lookup ON rate_limits(ip, action, created_at)",
     ];
 
     foreach ($statements as $sql) {
         $db->exec($sql);
     }
+}
+
+function checkRateLimit($action, $maxAttempts = 10, $windowSeconds = 300) {
+    $db = getDb();
+    $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown';
+
+    $db->prepare("DELETE FROM rate_limits WHERE created_at < datetime('now', ? || ' seconds')")
+       ->execute(['-' . $windowSeconds]);
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM rate_limits WHERE ip = ? AND action = ? AND created_at > datetime('now', ? || ' seconds')");
+    $stmt->execute([$ip, $action, '-' . $windowSeconds]);
+    $count = (int)$stmt->fetchColumn();
+
+    if ($count >= $maxAttempts) return false;
+
+    $db->prepare("INSERT INTO rate_limits (ip, action) VALUES (?, ?)")
+       ->execute([$ip, $action]);
+
+    return true;
 }
