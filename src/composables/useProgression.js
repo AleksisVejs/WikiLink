@@ -28,6 +28,23 @@ function saveProgression(data) {
   localStorage.setItem(XP_KEY, JSON.stringify(data))
 }
 
+const MODE_XP = {
+  classic:   { multiplier: 1.0  },
+  sprint:    { multiplier: 1.5  },
+  challenge: { multiplier: 1.5  },
+  trending:  { multiplier: 1.25 },
+  custom:    { multiplier: 0    },
+  freeplay:  { multiplier: 0    },
+  daily:     { multiplier: 2.0  },
+}
+
+const DIFFICULTY_XP = {
+  easy:   1.25,
+  normal: 1.5,
+  hard:   2.0,
+  custom: 1.25,
+}
+
 const totalXp = ref(loadProgression().totalXp)
 
 export function useProgression() {
@@ -39,22 +56,15 @@ export function useProgression() {
 
   function calculateXpReward(gameResult) {
     const rewards = []
-    const { won, mode, clicks, elapsed, streak, hintsUsed = 0, modifiers = [] } = gameResult
+    const { won, mode, difficulty = 'normal', clicks, elapsed, streak, hintsUsed = 0, modifiers = [] } = gameResult
+    const modeXp = MODE_XP[mode] || MODE_XP.classic
+    const hasDifficulty = mode === 'sprint' || mode === 'challenge'
+    const diffMult = hasDifficulty ? (DIFFICULTY_XP[difficulty] || 1.0) : 1.0
+    const modMult = modifiers.length > 0 ? (1 + 0.25 * modifiers.length) : 1.0
 
-    if (!won) {
-      rewards.push({ label: 'Game completed', xp: 15 })
-      return applyModifierBonus(rewards, modifiers)
-    }
+    if (modeXp.multiplier === 0 || !won) return []
 
     rewards.push({ label: 'Victory', xp: 100 })
-
-    if (mode === 'daily') {
-      rewards.push({ label: 'Daily bonus', xp: 50 })
-    }
-
-    if (mode === 'trending') {
-      rewards.push({ label: 'Trending bonus', xp: 25 })
-    }
 
     if (streak && streak > 1) {
       rewards.push({ label: `${streak}-day streak`, xp: Math.min(streak * 25, 200) })
@@ -78,25 +88,26 @@ export function useProgression() {
       rewards.push({ label: 'No hints', xp: 25 })
     }
 
-    if (mode === 'sprint') {
-      rewards.push({ label: 'Sprint mode', xp: 25 })
-    }
-    if (mode === 'challenge') {
-      rewards.push({ label: 'Click limit mode', xp: 25 })
-    }
-
-    return applyModifierBonus(rewards, modifiers)
-  }
-
-  function applyModifierBonus(rewards, modifiers) {
-    if (modifiers.length > 0) {
-      const multiplier = 1 + 0.25 * modifiers.length
+    const totalMult = modeXp.multiplier * diffMult * modMult
+    if (totalMult !== 1.0) {
       const baseTotal = rewards.reduce((sum, r) => sum + r.xp, 0)
-      const bonus = Math.round(baseTotal * (multiplier - 1))
-      if (bonus > 0) {
-        rewards.push({ label: `${modifiers.length}x modifier bonus`, xp: bonus })
+      const bonus = Math.round(baseTotal * (totalMult - 1))
+      const parts = []
+      if (modeXp.multiplier !== 1.0) {
+        const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1)
+        parts.push(`${modeLabel} ${modeXp.multiplier}x`)
       }
+      if (diffMult !== 1.0) {
+        const diffLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1)
+        parts.push(`${diffLabel} ${diffMult}x`)
+      }
+      if (modMult !== 1.0) {
+        parts.push(`${modifiers.length} mod ${modMult}x`)
+      }
+      const roundedMult = Math.round(totalMult * 100) / 100
+      rewards.push({ label: `${parts.join(' + ')} = ${roundedMult}x`, xp: bonus })
     }
+
     return rewards
   }
 
@@ -114,6 +125,19 @@ export function useProgression() {
     return { rewards, totalReward, leveledUp, newLevel }
   }
 
+  function estimateXp(mode, difficulty = 'normal', modifierCount = 0) {
+    const modeXp = MODE_XP[mode]
+    if (!modeXp || modeXp.multiplier === 0) return { base: 0, total: 0, multiplier: 0 }
+    const hasDifficulty = mode === 'sprint' || mode === 'challenge'
+    const diffMult = hasDifficulty ? (DIFFICULTY_XP[difficulty] || 1.0) : 1.0
+    const combinedMult = modeXp.multiplier * diffMult
+    const modMult = 1 + 0.25 * modifierCount
+    const finalMult = combinedMult * modMult
+    const base = 100
+    const total = Math.round(base * finalMult)
+    return { base, total, multiplier: Math.round(finalMult * 100) / 100 }
+  }
+
   return {
     totalXp,
     level,
@@ -121,5 +145,8 @@ export function useProgression() {
     nextLevelXp,
     progress,
     awardXp,
+    estimateXp,
+    MODE_XP,
+    DIFFICULTY_XP,
   }
 }

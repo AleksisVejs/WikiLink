@@ -2,11 +2,11 @@
   <div class="relative min-h-screen flex flex-col">
 
     <!-- Top bar -->
-    <header class="relative z-20 border-b border-retro-border/40 shrink-0">
-      <div class="max-w-6xl mx-auto px-4 sm:px-5 py-2 sm:py-3 flex items-center justify-between">
+    <header class="relative z-20 glass-header shrink-0">
+      <div class="max-w-6xl mx-auto px-4 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <router-link to="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <img src="/favicon.svg" alt="WikiLink" class="w-9 h-9" />
+            <img src="/favicon.svg" alt="WikiLink" class="w-9 h-9 drop-shadow-[0_0_8px_rgba(57,255,20,0.3)]" />
             <span class="font-pixel text-[9px] text-crt-white/80 tracking-wider hidden sm:block">WIKILINK</span>
           </router-link>
         </div>
@@ -55,101 +55,124 @@
       <div class="max-w-2xl w-full space-y-4">
 
         <!-- Profile header card -->
-        <div class="rounded-xl p-5 sm:p-6 animate-fade-in"
-             style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
-          <div class="flex items-start gap-4 mb-5">
-            <!-- Avatar -->
-            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl flex items-center justify-center shrink-0"
-                 style="background: rgba(57,255,20,0.08); border: 1.5px solid rgba(57,255,20,0.25);">
-              <span class="font-pixel text-2xl sm:text-3xl text-crt-green">{{ profileInitial }}</span>
-            </div>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <h1 class="font-pixel text-sm sm:text-base text-crt-green tracking-wider">{{ profileData.username }}</h1>
-                <span v-if="isOwnProfile" class="font-mono text-[9px] text-crt-cyan/60 px-1.5 py-0.5 rounded border border-crt-cyan/20 bg-crt-cyan/5">YOU</span>
-              </div>
-              <p v-if="profileMemberSince" class="font-mono text-[10px] text-retro-muted mt-0.5">Member since {{ profileMemberSince }}</p>
+        <div class="rounded-2xl overflow-hidden animate-fade-in"
+             style="background: linear-gradient(180deg, #0d0e15, #0a0b11); border: 1.5px solid rgba(37,39,56,0.7); box-shadow: 0 12px 40px rgba(0,0,0,0.4);">
 
-              <!-- XP / Level (own profile only) -->
-              <div v-if="isOwnProfile" class="mt-2">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="font-pixel text-[8px] text-crt-green tracking-wider">LV {{ progression.level.value }}</span>
-                  <span class="font-mono text-[9px] text-retro-muted">{{ progression.currentXp.value }} / {{ progression.nextLevelXp.value }} XP</span>
-                </div>
-                <div class="xp-bar">
-                  <div class="xp-bar-fill" :style="{ width: (progression.progress.value * 100) + '%' }"></div>
-                </div>
-              </div>
-
-              <!-- Friend action (other profile) -->
-              <div v-if="!isOwnProfile && auth.user.value" class="mt-2.5 flex items-center gap-2">
-                <template v-if="friendshipStatus === 'accepted'">
-                  <span class="font-mono text-[10px] text-crt-green flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                    Friends
-                  </span>
-                  <button @click="handleRemoveFriend" class="btn-retro-ghost px-2 py-1 font-mono text-[9px] text-crt-red/70 hover:text-crt-red">Remove</button>
-                </template>
-                <template v-else-if="friendshipStatus === 'pending' && friendshipDirection === 'sent'">
-                  <span class="font-mono text-[10px] text-crt-amber flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    Request sent
-                  </span>
-                </template>
-                <template v-else-if="friendshipStatus === 'pending' && friendshipDirection === 'received'">
-                  <button @click="handleAcceptFromProfile" class="btn-retro-primary px-3 py-1.5 font-pixel text-[7px]">ACCEPT REQUEST</button>
-                </template>
-                <template v-else>
-                  <button @click="handleAddFriend" :disabled="friendActionLoading" class="btn-retro-primary px-3 py-1.5 font-pixel text-[7px]">
-                    {{ friendActionLoading ? 'SENDING...' : 'ADD FRIEND' }}
-                  </button>
-                </template>
-                <!-- Invite to 1v1 button -->
-                <button v-if="friendshipStatus === 'accepted'" @click="inviteTo1v1"
-                        class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-pixel text-[7px] tracking-wider transition-all duration-200"
-                        style="border: 1.5px solid rgba(180,76,255,0.4); color: #b44cff; background: rgba(180,76,255,0.06);"
-                        @mouseenter="$event.currentTarget.style.background='rgba(180,76,255,0.12)'"
-                        @mouseleave="$event.currentTarget.style.background='rgba(180,76,255,0.06)'">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                  1v1
-                </button>
-              </div>
-            </div>
+          <!-- Accent header strip -->
+          <div class="relative h-20 sm:h-24 overflow-hidden"
+               :style="`background: linear-gradient(135deg, ${rankColor}10, ${rankColor}05, transparent);`">
+            <div class="absolute inset-0 opacity-[0.03]"
+                 style="background-image: radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px); background-size: 20px 20px;"></div>
+            <div class="absolute bottom-0 left-0 right-0 h-[1px]" :style="`background: linear-gradient(90deg, transparent, ${rankColor}30, transparent);`"></div>
           </div>
 
-          <!-- Stats row -->
-          <div class="flex items-center gap-4 sm:gap-6 pt-4 border-t border-retro-border/20">
-            <div class="text-center flex-1">
-              <div class="font-terminal text-xl sm:text-2xl text-crt-amber">{{ profileStats.streak }}</div>
-              <div class="font-mono text-[8px] text-retro-muted tracking-wider">DAILY STREAK</div>
+          <div class="px-5 sm:px-6 pb-5 sm:pb-6 -mt-10 sm:-mt-12 relative">
+            <div class="flex items-end gap-4 mb-4">
+              <!-- Avatar -->
+              <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl flex items-center justify-center shrink-0 relative"
+                   :style="`background: #0d0e15; border: 2.5px solid ${rankColor}40; box-shadow: 0 0 20px ${rankColor}15;`">
+                <span class="font-pixel text-3xl sm:text-4xl" :style="`color: ${rankColor}`">{{ profileInitial }}</span>
+                <!-- Level badge -->
+                <div v-if="isOwnProfile" class="absolute -bottom-2 -right-2 px-2 py-0.5 rounded-lg font-pixel text-[8px] tracking-wider"
+                     :style="`background: #0d0e15; border: 1.5px solid ${rankColor}50; color: ${rankColor};`">
+                  LV {{ progression.level.value }}
+                </div>
+              </div>
+              <div class="min-w-0 flex-1 pb-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h1 class="font-pixel text-sm sm:text-base text-crt-white tracking-wider">{{ profileData.username }}</h1>
+                  <span v-if="isOwnProfile" class="font-mono text-[9px] text-crt-cyan/60 px-1.5 py-0.5 rounded border border-crt-cyan/20 bg-crt-cyan/5">YOU</span>
+                </div>
+                <p v-if="profileMemberSince" class="font-mono text-[10px] text-retro-muted mt-0.5">Member since {{ profileMemberSince }}</p>
+
+                <!-- Rank title -->
+                <div class="flex items-center gap-2 mt-1.5">
+                  <span class="font-pixel text-[8px] tracking-wider" :style="`color: ${rankColor}`">{{ rankTitle }}</span>
+                </div>
+              </div>
             </div>
-            <div class="w-px h-10 bg-retro-border/20"></div>
-            <div class="text-center flex-1">
-              <div class="font-terminal text-xl sm:text-2xl text-crt-cyan">{{ profileStats.totalGames }}</div>
-              <div class="font-mono text-[8px] text-retro-muted tracking-wider">GAMES PLAYED</div>
+
+            <!-- XP bar (own profile only) -->
+            <div v-if="isOwnProfile" class="mb-4">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="font-mono text-[9px] text-retro-muted">{{ progression.currentXp.value }} / {{ progression.nextLevelXp.value }} XP</span>
+                <span class="font-mono text-[9px]" :style="`color: ${rankColor}`">Level {{ progression.level.value }}</span>
+              </div>
+              <div class="h-2 rounded-full overflow-hidden" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);">
+                <div class="h-full rounded-full transition-all duration-500"
+                     :style="`width: ${progression.progress.value * 100}%; background: linear-gradient(90deg, ${rankColor}80, ${rankColor}); box-shadow: 0 0 8px ${rankColor}40;`"></div>
+              </div>
             </div>
-            <div class="w-px h-10 bg-retro-border/20"></div>
-            <div class="text-center flex-1">
-              <div class="font-terminal text-xl sm:text-2xl text-crt-green">{{ profileStats.totalWins }}</div>
-              <div class="font-mono text-[8px] text-retro-muted tracking-wider">WINS</div>
+
+            <!-- Friend action (other profile) -->
+            <div v-if="!isOwnProfile && auth.user.value" class="mb-4 flex items-center gap-2">
+              <template v-if="friendshipStatus === 'accepted'">
+                <span class="font-mono text-[10px] text-crt-green flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                  Friends
+                </span>
+                <button @click="handleRemoveFriend" class="btn-retro-ghost px-2 py-1 font-mono text-[9px] text-crt-red/70 hover:text-crt-red">Remove</button>
+              </template>
+              <template v-else-if="friendshipStatus === 'pending' && friendshipDirection === 'sent'">
+                <span class="font-mono text-[10px] text-crt-amber flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Request sent
+                </span>
+              </template>
+              <template v-else-if="friendshipStatus === 'pending' && friendshipDirection === 'received'">
+                <button @click="handleAcceptFromProfile" class="btn-retro-primary px-3 py-1.5 font-pixel text-[7px]">ACCEPT REQUEST</button>
+              </template>
+              <template v-else>
+                <button @click="handleAddFriend" :disabled="friendActionLoading" class="btn-retro-primary px-3 py-1.5 font-pixel text-[7px]">
+                  {{ friendActionLoading ? 'SENDING...' : 'ADD FRIEND' }}
+                </button>
+              </template>
+              <button v-if="friendshipStatus === 'accepted'" @click="inviteTo1v1"
+                      class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-pixel text-[7px] tracking-wider transition-all duration-200"
+                      style="border: 1.5px solid rgba(180,76,255,0.4); color: #b44cff; background: rgba(180,76,255,0.06);"
+                      @mouseenter="$event.currentTarget.style.background='rgba(180,76,255,0.12)'"
+                      @mouseleave="$event.currentTarget.style.background='rgba(180,76,255,0.06)'">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                1v1
+              </button>
             </div>
-            <div class="w-px h-10 bg-retro-border/20"></div>
-            <div class="text-center flex-1">
-              <div class="font-terminal text-xl sm:text-2xl" :class="winRate > 60 ? 'text-crt-green' : winRate > 40 ? 'text-crt-amber' : 'text-crt-red'">{{ winRate }}%</div>
-              <div class="font-mono text-[8px] text-retro-muted tracking-wider">WIN RATE</div>
+
+            <!-- Stats grid -->
+            <div class="grid grid-cols-4 gap-2 sm:gap-3">
+              <div class="text-center rounded-xl py-3 px-2" style="background: rgba(255,191,0,0.04); border: 1px solid rgba(255,191,0,0.12);">
+                <div class="font-terminal text-xl sm:text-2xl text-crt-amber tabular-nums">{{ profileStats.streak }}</div>
+                <div class="font-mono text-[7px] sm:text-[8px] text-retro-muted tracking-wider mt-0.5">STREAK</div>
+              </div>
+              <div class="text-center rounded-xl py-3 px-2" style="background: rgba(0,229,255,0.04); border: 1px solid rgba(0,229,255,0.12);">
+                <div class="font-terminal text-xl sm:text-2xl text-crt-cyan tabular-nums">{{ profileStats.totalGames }}</div>
+                <div class="font-mono text-[7px] sm:text-[8px] text-retro-muted tracking-wider mt-0.5">GAMES</div>
+              </div>
+              <div class="text-center rounded-xl py-3 px-2" style="background: rgba(57,255,20,0.04); border: 1px solid rgba(57,255,20,0.12);">
+                <div class="font-terminal text-xl sm:text-2xl text-crt-green tabular-nums">{{ profileStats.totalWins }}</div>
+                <div class="font-mono text-[7px] sm:text-[8px] text-retro-muted tracking-wider mt-0.5">WINS</div>
+              </div>
+              <div class="text-center rounded-xl py-3 px-2"
+                   :style="winRate > 60
+                     ? 'background: rgba(57,255,20,0.04); border: 1px solid rgba(57,255,20,0.12);'
+                     : winRate > 40
+                       ? 'background: rgba(255,191,0,0.04); border: 1px solid rgba(255,191,0,0.12);'
+                       : 'background: rgba(255,68,68,0.04); border: 1px solid rgba(255,68,68,0.12);'">
+                <div class="font-terminal text-xl sm:text-2xl tabular-nums" :class="winRate > 60 ? 'text-crt-green' : winRate > 40 ? 'text-crt-amber' : 'text-crt-red'">{{ winRate }}%</div>
+                <div class="font-mono text-[7px] sm:text-[8px] text-retro-muted tracking-wider mt-0.5">WIN RATE</div>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Tab navigation -->
-        <div class="flex items-center gap-1 px-1 animate-fade-in">
+        <div class="flex items-center gap-1 px-1 animate-fade-in overflow-x-auto">
           <button v-for="tab in availableTabs" :key="tab.id"
                   @click="activeTab = tab.id"
-                  class="flex items-center gap-1.5 px-3 py-2 rounded-lg font-pixel text-[7px] sm:text-[8px] tracking-wider transition-all duration-200"
+                  class="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-lg font-pixel text-[7px] sm:text-[8px] tracking-wider transition-all duration-200 shrink-0 touch-manipulation"
                   :class="activeTab === tab.id
                     ? 'text-crt-green bg-crt-green/8 border border-crt-green/25'
                     : 'text-retro-muted hover:text-crt-white border border-transparent'">
-            <span v-html="tab.icon" class="text-sm"></span>
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" v-html="tab.svgIcon"></svg>
             <span class="hidden sm:inline">{{ tab.label }}</span>
             <span v-if="tab.badge" class="font-mono text-[8px] px-1 py-0.5 rounded bg-crt-red/20 text-crt-red ml-0.5">{{ tab.badge }}</span>
           </button>
@@ -160,43 +183,62 @@
           <!-- Mode stats -->
           <div v-if="hasDetailedStats" class="space-y-3">
             <div v-for="(modeStats, modeId) in profileDetailedStats.modes" :key="modeId"
-                 class="rounded-xl p-4 sm:p-5" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
-              <h3 class="font-pixel text-[8px] text-crt-cyan mb-3 tracking-[0.2em]">{{ getModeLabel(modeId) }}</h3>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div class="text-center">
-                  <div class="font-terminal text-xl text-crt-green tabular-nums">{{ modeStats.gamesWon }}</div>
-                  <div class="font-mono text-[9px] text-retro-muted">WON</div>
-                </div>
-                <div class="text-center">
-                  <div class="font-terminal text-xl text-crt-red tabular-nums">{{ modeStats.gamesLost || 0 }}</div>
-                  <div class="font-mono text-[9px] text-retro-muted">LOST</div>
-                </div>
-                <div class="text-center">
-                  <div class="font-terminal text-xl text-crt-amber tabular-nums">{{ modeStats.bestClicks ?? '-' }}</div>
-                  <div class="font-mono text-[9px] text-retro-muted">BEST CLICKS</div>
-                </div>
-                <div class="text-center">
-                  <div class="font-terminal text-xl text-crt-cyan tabular-nums">{{ formatTime(modeStats.bestTime) }}</div>
-                  <div class="font-mono text-[9px] text-retro-muted">BEST TIME</div>
-                </div>
+                 class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 1.5px solid #252738;">
+              <div class="px-4 sm:px-5 py-3 border-b border-retro-border/20 flex items-center gap-2.5">
+                <div class="w-1 h-4 rounded-full bg-crt-cyan"></div>
+                <h3 class="font-pixel text-[8px] text-crt-cyan tracking-[0.2em]">{{ getModeLabel(modeId) }}</h3>
+                <span class="font-mono text-[9px] text-retro-muted ml-auto">{{ modeStats.gamesPlayed || 0 }} played</span>
               </div>
-              <div v-if="modeStats.bestStreak" class="mt-3 pt-3 border-t border-retro-border/20 flex items-center justify-center gap-1.5">
-                <span class="font-mono text-[9px] text-retro-muted">BEST STREAK:</span>
-                <span class="font-terminal text-sm text-arcade-gold">{{ modeStats.bestStreak }}</span>
+              <div class="p-4 sm:p-5">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                  <div class="text-center">
+                    <div class="font-terminal text-xl text-crt-green tabular-nums">{{ modeStats.gamesWon }}</div>
+                    <div class="font-mono text-[9px] text-retro-muted">WON</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="font-terminal text-xl text-crt-red tabular-nums">{{ modeStats.gamesLost || 0 }}</div>
+                    <div class="font-mono text-[9px] text-retro-muted">LOST</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="font-terminal text-xl text-crt-amber tabular-nums">{{ modeStats.bestClicks ?? '-' }}</div>
+                    <div class="font-mono text-[9px] text-retro-muted">BEST CLICKS</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="font-terminal text-xl text-crt-cyan tabular-nums">{{ formatTime(modeStats.bestTime) }}</div>
+                    <div class="font-mono text-[9px] text-retro-muted">BEST TIME</div>
+                  </div>
+                </div>
+                <!-- Win rate bar for this mode -->
+                <div v-if="modeStats.gamesPlayed > 0" class="mt-4 pt-3 border-t border-retro-border/15">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="font-mono text-[9px] text-retro-muted">Win rate</span>
+                    <span class="font-terminal text-sm" :class="modeWinRate(modeStats) > 60 ? 'text-crt-green' : modeWinRate(modeStats) > 40 ? 'text-crt-amber' : 'text-crt-red'">{{ modeWinRate(modeStats) }}%</span>
+                  </div>
+                  <div class="h-1.5 rounded-full overflow-hidden" style="background: rgba(255,255,255,0.04);">
+                    <div class="h-full rounded-full transition-all duration-500"
+                         :class="modeWinRate(modeStats) > 60 ? 'bg-crt-green/60' : modeWinRate(modeStats) > 40 ? 'bg-crt-amber/60' : 'bg-crt-red/60'"
+                         :style="`width: ${modeWinRate(modeStats)}%`"></div>
+                  </div>
+                </div>
+                <div v-if="modeStats.bestStreak" class="mt-3 pt-3 border-t border-retro-border/15 flex items-center justify-center gap-1.5">
+                  <span class="font-mono text-[9px] text-retro-muted">BEST STREAK:</span>
+                  <span class="font-terminal text-sm text-arcade-gold">{{ modeStats.bestStreak }}</span>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Genre stats -->
-          <div v-if="hasGenreStats" class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
-            <div class="px-4 sm:px-5 py-3 border-b border-retro-border/20">
+          <div v-if="hasGenreStats" class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 1.5px solid #252738;">
+            <div class="px-4 sm:px-5 py-3 border-b border-retro-border/20 flex items-center gap-2.5">
+              <div class="w-1 h-4 rounded-full bg-crt-amber"></div>
               <h3 class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">GENRE BREAKDOWN</h3>
             </div>
             <div class="divide-y divide-retro-border/10">
               <div v-for="(gs, gId) in profileDetailedStats.genres" :key="gId"
                    class="px-4 sm:px-5 py-3 flex items-center justify-between hover:bg-retro-surface/10 transition-colors">
                 <div class="flex items-center gap-2.5">
-                  <span class="text-base">{{ getGenreEmoji(gId) }}</span>
+                  <svg class="w-4.5 h-4.5 text-crt-cyan/60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" v-html="getGenreSvgIcon(gId)"></svg>
                   <span class="font-mono text-[11px] text-crt-white">{{ getGenreLabel(gId) }}</span>
                 </div>
                 <div class="flex items-center gap-4 text-center">
@@ -218,64 +260,48 @@
           </div>
 
           <!-- Achievements (own profile) -->
-          <div v-if="isOwnProfile" class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+          <div v-if="isOwnProfile" class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 1.5px solid #252738;">
             <div class="px-4 sm:px-5 py-3 border-b border-retro-border/20 flex items-center justify-between">
-              <h3 class="font-pixel text-[8px] text-arcade-gold tracking-[0.2em]">ACHIEVEMENTS</h3>
+              <div class="flex items-center gap-2.5">
+                <div class="w-1 h-4 rounded-full bg-arcade-gold"></div>
+                <h3 class="font-pixel text-[8px] text-arcade-gold tracking-[0.2em]">ACHIEVEMENTS</h3>
+              </div>
               <span class="font-terminal text-sm text-arcade-gold">{{ achievements.unlockedCount.value }} / {{ achievements.totalCount.value }}</span>
             </div>
-            <div class="p-4 sm:p-5 grid grid-cols-3 sm:grid-cols-4 gap-2">
-              <div v-for="badge in achievements.getAllAchievements()" :key="badge.id"
-                   class="achievement-badge" :class="badge.unlocked ? 'unlocked' : 'locked'"
-                   :title="badge.unlocked ? badge.description : '???'">
-                <span class="badge-icon" v-html="badge.icon"></span>
-                <div class="font-pixel text-[6px] tracking-wider" :class="badge.unlocked ? 'text-arcade-gold' : 'text-retro-muted/40'">{{ badge.unlocked ? badge.name : '???' }}</div>
-                <div v-if="badge.unlocked" class="font-mono text-[8px] text-crt-green mt-0.5">+{{ badge.xp }} XP</div>
+            <div class="p-4 sm:p-5">
+              <!-- Progress bar -->
+              <div class="mb-4">
+                <div class="h-1.5 rounded-full overflow-hidden" style="background: rgba(255,255,255,0.04);">
+                  <div class="h-full rounded-full bg-arcade-gold/60 transition-all duration-500"
+                       :style="`width: ${achievements.totalCount.value > 0 ? (achievements.unlockedCount.value / achievements.totalCount.value * 100) : 0}%`"></div>
+                </div>
+              </div>
+              <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                <div v-for="badge in achievements.getAllAchievements()" :key="badge.id"
+                     class="achievement-badge" :class="badge.unlocked ? 'unlocked' : 'locked'"
+                     :title="badge.unlocked ? badge.description : '???'">
+                  <svg class="badge-icon w-5 h-5" :class="badge.unlocked ? 'text-arcade-gold' : 'text-retro-muted/30'" fill="none" stroke="currentColor" viewBox="0 0 24 24" v-html="achievementSvgPath(badge.category)"></svg>
+                  <div class="font-pixel text-[6px] tracking-wider" :class="badge.unlocked ? 'text-arcade-gold' : 'text-retro-muted/40'">{{ badge.unlocked ? badge.name : '???' }}</div>
+                  <div v-if="badge.unlocked" class="font-mono text-[8px] text-crt-green mt-0.5">+{{ badge.xp }} XP</div>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Empty state -->
-          <div v-if="!hasDetailedStats && !hasGenreStats" class="text-center py-12">
+          <div v-if="!hasDetailedStats && !hasGenreStats" class="rounded-xl p-10 text-center" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 1.5px solid #252738;">
+            <svg class="w-10 h-10 text-retro-muted/20 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
             <div class="font-pixel text-[8px] text-retro-muted/50 mb-2">NO STATS YET</div>
             <p class="font-mono text-xs text-retro-muted/30">{{ isOwnProfile ? 'Play some games to see your stats here' : 'This player hasn\'t played any games yet' }}</p>
-          </div>
-        </div>
-
-        <!-- Tab: Game History (own profile only) -->
-        <div v-if="activeTab === 'history'" class="animate-fade-in">
-          <div v-if="history.length" class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
-            <div class="divide-y divide-retro-border/10">
-              <div v-for="(entry, idx) in history" :key="idx"
-                   class="px-4 sm:px-5 py-3 flex items-center gap-3 hover:bg-retro-surface/10 transition-colors">
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
-                     :style="entry.result === 'won' ? 'background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.2);' : entry.result === 'finished' ? 'background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.2);' : 'background: rgba(255,68,68,0.08); border: 1px solid rgba(255,68,68,0.2);'">
-                  <span v-html="entry.result === 'won' ? '&#10003;' : entry.result === 'finished' ? '&#10148;' : '&#10007;'"></span>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-2 mb-0.5">
-                    <span class="font-pixel text-[6px] tracking-wider"
-                          :class="entry.result === 'won' ? 'text-crt-green' : entry.result === 'finished' ? 'text-crt-cyan' : 'text-crt-red'">{{ getModeLabel(entry.mode) }}</span>
-                    <span class="font-mono text-[9px] text-retro-muted/50">{{ formatDate(entry.date) }}</span>
-                  </div>
-                  <p class="font-mono text-[10px] text-retro-muted truncate">{{ entry.start }}{{ entry.target ? ' -> ' + entry.target : '' }}</p>
-                </div>
-                <div class="text-right shrink-0">
-                  <div class="font-terminal text-sm text-crt-white tabular-nums">{{ entry.clicks }} clicks</div>
-                  <div class="font-mono text-[9px] text-retro-muted">{{ formatTime(entry.time) }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div v-else class="text-center py-12">
-            <div class="font-pixel text-[8px] text-retro-muted/50 mb-2">NO HISTORY</div>
-            <p class="font-mono text-xs text-retro-muted/30">Your recent games will appear here</p>
           </div>
         </div>
 
         <!-- Tab: Friends -->
         <div v-if="activeTab === 'friends'" class="space-y-3 animate-fade-in">
           <!-- Add friend form (own profile) -->
-          <div v-if="isOwnProfile" class="rounded-xl p-4 sm:p-5" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+          <div v-if="isOwnProfile" class="rounded-xl p-4 sm:p-5" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 1.5px solid #252738;">
             <div class="flex items-center gap-2.5 mb-3">
               <div class="w-1 h-4 rounded-full bg-crt-cyan"></div>
               <span class="font-pixel text-[8px] text-crt-cyan tracking-[0.2em]">ADD FRIEND</span>
@@ -316,7 +342,7 @@
 
           <!-- Pending requests (own profile) -->
           <div v-if="isOwnProfile && friendsComposable.incomingRequests.value.length > 0"
-               class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid rgba(255,191,0,0.25);">
+               class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 1.5px solid rgba(255,191,0,0.25);">
             <div class="px-4 sm:px-5 py-3 border-b border-retro-border/20 flex items-center gap-2.5">
               <div class="w-1 h-4 rounded-full bg-crt-amber"></div>
               <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">PENDING REQUESTS</span>
@@ -347,7 +373,7 @@
           </div>
 
           <!-- Friends list -->
-          <div class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+          <div class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 1.5px solid #252738;">
             <div class="px-4 sm:px-5 py-3 border-b border-retro-border/20 flex items-center gap-2.5">
               <div class="w-1 h-4 rounded-full bg-crt-green"></div>
               <span class="font-pixel text-[8px] text-crt-green tracking-[0.2em]">FRIENDS</span>
@@ -391,6 +417,9 @@
               </div>
             </div>
             <div v-else class="px-4 sm:px-5 py-8 text-center">
+              <svg class="w-8 h-8 text-retro-muted/15 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
               <div class="font-pixel text-[8px] text-retro-muted/50 mb-2">NO FRIENDS YET</div>
               <p class="font-mono text-xs text-retro-muted/30">{{ isOwnProfile ? 'Search for players above to add friends' : 'This player hasn\'t added any friends yet' }}</p>
             </div>
@@ -400,7 +429,7 @@
         <!-- Tab: Settings (own profile only) -->
         <div v-if="activeTab === 'settings'" class="space-y-3 animate-fade-in">
           <!-- Change Password -->
-          <div class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid #252738;">
+          <div class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 1.5px solid #252738;">
             <button @click="showChangePassword = !showChangePassword"
                     class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-retro-surface/30 transition-colors">
               <div class="flex items-center gap-2.5">
@@ -436,7 +465,7 @@
           </div>
 
           <!-- Danger Zone -->
-          <div class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 2px solid rgba(255,68,68,0.2);">
+          <div class="rounded-xl overflow-hidden" style="background: linear-gradient(180deg, #0d0e15, #0a0b12); border: 1.5px solid rgba(255,68,68,0.2);">
             <button @click="showDeleteSection = !showDeleteSection"
                     class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-crt-red/5 transition-colors">
               <div class="flex items-center gap-2.5">
@@ -545,7 +574,7 @@ const route = useRoute()
 const auth = useAuth()
 const api = useApi()
 const toast = useToast()
-const { GAME_MODES, GENRES, getStats, getHistory } = useGame()
+const { GAME_MODES, GENRES, getStats } = useGame()
 const progression = useProgression()
 const achievements = useAchievements()
 const friendsComposable = useFriends()
@@ -602,23 +631,50 @@ const winRate = computed(() => {
 
 const hasDetailedStats = computed(() => Object.keys(profileDetailedStats.value.modes || {}).length > 0)
 const hasGenreStats = computed(() => Object.keys(profileDetailedStats.value.genres || {}).length > 0)
-const history = computed(() => isOwnProfile.value ? getHistory() : [])
+
+const RANK_TIERS = [
+  { minLevel: 50, title: 'WIKI LEGEND', color: '#ff2ecc' },
+  { minLevel: 40, title: 'GRANDMASTER', color: '#b44cff' },
+  { minLevel: 30, title: 'MASTER', color: '#ff6b2b' },
+  { minLevel: 20, title: 'EXPERT', color: '#ffbf00' },
+  { minLevel: 15, title: 'VETERAN', color: '#00e5ff' },
+  { minLevel: 10, title: 'SPECIALIST', color: '#4c9fff' },
+  { minLevel: 5,  title: 'PATHFINDER', color: '#39ff14' },
+  { minLevel: 1,  title: 'NEWCOMER', color: '#555770' },
+]
+
+const currentRank = computed(() => {
+  const lvl = isOwnProfile.value ? progression.level.value : 1
+  return RANK_TIERS.find(r => lvl >= r.minLevel) || RANK_TIERS[RANK_TIERS.length - 1]
+})
+
+const rankTitle = computed(() => currentRank.value.title)
+const rankColor = computed(() => currentRank.value.color)
+
+function modeWinRate(modeStats) {
+  const played = modeStats.gamesPlayed || 0
+  if (played === 0) return 0
+  return Math.round(((modeStats.gamesWon || 0) / played) * 100)
+}
+
+const TAB_SVG_ICONS = {
+  stats: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />',
+  friends: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />',
+  settings: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />',
+}
 
 const availableTabs = computed(() => {
   const tabs = [
-    { id: 'stats', label: 'STATS', icon: '&#128200;' },
+    { id: 'stats', label: 'STATS', svgIcon: TAB_SVG_ICONS.stats },
   ]
-  if (isOwnProfile.value) {
-    tabs.push({ id: 'history', label: 'HISTORY', icon: '&#128214;' })
-  }
   tabs.push({
     id: 'friends',
     label: 'FRIENDS',
-    icon: '&#128101;',
+    svgIcon: TAB_SVG_ICONS.friends,
     badge: isOwnProfile.value ? friendsComposable.incomingRequests.value.length || null : null,
   })
   if (isOwnProfile.value) {
-    tabs.push({ id: 'settings', label: 'SETTINGS', icon: '&#9881;' })
+    tabs.push({ id: 'settings', label: 'SETTINGS', svgIcon: TAB_SVG_ICONS.settings })
   }
   return tabs
 })
@@ -661,8 +717,21 @@ function getGenreLabel(genreId) {
   return GENRES[genreId]?.name || genreId || 'Unknown'
 }
 
-function getGenreEmoji(genreId) {
-  return GENRES[genreId]?.emoji || '?'
+function getGenreSvgIcon(genreId) {
+  return GENRES[genreId]?.svgIcon || ''
+}
+
+const ACHIEVEMENT_CATEGORY_SVG = {
+  speed: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />',
+  efficiency: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />',
+  milestone: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />',
+  dedication: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />',
+  explorer: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />',
+  mode: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />',
+  special: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />',
+}
+function achievementSvgPath(category) {
+  return ACHIEVEMENT_CATEGORY_SVG[category] || ACHIEVEMENT_CATEGORY_SVG.milestone
 }
 
 function formatTime(seconds) {
@@ -670,12 +739,6 @@ function formatTime(seconds) {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function formatDate(isoString) {
-  if (!isoString) return ''
-  const d = new Date(isoString)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 async function loadProfile() {
@@ -891,7 +954,6 @@ function startInviteMatch() {
   }).catch(() => toast.error('Failed to start match'))
 }
 
-// Close search results when clicking outside
 function handleGlobalClick(e) {
   if (!e.target.closest('.relative')) {
     showSearchResults.value = false
