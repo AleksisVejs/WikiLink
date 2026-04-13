@@ -613,7 +613,12 @@ const showPathReplay = ref(false)
 const pathReplayIndex = ref(0)
 const activeModifiers = computed(() => {
   const modParam = route.query.modifiers
-  return modParam ? modParam.split(',').filter(Boolean) : []
+  if (!modParam) return []
+  const valid = modParam.split(',').filter(id => id && game.MODIFIERS[id])
+  if (valid.length !== modParam.split(',').filter(Boolean).length) {
+    toast.error('Invalid modifier detected — removed unknown modifiers')
+  }
+  return valid
 })
 
 const currentMode = computed(() => game.currentMode.value)
@@ -729,7 +734,7 @@ function processPostGame(won) {
 }
 
 function buildProcessedHtml(data) {
-  if (!data?.html) return ''
+  if (!data?.html) return { html: '', allowedTitles: new Set() }
   const parser = new DOMParser()
   const doc = parser.parseFromString(data.html, 'text/html')
 
@@ -784,10 +789,10 @@ function buildProcessedHtml(data) {
 }
 
 const processedResult = computed(() => buildProcessedHtml(articleData.value))
-const processedHtml = computed(() => processedResult.value.html || '')
+const processedHtml = computed(() => processedResult.value.html)
 
 watch(processedResult, (result) => {
-  if (result.allowedTitles) validLinks.value = result.allowedTitles
+  validLinks.value = result.allowedTitles
 })
 
 async function initializeGame() {
@@ -800,88 +805,76 @@ async function initializeGame() {
   setTimeout(() => bootStep.value = 2, 800)
   setTimeout(() => bootStep.value = 3, 1300)
 
-  if (props.mode === 'daily') {
-    let pair = null
-    // Try server-side daily pair first
-    try {
-      const serverDaily = await api.get('/daily')
-      if (serverDaily.start && serverDaily.end) {
-        pair = { start: serverDaily.start, end: serverDaily.end }
-      }
-    } catch { /* fall through */ }
-    // Fall back to client-side generation, then save to server
-    if (!pair) {
-      pair = await wiki.getDailyPair()
-      if (pair) {
-        try { await api.post('/daily', { start: pair.start, end: pair.end }) } catch { /* ignore */ }
-      }
-    }
-    if (!pair) { toast.error('Failed to load daily challenge'); router.push({ name: 'home' }); return }
-    game.initGame('daily', pair.start, pair.end, 'random', 'normal')
-    await loadArticle(pair.start.title)
-  } else if (props.mode === 'custom') {
-    // Check for shared challenge code
-    const codeQ = typeof route.query.code === 'string' ? route.query.code.trim() : ''
-    let fromQ = typeof route.query.from === 'string' ? route.query.from.trim() : ''
-    let toQ = typeof route.query.to === 'string' ? route.query.to.trim() : ''
-    if (codeQ && (!fromQ || !toQ)) {
+  try {
+    if (props.mode === 'daily') {
+      let pair = null
       try {
-        const ch = await api.get(`/challenge/${codeQ}`)
-        fromQ = ch.start_title || fromQ
-        toQ = ch.end_title || toQ
-      } catch {
-        toast.error('Challenge not found')
-        router.push({ name: 'home' })
-        return
+        const serverDaily = await api.get('/daily')
+        if (serverDaily.start && serverDaily.end) {
+          pair = { start: serverDaily.start, end: serverDaily.end }
+        }
+      } catch { /* fall through */ }
+      if (!pair) {
+        pair = await wiki.getDailyPair()
+        if (pair) {
+          try { await api.post('/daily', { start: pair.start, end: pair.end }) } catch { /* ignore */ }
+        }
       }
-    }
-    if (!fromQ || !toQ) {
-      toast.error('Custom game needs start and target articles')
-      router.push({ name: 'home' })
-      return
-    }
-    if (fromQ.toLowerCase() === toQ.toLowerCase()) {
-      toast.error('Start and target must be different articles')
-      router.push({ name: 'home' })
-      return
-    }
-    const [startArticle, targetArticle] = await Promise.all([
-      wiki.getArticleSummary(fromQ),
-      wiki.getArticleSummary(toQ),
-    ])
-    if (!startArticle || !targetArticle) {
-      toast.error('Could not find one or both articles. Check the titles and try again.')
-      router.push({ name: 'home' })
-      return
-    }
-    game.initGame('custom', startArticle, targetArticle, 'random', 'normal')
-    await loadArticle(startArticle.title)
-  } else if (props.mode === 'trending') {
-    const pair = await trending.getTrendingPair()
-    if (!pair) {
-      toast.warn('Trending data unavailable, falling back to random')
-      const fallback = await wiki.getRandomPairByGenre(genre.value)
-      if (!fallback) { toast.error('Could not find article pair'); router.push({ name: 'home' }); return }
-      game.initGame('trending', fallback.start, fallback.end, 'random', 'normal', {}, activeModifiers.value)
-      await loadArticle(fallback.start.title)
+      if (!pair) { toast.error('Failed to load daily challenge'); router.push({ name: 'home' }); return }
+      game.initGame('daily', pair.start, pair.end, 'random', 'normal')
+      await loadArticle(pair.start.title)
+    } else if (props.mode === 'custom') {
+      const codeQ = typeof route.query.code === 'string' ? route.query.code.trim() : ''
+      let fromQ = typeof route.query.from === 'string' ? route.query.from.trim() : ''
+      let toQ = typeof route.query.to === 'string' ? route.query.to.trim() : ''
+      if (codeQ && (!fromQ || !toQ)) {
+        try {
+          const ch = await api.get(`/challenge/${codeQ}`)
+          fromQ = ch.start_title || fromQ
+          toQ = ch.end_title || toQ
+        } catch {
+          toast.error('Challenge not found')
+          router.push({ name: 'home' })
+          return
+        }
+      }
+      if (!fromQ || !toQ) { toast.error('Custom game needs start and target articles'); router.push({ name: 'home' }); return }
+      if (fromQ.toLowerCase() === toQ.toLowerCase()) { toast.error('Start and target must be different articles'); router.push({ name: 'home' }); return }
+      const [startArticle, targetArticle] = await Promise.all([
+        wiki.getArticleSummary(fromQ),
+        wiki.getArticleSummary(toQ),
+      ])
+      if (!startArticle || !targetArticle) { toast.error('Could not find one or both articles. Check the titles and try again.'); router.push({ name: 'home' }); return }
+      game.initGame('custom', startArticle, targetArticle, 'random', 'normal')
+      await loadArticle(startArticle.title)
+    } else if (props.mode === 'trending') {
+      const pair = await trending.getTrendingPair()
+      if (!pair) {
+        toast.warn('Trending data unavailable, falling back to random')
+        const fallback = await wiki.getRandomPairByGenre(genre.value)
+        if (!fallback) { toast.error('Could not find article pair'); router.push({ name: 'home' }); return }
+        game.initGame('trending', fallback.start, fallback.end, 'random', 'normal', {}, activeModifiers.value)
+        await loadArticle(fallback.start.title)
+      } else {
+        game.initGame('trending', pair.start, pair.end, 'random', 'normal', {}, activeModifiers.value)
+        await loadArticle(pair.start.title)
+      }
+    } else if (game.GAME_MODES[props.mode]?.noTarget) {
+      const startArticle = await wiki.getRandomArticleByGenre(genre.value)
+      if (!startArticle) { toast.error('Failed to load article'); router.push({ name: 'home' }); return }
+      game.initGame(props.mode, startArticle, null, genreId.value, difficulty.value, customLimitsFromRoute.value, activeModifiers.value)
+      await loadArticle(startArticle.title)
     } else {
-      game.initGame('trending', pair.start, pair.end, 'random', 'normal', {}, activeModifiers.value)
+      const pair = await wiki.getRandomPairByGenre(genre.value)
+      if (!pair) { toast.error('Could not find article pair'); router.push({ name: 'home' }); return }
+      game.initGame(props.mode, pair.start, pair.end, genreId.value, difficulty.value, customLimitsFromRoute.value, activeModifiers.value)
       await loadArticle(pair.start.title)
     }
-  } else if (game.GAME_MODES[props.mode]?.noTarget) {
-    const startArticle = await wiki.getRandomArticleByGenre(genre.value)
-    if (!startArticle) { toast.error('Failed to load article'); router.push({ name: 'home' }); return }
-    game.initGame(props.mode, startArticle, null, genreId.value, difficulty.value, customLimitsFromRoute.value, activeModifiers.value)
-    await loadArticle(startArticle.title)
-  } else {
-    const pair = await wiki.getRandomPairByGenre(genre.value)
-    if (!pair) { toast.error('Could not find article pair'); router.push({ name: 'home' }); return }
-    game.initGame(props.mode, pair.start, pair.end, genreId.value, difficulty.value, customLimitsFromRoute.value, activeModifiers.value)
-    await loadArticle(pair.start.title)
-  }
 
-  initialLoading.value = false
-  sound.playStart()
+    sound.playStart()
+  } finally {
+    initialLoading.value = false
+  }
 }
 
 async function loadArticle(title) {
@@ -907,6 +900,14 @@ function handleLinkClick(event) {
 
   const title = link.getAttribute('data-wiki-title')
   if (!title) return
+
+  const normalizedTitle = title.replace(/ /g, '_')
+  const isValid = validLinks.value.has(title) || validLinks.value.has(normalizedTitle)
+    || validLinks.value.has(title.replace(/_/g, ' '))
+  if (!isValid) {
+    toast.error('Invalid link — this page is not reachable from here')
+    return
+  }
 
   sound.playNavigate()
   const gameOver = game.navigateTo(title)

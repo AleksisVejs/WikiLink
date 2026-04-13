@@ -740,14 +740,16 @@
 }
 
 /* ===== FOG OF WAR MODIFIER ===== */
-.fog-mode .wiki-link {
+.wiki-content.fog-mode .wiki-link,
+.wiki-content.fog-mode a.wiki-link {
   color: transparent !important;
   text-decoration-color: transparent !important;
   background: #252738;
   border-radius: 2px;
   transition: all 0.3s;
 }
-.fog-mode .wiki-link:hover {
+.wiki-content.fog-mode .wiki-link:hover,
+.wiki-content.fog-mode a.wiki-link:hover {
   color: #39ff14 !important;
   text-decoration-color: rgba(57,255,20,0.25) !important;
   background: transparent;

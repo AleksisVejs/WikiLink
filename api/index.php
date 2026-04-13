@@ -152,6 +152,7 @@ if ($method === 'GET' && $uri === '/daily') {
 
 // POST /daily
 if ($method === 'POST' && $uri === '/daily') {
+    requireAuth();
     requireRateLimit('daily_set', 3, 60);
     $body = jsonInput();
     $date = gmdate('Y-m-d');

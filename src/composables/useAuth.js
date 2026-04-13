@@ -26,8 +26,7 @@ async function init() {
     streak.value = data.streak || 0
     hydrateLocalStats(data.stats)
   } catch (e) {
-    const isAuthError = e.message && (e.message.includes('401') || e.message.includes('403') || e.message.toLowerCase().includes('unauthorized') || e.message.toLowerCase().includes('invalid'))
-    if (isAuthError) {
+    if (e.status === 401 || e.status === 403) {
       localStorage.removeItem(TOKEN_KEY)
       user.value = null
     }

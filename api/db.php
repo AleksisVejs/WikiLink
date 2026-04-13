@@ -90,6 +90,15 @@ function initSchema($db) {
     }
 }
 
+function generateUniqueCode($length = 6) {
+    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    $code = '';
+    for ($i = 0; $i < $length; $i++) {
+        $code .= $chars[random_int(0, strlen($chars) - 1)];
+    }
+    return $code;
+}
+
 function checkRateLimit($action, $maxAttempts = 10, $windowSeconds = 300) {
     $db = getDb();
     $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown';

@@ -292,13 +292,7 @@ export function useGame() {
     return false
   }
 
-  function endGame(result) {
-    state.status = result
-    state.elapsed = Math.floor((Date.now() - state.startTime) / 1000)
-    stopTimer()
-    saveStats(result)
-    saveHistory(result)
-    if (state.mode === 'daily' && result === 'won') saveDailyResult()
+  function syncStatsToServer(won) {
     try {
       const api = useApi()
       const isLoggedIn = !!localStorage.getItem('wikilink_token')
@@ -308,12 +302,22 @@ export function useGame() {
           genre: state.genre || 'random',
           clicks: state.clicks,
           time: state.elapsed,
-          won: result === 'won',
+          won,
         }).catch(() => {})
       } else {
-        api.post('/stats/increment', { clicks: state.clicks, won: result === 'won' }).catch(() => {})
+        api.post('/stats/increment', { clicks: state.clicks, won }).catch(() => {})
       }
     } catch { /* ignore */ }
+  }
+
+  function endGame(result) {
+    state.status = result
+    state.elapsed = Math.floor((Date.now() - state.startTime) / 1000)
+    stopTimer()
+    saveStats(result)
+    saveHistory(result)
+    if (state.mode === 'daily' && result === 'won') saveDailyResult()
+    syncStatsToServer(result === 'won')
   }
 
   function saveStats(result) {
@@ -334,6 +338,8 @@ export function useGame() {
       if (ms.currentStreak > ms.bestStreak) ms.bestStreak = ms.currentStreak
       if (ms.bestClicks === null || state.clicks < ms.bestClicks) ms.bestClicks = state.clicks
       if (ms.bestTime === null || state.elapsed < ms.bestTime) ms.bestTime = state.elapsed
+    } else if (result === 'finished') {
+      // Freeplay: count as played but not won or lost; don't break streak
     } else {
       ms.gamesLost++
       ms.currentStreak = 0
@@ -345,7 +351,7 @@ export function useGame() {
     }
     stats.genres[genre].gamesPlayed++
     if (result === 'won') stats.genres[genre].gamesWon++
-    else stats.genres[genre].gamesLost++
+    else if (result !== 'finished') stats.genres[genre].gamesLost++
 
     localStorage.setItem(STATS_KEY, JSON.stringify(stats))
   }
@@ -392,23 +398,9 @@ export function useGame() {
       state.status = 'won'
       state.elapsed = Math.floor((Date.now() - state.startTime) / 1000)
       stopTimer()
-      saveStats('won')
+      saveStats('finished')
       saveHistory('finished')
-      try {
-        const api = useApi()
-        const isLoggedIn = !!localStorage.getItem('wikilink_token')
-        if (isLoggedIn) {
-          api.post('/stats/game', {
-            mode: state.mode,
-            genre: state.genre || 'random',
-            clicks: state.clicks,
-            time: state.elapsed,
-            won: true,
-          }).catch(() => {})
-        } else {
-          api.post('/stats/increment', { clicks: state.clicks, won: true }).catch(() => {})
-        }
-      } catch { /* ignore */ }
+      syncStatsToServer(false)
     }
   }
 

@@ -5,7 +5,8 @@ import { useWikipedia } from './useWikipedia.js'
 const trendingArticles = ref([])
 const trendingLoaded = ref(false)
 const trendingLoading = ref(false)
-const trendingFailed = ref(false)
+let trendingFailedAt = 0
+const TRENDING_RETRY_MS = 60_000
 
 function fisherYatesShuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -20,18 +21,20 @@ export function useTrending() {
   const wiki = useWikipedia()
 
   async function fetchTrending() {
-    if (trendingLoaded.value || trendingLoading.value || trendingFailed.value) return trendingArticles.value
+    if (trendingLoaded.value || trendingLoading.value) return trendingArticles.value
+    if (trendingFailedAt && (Date.now() - trendingFailedAt) < TRENDING_RETRY_MS) return trendingArticles.value
     trendingLoading.value = true
     try {
       const data = await api.get('/trending')
       if (data.articles && data.articles.length > 0) {
         trendingArticles.value = data.articles
         trendingLoaded.value = true
+        trendingFailedAt = 0
       } else {
-        trendingFailed.value = true
+        trendingFailedAt = Date.now()
       }
     } catch {
-      trendingFailed.value = true
+      trendingFailedAt = Date.now()
     } finally {
       trendingLoading.value = false
     }

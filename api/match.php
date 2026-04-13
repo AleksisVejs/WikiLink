@@ -21,25 +21,21 @@ function ensureMatchTable() {
     )");
 }
 
-function generateMatchCode() {
-    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    $code = '';
-    for ($i = 0; $i < 6; $i++) {
-        $code .= $chars[random_int(0, strlen($chars) - 1)];
-    }
-    return $code;
-}
-
 function createMatch($startTitle, $endTitle, $userId) {
+    $startTitle = trim($startTitle);
+    $endTitle = trim($endTitle);
     if (empty($startTitle) || empty($endTitle)) {
         return ['error' => 'Both start and end titles are required.'];
+    }
+    if (strtolower($startTitle) === strtolower($endTitle)) {
+        return ['error' => 'Start and end must be different.'];
     }
 
     ensureMatchTable();
     $db = getDb();
 
     for ($attempt = 0; $attempt < 10; $attempt++) {
-        $code = generateMatchCode();
+        $code = generateUniqueCode();
         try {
             $stmt = $db->prepare('INSERT INTO matches (code, start_title, end_title, player1_id) VALUES (?, ?, ?, ?)');
             $stmt->execute([$code, $startTitle, $endTitle, $userId]);
@@ -145,6 +141,9 @@ function getMatchStatus($code, $userId) {
     $match = $stmt->fetch();
 
     if (!$match) return ['error' => 'Match not found.'];
+    if ($match['player1_id'] != $userId && $match['player2_id'] != $userId) {
+        return ['error' => 'You are not in this match.'];
+    }
 
     return formatMatchResult($match, $userId);
 }
