@@ -89,13 +89,18 @@ async function runFetch(q) {
   }
   const gen = ++fetchGeneration
   searching.value = true
-  const list = await wiki.searchArticleTitles(trimmed, 10)
-  searching.value = false
-  if (gen !== fetchGeneration) return
-  if (trimmed !== props.modelValue.trim()) return
-  suggestions.value = list
-  highlightIndex.value = list.length ? 0 : -1
-  syncActiveId()
+  try {
+    const list = await wiki.searchArticleTitles(trimmed, 10)
+    if (gen !== fetchGeneration) return
+    if (trimmed !== props.modelValue.trim()) return
+    suggestions.value = list
+    highlightIndex.value = list.length ? 0 : -1
+    syncActiveId()
+  } catch {
+    if (gen === fetchGeneration) suggestions.value = []
+  } finally {
+    if (gen === fetchGeneration) searching.value = false
+  }
 }
 
 function onInput(e) {
@@ -107,6 +112,7 @@ function onInput(e) {
 }
 
 function onFocus() {
+  clearBlurTimer()
   open.value = true
   if (props.modelValue.trim().length >= 2) {
     scheduleFetch(props.modelValue)

@@ -25,9 +25,12 @@ async function init() {
     user.value = data.user
     streak.value = data.streak || 0
     hydrateLocalStats(data.stats)
-  } catch {
-    localStorage.removeItem(TOKEN_KEY)
-    user.value = null
+  } catch (e) {
+    const isAuthError = e.message && (e.message.includes('401') || e.message.includes('403') || e.message.toLowerCase().includes('unauthorized') || e.message.toLowerCase().includes('invalid'))
+    if (isAuthError) {
+      localStorage.removeItem(TOKEN_KEY)
+      user.value = null
+    }
   }
 }
 

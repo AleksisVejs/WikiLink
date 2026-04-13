@@ -810,6 +810,7 @@ const api = useApi()
 const trending = useTrending()
 const progression = useProgression()
 const achievements = useAchievements()
+const wiki = useWikipedia()
 
 const showStats = ref(false)
 const showAuthModal = ref(false)
@@ -977,7 +978,6 @@ async function createMatch() {
   matchLoading.value = true
   matchError.value = ''
   try {
-    const wiki = useWikipedia()
     const pair = await wiki.getRandomPairByGenre(genres.find(g => g.id === selectedGenreId.value))
     if (!pair) { matchError.value = 'Could not generate articles'; return }
     const result = await api.post('/match/create', { startTitle: pair.start.title, endTitle: pair.end.title })
@@ -1044,7 +1044,7 @@ function startCreatedMatch() {
 
 function copyMatchCode() {
   if (!matchCode.value) return
-  navigator.clipboard.writeText(matchCode.value).then(() => toast.success('Code copied!')).catch(() => {})
+  navigator.clipboard.writeText(matchCode.value).then(() => toast.success('Code copied!')).catch(() => toast.warn('Could not copy to clipboard'))
 }
 
 function formatTime(seconds) {

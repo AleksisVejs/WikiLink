@@ -7,7 +7,14 @@ import NotFoundView from '../views/NotFoundView.vue'
 const routes = [
   { path: '/', name: 'home', component: HomeView },
   { path: '/play/:mode', name: 'game', component: GameView, props: true },
-  { path: '/profile', name: 'profile', component: ProfileView },
+  {
+    path: '/profile',
+    name: 'profile',
+    component: ProfileView,
+    beforeEnter: () => {
+      if (!localStorage.getItem('wikilink_token')) return { name: 'home' }
+    },
+  },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundView },
 ]
 

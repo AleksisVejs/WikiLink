@@ -211,7 +211,8 @@ const showDeletePw = ref(false)
 const memberSince = computed(() => {
   const createdAt = auth.user.value?.created_at
   if (!createdAt) return null
-  const d = new Date(createdAt + 'Z')
+  const d = new Date(createdAt.endsWith('Z') || createdAt.includes('+') ? createdAt : createdAt + 'Z')
+  if (isNaN(d.getTime())) return null
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 })
 

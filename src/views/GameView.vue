@@ -600,6 +600,7 @@ const dailyLeaderboard = ref([])
 const matchCode = computed(() => route.query.match || null)
 const matchResult = ref(null)
 const matchPolling = ref(false)
+let matchPollTimerId = null
 const showScreenShake = ref(false)
 const showRedVignette = ref(false)
 const comboDisplay = ref(null)
@@ -727,10 +728,10 @@ function processPostGame(won) {
   }
 }
 
-const processedHtml = computed(() => {
-  if (!articleData.value?.html) return ''
+function buildProcessedHtml(data) {
+  if (!data?.html) return ''
   const parser = new DOMParser()
-  const doc = parser.parseFromString(articleData.value.html, 'text/html')
+  const doc = parser.parseFromString(data.html, 'text/html')
 
   doc.querySelectorAll(
     '.mw-editsection, .reference, .reflist, .navbox, .sistersitebox, ' +
@@ -740,8 +741,7 @@ const processedHtml = computed(() => {
   ).forEach(el => el.remove())
 
   const links = doc.querySelectorAll('a[href]')
-  const allowedTitles = new Set(articleData.value.links || [])
-  validLinks.value = allowedTitles
+  const allowedTitles = new Set(data.links || [])
 
   links.forEach(link => {
     const href = link.getAttribute('href')
@@ -780,7 +780,14 @@ const processedHtml = computed(() => {
     })
   }
 
-  return doc.body.innerHTML
+  return { html: doc.body.innerHTML, allowedTitles }
+}
+
+const processedResult = computed(() => buildProcessedHtml(articleData.value))
+const processedHtml = computed(() => processedResult.value.html || '')
+
+watch(processedResult, (result) => {
+  if (result.allowedTitles) validLinks.value = result.allowedTitles
 })
 
 async function initializeGame() {
@@ -1095,7 +1102,7 @@ async function pollMatchResult() {
       return
     }
   } catch { /* ignore */ }
-  setTimeout(pollMatchResult, 3000)
+  matchPollTimerId = setTimeout(pollMatchResult, 3000)
 }
 
 async function submitDailyScore() {
@@ -1183,6 +1190,7 @@ onUnmounted(() => {
   clearTimeout(hoverTimer)
   if (pathReplayInterval) clearInterval(pathReplayInterval)
   matchPolling.value = false
+  if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
   game.resetGame()
 })
 </script>

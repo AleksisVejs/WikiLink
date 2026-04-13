@@ -53,6 +53,7 @@ function createMatch($startTitle, $endTitle, $userId) {
 }
 
 function joinMatch($code, $userId) {
+    $code = strtoupper(trim($code));
     ensureMatchTable();
     $db = getDb();
 
@@ -98,6 +99,7 @@ function joinMatch($code, $userId) {
 }
 
 function submitMatchResult($code, $userId, $clicks, $time, $path) {
+    $code = strtoupper(trim($code));
     ensureMatchTable();
     $db = getDb();
 
@@ -134,6 +136,7 @@ function submitMatchResult($code, $userId, $clicks, $time, $path) {
 }
 
 function getMatchStatus($code, $userId) {
+    $code = strtoupper(trim($code));
     ensureMatchTable();
     $db = getDb();
 

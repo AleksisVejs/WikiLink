@@ -5,22 +5,33 @@ import { useWikipedia } from './useWikipedia.js'
 const trendingArticles = ref([])
 const trendingLoaded = ref(false)
 const trendingLoading = ref(false)
+const trendingFailed = ref(false)
+
+function fisherYatesShuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
 
 export function useTrending() {
   const api = useApi()
   const wiki = useWikipedia()
 
   async function fetchTrending() {
-    if (trendingLoaded.value || trendingLoading.value) return trendingArticles.value
+    if (trendingLoaded.value || trendingLoading.value || trendingFailed.value) return trendingArticles.value
     trendingLoading.value = true
     try {
       const data = await api.get('/trending')
       if (data.articles && data.articles.length > 0) {
         trendingArticles.value = data.articles
         trendingLoaded.value = true
+      } else {
+        trendingFailed.value = true
       }
     } catch {
-      /* will fall back to random if trending unavailable */
+      trendingFailed.value = true
     } finally {
       trendingLoading.value = false
     }
@@ -31,17 +42,27 @@ export function useTrending() {
     const articles = await fetchTrending()
     if (!articles || articles.length < 2) return null
 
-    const shuffled = [...articles].sort(() => Math.random() - 0.5)
-    for (let i = 0; i < Math.min(shuffled.length, 10); i++) {
-      for (let j = i + 1; j < Math.min(shuffled.length, 10); j++) {
+    const shuffled = fisherYatesShuffle([...articles])
+    const candidates = shuffled.slice(0, 10)
+
+    const summaryCache = new Map()
+    async function getSummary(article) {
+      if (summaryCache.has(article.title)) return summaryCache.get(article.title)
+      const summary = await wiki.getArticleSummary(article.title)
+      summaryCache.set(article.title, summary)
+      return summary
+    }
+
+    for (let i = 0; i < candidates.length; i++) {
+      for (let j = i + 1; j < candidates.length; j++) {
         const [startSummary, endSummary] = await Promise.all([
-          wiki.getArticleSummary(shuffled[i].title),
-          wiki.getArticleSummary(shuffled[j].title),
+          getSummary(candidates[i]),
+          getSummary(candidates[j]),
         ])
         if (startSummary && endSummary && startSummary.title !== endSummary.title) {
           return {
-            start: { ...startSummary, views: shuffled[i].views },
-            end: { ...endSummary, views: shuffled[j].views },
+            start: { ...startSummary, views: candidates[i].views },
+            end: { ...endSummary, views: candidates[j].views },
           }
         }
       }

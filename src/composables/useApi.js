@@ -17,7 +17,7 @@ async function request(path, opts = {}) {
     data = text ? JSON.parse(text) : {}
   } catch {
     if (!res.ok) throw new Error(`Request failed (${res.status})`)
-    return {}
+    return { _raw: text }
   }
 
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`)

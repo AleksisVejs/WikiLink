@@ -45,10 +45,6 @@ export function useAchievements() {
   const unlockedCount = computed(() => Object.keys(unlockedMap.value).length)
   const totalCount = computed(() => Object.keys(ACHIEVEMENTS).length)
 
-  function isUnlocked(id) {
-    return !!unlockedMap.value[id]
-  }
-
   function unlock(id) {
     if (unlockedMap.value[id]) return false
     if (!ACHIEVEMENTS[id]) return false

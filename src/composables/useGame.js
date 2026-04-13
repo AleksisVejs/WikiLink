@@ -392,7 +392,23 @@ export function useGame() {
       state.status = 'won'
       state.elapsed = Math.floor((Date.now() - state.startTime) / 1000)
       stopTimer()
+      saveStats('won')
       saveHistory('finished')
+      try {
+        const api = useApi()
+        const isLoggedIn = !!localStorage.getItem('wikilink_token')
+        if (isLoggedIn) {
+          api.post('/stats/game', {
+            mode: state.mode,
+            genre: state.genre || 'random',
+            clicks: state.clicks,
+            time: state.elapsed,
+            won: true,
+          }).catch(() => {})
+        } else {
+          api.post('/stats/increment', { clicks: state.clicks, won: true }).catch(() => {})
+        }
+      } catch { /* ignore */ }
     }
   }
 
