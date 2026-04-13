@@ -278,10 +278,9 @@
               </div>
               <div class="text-left min-w-0">
                 <div class="flex items-center gap-2">
-                  <span class="font-pixel text-[8px] text-arcade-purple tracking-[0.15em]">1v1 MATCH</span>
-                  <span class="font-mono text-[9px] px-1.5 py-0.5 rounded" style="color: #b44cff; background: rgba(180,76,255,0.08); border: 1px solid rgba(180,76,255,0.2);">PVP</span>
+                  <span class="font-pixel text-[8px] text-arcade-purple tracking-[0.15em]">PVP</span>
                 </div>
-                <p class="font-mono text-[10px] sm:text-[11px] text-retro-muted truncate mt-0.5">Challenge a friend to the same pair. Who wins?</p>
+                <p class="font-mono text-[10px] sm:text-[11px] text-retro-muted truncate mt-0.5">Challenge a friend or create a lobby of up to 8 players.</p>
               </div>
             </div>
             <svg class="w-5 h-5 text-arcade-purple/30 group-hover:text-arcade-purple group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -692,12 +691,12 @@
       <transition name="fade">
         <div v-if="showMatchModal" class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
           <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="showMatchModal = false"></div>
-          <div class="relative rounded-2xl p-6 max-w-sm w-full animate-scale-in"
+          <div class="relative rounded-2xl p-5 sm:p-6 max-w-[400px] w-full animate-scale-in"
                style="background: #0d0e15; border: 1.5px solid rgba(180,76,255,0.25); box-shadow: 0 0 60px rgba(0,0,0,0.8), 0 0 30px rgba(180,76,255,0.06);">
             <div class="flex items-center justify-between mb-5">
               <div class="flex items-center gap-2.5">
                 <div class="w-1 h-4 rounded-full bg-arcade-purple"></div>
-                <h2 class="font-pixel text-[9px] text-arcade-purple tracking-[0.2em]">1v1 MATCH</h2>
+                <h2 class="font-pixel text-[9px] text-arcade-purple tracking-[0.2em]">PVP</h2>
               </div>
               <button @click="showMatchModal = false" class="btn-ghost p-1.5">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -706,7 +705,36 @@
               </button>
             </div>
 
-            <template v-if="matchTab === 'waiting'">
+            <template v-if="matchTab === 'group' && groupView === 'waiting'">
+              <div class="text-center py-3">
+                <div class="font-pixel text-[8px] mb-2 tracking-wider text-crt-cyan">GROUP LOBBY</div>
+                <div class="font-terminal text-3xl text-arcade-purple mb-2 tracking-[0.25em]">{{ groupLobbyCode }}</div>
+                <p class="font-mono text-[10px] text-retro-muted mb-3">Share the code. Host starts when everyone is ready (min. 2 players).</p>
+                <div class="rounded-lg px-3 py-2 mb-3 text-left" style="background: #12131c; border: 1px solid #252738;">
+                  <div class="font-pixel text-[6px] text-retro-muted mb-1.5 tracking-wider">PLAYERS ({{ groupLobbyData?.players?.length || 0 }} / {{ groupLobbyData?.max_players || '—' }})</div>
+                  <ul class="font-mono text-[11px] text-crt-white space-y-1 max-h-[140px] overflow-y-auto">
+                    <li v-for="p in groupLobbyData?.players || []" :key="p.user_id" class="flex items-center justify-between gap-2">
+                      <span class="truncate">{{ p.username }}<span v-if="p.user_id === auth.user.value?.id" class="text-crt-green/60 text-[9px] ml-1">(you)</span></span>
+                      <span v-if="groupLobbyData?.host_id === p.user_id" class="font-pixel text-[6px] text-crt-amber shrink-0">HOST</span>
+                    </li>
+                  </ul>
+                </div>
+                <div v-if="groupLobbyData?.status === 'waiting'" class="flex flex-col gap-2">
+                  <div v-if="groupLobbyData?.is_host" class="flex gap-2">
+                    <button type="button" @click="copyGroupLobbyCode" class="btn-retro-ghost flex-1 !py-2 text-[10px]">COPY CODE</button>
+                    <button type="button" @click="postStartGroupLobby" :disabled="groupStartLoading || (groupLobbyData?.players?.length || 0) < 2"
+                            class="flex-1 !py-2 !text-[9px]"
+                            :class="(groupLobbyData?.players?.length || 0) >= 2 ? 'btn-retro-primary' : 'btn-retro-ghost opacity-40 cursor-not-allowed'">
+                      {{ groupStartLoading ? '...' : 'START' }}
+                    </button>
+                  </div>
+                  <div v-else class="font-mono text-[10px] text-crt-amber/80 animate-blink-slow">Waiting for host to start...</div>
+                </div>
+                <div v-if="groupError" class="font-mono text-[11px] text-crt-red mt-2">{{ groupError }}</div>
+              </div>
+            </template>
+
+            <template v-else-if="matchTab === 'waiting'">
               <div class="text-center py-4">
                 <div class="font-pixel text-[8px] mb-3 tracking-wider"
                      :class="matchStatus === 'ready' ? 'text-crt-green' : 'text-crt-amber'">
@@ -722,9 +750,12 @@
                 </div>
 
                 <!-- Ready indicator -->
-                <div v-else class="flex items-center justify-center gap-2 mb-4 py-2">
-                  <span class="w-2 h-2 rounded-full bg-crt-green" style="box-shadow: 0 0 6px rgba(57,255,20,0.5);"></span>
-                  <span class="font-mono text-[11px] text-crt-green">Opponent is ready!</span>
+                <div v-else class="flex flex-col items-center justify-center gap-1 mb-4 py-2">
+                  <div class="flex items-center justify-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-crt-green" style="box-shadow: 0 0 6px rgba(57,255,20,0.5);"></span>
+                    <span class="font-mono text-[11px] text-crt-green">Opponent is ready!</span>
+                  </div>
+                  <span v-if="matchOpponentUsername" class="font-mono text-[10px] text-arcade-purple/80">{{ matchOpponentUsername }}</span>
                 </div>
 
                 <div class="flex gap-2">
@@ -742,30 +773,86 @@
             </template>
 
             <template v-else>
-              <div class="flex gap-1 mb-4">
-                <button @click="matchTab = 'create'" class="font-pixel text-[8px] px-3 py-1.5 rounded transition-all"
-                        :class="matchTab === 'create' ? 'text-arcade-purple bg-arcade-purple/10' : 'text-retro-muted'">CREATE</button>
-                <button @click="matchTab = 'join'" class="font-pixel text-[8px] px-3 py-1.5 rounded transition-all"
-                        :class="matchTab === 'join' ? 'text-crt-cyan bg-crt-cyan/10' : 'text-retro-muted'">JOIN</button>
+              <!-- One choice: duel vs group (no separate create/join tabs) -->
+              <div class="flex p-1 mb-5 rounded-xl gap-1" style="background: #12131c; border: 1px solid #252738;">
+                <button type="button"
+                        class="flex-1 font-pixel text-[8px] tracking-[0.12em] py-2.5 rounded-lg transition-all duration-200"
+                        :class="matchTab === 'duel'
+                          ? 'text-crt-white'
+                          : 'text-retro-muted hover:text-crt-white/75'"
+                        :style="matchTab === 'duel'
+                          ? 'background: linear-gradient(180deg, rgba(180,76,255,0.28), rgba(180,76,255,0.08)); border: 1px solid rgba(180,76,255,0.4); box-shadow: 0 0 16px rgba(180,76,255,0.12);'
+                          : 'border: 1px solid transparent;'"
+                        @click="switchPvpHub('duel')">1v1 DUEL</button>
+                <button type="button"
+                        class="flex-1 font-pixel text-[8px] tracking-[0.12em] py-2.5 rounded-lg transition-all duration-200"
+                        :class="matchTab === 'group' && groupView === 'menu'
+                          ? 'text-crt-white'
+                          : 'text-retro-muted hover:text-crt-white/75'"
+                        :style="matchTab === 'group' && groupView === 'menu'
+                          ? 'background: linear-gradient(180deg, rgba(57,255,20,0.22), rgba(57,255,20,0.06)); border: 1px solid rgba(57,255,20,0.38); box-shadow: 0 0 16px rgba(57,255,20,0.1);'
+                          : 'border: 1px solid transparent;'"
+                        @click="switchPvpHub('group')">GROUP</button>
               </div>
 
-              <div v-if="matchTab === 'create'" class="space-y-3">
-                <p class="font-mono text-xs text-retro-muted">Create a match with a random article pair. Share the code with a friend.</p>
-                <button @click="createMatch" :disabled="matchLoading" class="btn-retro-primary w-full !py-2.5">
-                  {{ matchLoading ? 'CREATING...' : 'CREATE MATCH' }}
+              <div v-if="matchTab === 'duel'" class="space-y-4">
+                <p class="font-mono text-[11px] text-retro-muted leading-relaxed">
+                  Same random article pair for two players. Fewest link-clicks wins; faster time breaks ties.
+                </p>
+                <button type="button" @click="createMatch" :disabled="matchLoading"
+                        class="btn-retro-primary w-full !py-3 font-pixel text-[8px] tracking-[0.15em]">
+                  {{ matchLoading ? 'CREATING...' : 'CREATE ROOM' }}
                 </button>
+                <div class="relative py-0.5">
+                  <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-retro-border/20"></div>
+                  <div class="relative flex justify-center">
+                    <span class="font-pixel text-[6px] tracking-[0.2em] text-retro-muted/80 px-2" style="background: #0d0e15;">HAVE A CODE</span>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <input v-model="joinRoomCode" type="text" placeholder="CODE" maxlength="6" autocomplete="off"
+                         class="min-w-0 flex-1 px-3 py-2.5 rounded-lg font-terminal text-lg text-center tracking-[0.28em] bg-[#12131c] border border-retro-border text-crt-white focus:border-arcade-purple focus:outline-none uppercase" />
+                  <button type="button" @click="joinMatch" :disabled="matchLoading"
+                          class="shrink-0 px-4 py-2.5 rounded-lg font-pixel text-[8px] tracking-[0.15em] transition-all touch-manipulation disabled:opacity-40"
+                          style="background: rgba(0,229,255,0.08); border: 1.5px solid rgba(0,229,255,0.35); color: #00e5ff;">
+                    {{ matchLoading ? '...' : 'JOIN' }}
+                  </button>
+                </div>
+                <p v-if="matchError" class="font-mono text-[10px] text-crt-red">{{ matchError }}</p>
               </div>
 
-              <div v-if="matchTab === 'join'" class="space-y-3">
-                <p class="font-mono text-xs text-retro-muted">Enter a match code from your opponent.</p>
-                <input v-model="joinCode" type="text" placeholder="ABCD12" maxlength="6"
-                       class="w-full px-3 py-2 rounded-lg font-terminal text-xl text-center tracking-[0.3em] bg-[#12131c] border border-retro-border text-crt-white focus:border-arcade-purple focus:outline-none uppercase" />
-                <button @click="joinMatch" :disabled="matchLoading" class="btn-retro-primary w-full !py-2.5">
-                  {{ matchLoading ? 'JOINING...' : 'JOIN MATCH' }}
+              <div v-if="matchTab === 'group' && groupView === 'menu'" class="space-y-4">
+                <p class="font-mono text-[11px] text-retro-muted leading-relaxed">
+                  2–8 players, same pair. When everyone finishes, the leaderboard ranks by clicks, then time.
+                </p>
+                <div class="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5" style="background: #12131c; border: 1px solid #252738;">
+                  <span class="font-mono text-[10px] text-retro-muted">Max players</span>
+                  <select v-model.number="groupMaxPlayers"
+                          class="min-w-[4.5rem] px-2 py-1.5 rounded-lg font-terminal text-sm bg-[#0a0b11] border border-retro-border text-crt-green focus:border-crt-green focus:outline-none">
+                    <option v-for="n in 7" :key="n + 1" :value="n + 1">{{ n + 1 }}</option>
+                  </select>
+                </div>
+                <button type="button" @click="createGroupLobby" :disabled="groupLoading"
+                        class="btn-retro-primary w-full !py-3 font-pixel text-[8px] tracking-[0.15em]" style="border-color: rgba(57,255,20,0.45);">
+                  {{ groupLoading ? 'CREATING...' : 'CREATE LOBBY' }}
                 </button>
+                <div class="relative py-0.5">
+                  <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-retro-border/20"></div>
+                  <div class="relative flex justify-center">
+                    <span class="font-pixel text-[6px] tracking-[0.2em] text-retro-muted/80 px-2" style="background: #0d0e15;">HAVE A CODE</span>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <input v-model="joinRoomCode" type="text" placeholder="CODE" maxlength="6" autocomplete="off"
+                         class="min-w-0 flex-1 px-3 py-2.5 rounded-lg font-terminal text-lg text-center tracking-[0.28em] bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-green focus:outline-none uppercase" />
+                  <button type="button" @click="joinGroupLobby" :disabled="groupLoading"
+                          class="shrink-0 px-4 py-2.5 rounded-lg font-pixel text-[8px] tracking-[0.15em] transition-all touch-manipulation disabled:opacity-40"
+                          style="background: rgba(57,255,20,0.08); border: 1.5px solid rgba(57,255,20,0.4); color: #39ff14;">
+                    {{ groupLoading ? '...' : 'JOIN' }}
+                  </button>
+                </div>
+                <p v-if="groupError" class="font-mono text-[10px] text-crt-red">{{ groupError }}</p>
               </div>
-
-              <div v-if="matchError" class="font-mono text-[11px] text-crt-red mt-3">{{ matchError }}</div>
             </template>
           </div>
         </div>
@@ -880,12 +967,22 @@ const customEndTitle = ref('')
 const activeModifiers = ref([])
 const matchCode = ref('')
 const showMatchModal = ref(false)
-const matchTab = ref('create')
-const joinCode = ref('')
+const matchTab = ref('duel')
+const joinRoomCode = ref('')
 const matchLoading = ref(false)
 const matchError = ref('')
 const matchStatus = ref(null)
+const matchOpponentUsername = ref('')
 let matchPollTimer = null
+
+const groupView = ref('menu')
+const groupLobbyCode = ref('')
+const groupLobbyData = ref(null)
+const groupMaxPlayers = ref(8)
+const groupLoading = ref(false)
+const groupStartLoading = ref(false)
+const groupError = ref('')
+let groupPollTimer = null
 
 const genres = Object.values(GENRES)
 const modifierList = Object.values(MODIFIERS)
@@ -1069,6 +1166,7 @@ async function createMatch() {
     const result = await api.post('/match/create', { startTitle: pair.start.title, endTitle: pair.end.title })
     if (result.error) { matchError.value = result.error; return }
     matchCode.value = result.code
+    matchOpponentUsername.value = ''
     matchStatus.value = 'waiting'
     matchTab.value = 'waiting'
     toast.success(`Match created! Code: ${result.code}`)
@@ -1086,11 +1184,13 @@ function startMatchPolling() {
     if (!matchCode.value) { stopMatchPolling(); return }
     try {
       const result = await api.get(`/match/${matchCode.value}`)
+      if (result.opponent?.username) matchOpponentUsername.value = result.opponent.username
       if (result.status === 'active' || result.status === 'finished') {
         matchStatus.value = 'ready'
         stopMatchPolling()
         sound.playStart()
-        toast.success('Opponent joined! Ready to start.')
+        const name = result.opponent?.username
+        toast.success(name ? `${name} joined! Ready to start.` : 'Opponent joined! Ready to start.')
       }
     } catch { /* ignore */ }
   }, 3000)
@@ -1100,9 +1200,131 @@ function stopMatchPolling() {
   if (matchPollTimer) { clearInterval(matchPollTimer); matchPollTimer = null }
 }
 
+function stopGroupLobbyPolling() {
+  if (groupPollTimer) { clearInterval(groupPollTimer); groupPollTimer = null }
+}
+
+function resetGroupLobbyUi() {
+  stopGroupLobbyPolling()
+  groupView.value = 'menu'
+  groupLobbyCode.value = ''
+  groupLobbyData.value = null
+  groupError.value = ''
+  groupMaxPlayers.value = 8
+  groupLoading.value = false
+  groupStartLoading.value = false
+  joinRoomCode.value = ''
+}
+
+function switchPvpHub(mode) {
+  if (mode === 'group') {
+    matchTab.value = 'group'
+    groupView.value = 'menu'
+  } else {
+    matchTab.value = 'duel'
+  }
+  matchError.value = ''
+  groupError.value = ''
+}
+
+function startGroupLobbyPolling() {
+  stopGroupLobbyPolling()
+  groupPollTimer = setInterval(async () => {
+    if (!groupLobbyCode.value) { stopGroupLobbyPolling(); return }
+    try {
+      const r = await api.get(`/lobby/${groupLobbyCode.value}`)
+      if (r.error) return
+      groupLobbyData.value = r
+      if (r.status === 'active') {
+        stopGroupLobbyPolling()
+        sound.playStart()
+        showMatchModal.value = false
+        router.push({ name: 'game', params: { mode: 'custom' }, query: { from: r.start_title, to: r.end_title, lobby: r.code } })
+      }
+    } catch { /* ignore */ }
+  }, 3000)
+}
+
+async function createGroupLobby() {
+  if (!auth.user.value) { toast.warn('Login required'); showAuthModal.value = true; return }
+  groupLoading.value = true
+  groupError.value = ''
+  try {
+    const pair = await wiki.getRandomPairByGenre(genres.find(g => g.id === selectedGenreId.value))
+    if (!pair) { groupError.value = 'Could not generate articles'; return }
+    const result = await api.post('/lobby/create', {
+      startTitle: pair.start.title,
+      endTitle: pair.end.title,
+      maxPlayers: groupMaxPlayers.value,
+    })
+    if (result.error) { groupError.value = result.error; return }
+    groupLobbyCode.value = result.code
+    groupLobbyData.value = result
+    groupView.value = 'waiting'
+    matchTab.value = 'group'
+    toast.success(`Lobby created: ${result.code}`)
+    startGroupLobbyPolling()
+  } catch (e) {
+    groupError.value = e.message || 'Failed to create lobby'
+  } finally {
+    groupLoading.value = false
+  }
+}
+
+async function joinGroupLobby() {
+  if (!auth.user.value) { toast.warn('Login required'); showAuthModal.value = true; return }
+  const code = joinRoomCode.value.trim().toUpperCase()
+  if (!code || code.length < 4) { groupError.value = 'Enter a valid lobby code'; return }
+  groupLoading.value = true
+  groupError.value = ''
+  try {
+    const result = await api.post(`/lobby/join/${code}`)
+    if (result.error) { groupError.value = result.error; return }
+    groupLobbyCode.value = result.code
+    groupLobbyData.value = result
+    matchTab.value = 'group'
+    if (result.status === 'active') {
+      sound.playStart()
+      showMatchModal.value = false
+      router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, lobby: result.code } })
+      return
+    }
+    groupView.value = 'waiting'
+    toast.success('Joined lobby')
+    startGroupLobbyPolling()
+  } catch (e) {
+    groupError.value = e.message || 'Failed to join lobby'
+  } finally {
+    groupLoading.value = false
+  }
+}
+
+async function postStartGroupLobby() {
+  if (!groupLobbyCode.value || !groupLobbyData.value?.is_host) return
+  groupStartLoading.value = true
+  groupError.value = ''
+  try {
+    const r = await api.post(`/lobby/start/${groupLobbyCode.value}`)
+    if (r.error) { groupError.value = r.error; return }
+    stopGroupLobbyPolling()
+    sound.playStart()
+    showMatchModal.value = false
+    router.push({ name: 'game', params: { mode: 'custom' }, query: { from: r.start_title, to: r.end_title, lobby: r.code } })
+  } catch (e) {
+    groupError.value = e.message || 'Failed to start'
+  } finally {
+    groupStartLoading.value = false
+  }
+}
+
+function copyGroupLobbyCode() {
+  if (!groupLobbyCode.value) return
+  navigator.clipboard.writeText(groupLobbyCode.value).then(() => toast.success('Code copied!')).catch(() => toast.warn('Could not copy'))
+}
+
 async function joinMatch() {
   if (!auth.user.value) { toast.warn('Login required for 1v1 matches'); showAuthModal.value = true; return }
-  const code = joinCode.value.trim().toUpperCase()
+  const code = joinRoomCode.value.trim().toUpperCase()
   if (!code || code.length < 4) { matchError.value = 'Enter a valid match code'; return }
   matchLoading.value = true
   matchError.value = ''
@@ -1159,12 +1381,15 @@ watch(selectedModeId, (id) => {
 watch(showMatchModal, (val) => {
   if (!val) {
     stopMatchPolling()
+    stopGroupLobbyPolling()
     if (matchStatus.value !== 'ready') {
       matchCode.value = ''
       matchStatus.value = null
-      matchTab.value = 'create'
+      matchOpponentUsername.value = ''
+      matchTab.value = 'duel'
       matchError.value = ''
     }
+    resetGroupLobbyUi()
   }
 })
 watch(authMode, () => { authError.value = ''; authConfirmPassword.value = ''; showPassword.value = false; showConfirmPassword.value = false })
@@ -1178,5 +1403,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   stopMatchPolling()
+  stopGroupLobbyPolling()
 })
 </script>

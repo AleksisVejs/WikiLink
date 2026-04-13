@@ -25,6 +25,7 @@ require_once __DIR__ . '/stats.php';
 require_once __DIR__ . '/user_stats.php';
 require_once __DIR__ . '/trending.php';
 require_once __DIR__ . '/match.php';
+require_once __DIR__ . '/lobby.php';
 require_once __DIR__ . '/friends.php';
 
 $uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
@@ -291,6 +292,56 @@ if ($method === 'POST' && preg_match('#^/match/submit/([A-Za-z0-9]+)$#', $uri, $
 if ($method === 'GET' && preg_match('#^/match/([A-Za-z0-9]+)$#', $uri, $m)) {
     $user = requireAuth();
     $result = getMatchStatus($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 404 : 200);
+}
+
+// POST /lobby/create
+if ($method === 'POST' && $uri === '/lobby/create') {
+    $user = requireAuth();
+    requireRateLimit('lobby_create', 10, 60);
+    $body = jsonInput();
+    $max = isset($body['maxPlayers']) ? $body['maxPlayers'] : 8;
+    $result = createLobby(
+        isset($body['startTitle']) ? $body['startTitle'] : '',
+        isset($body['endTitle']) ? $body['endTitle'] : '',
+        $user['id'],
+        $max
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /lobby/join/:code
+if ($method === 'POST' && preg_match('#^/lobby/join/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = joinLobby($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /lobby/start/:code
+if ($method === 'POST' && preg_match('#^/lobby/start/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = startLobby($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /lobby/submit/:code
+if ($method === 'POST' && preg_match('#^/lobby/submit/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = submitLobbyResult(
+        $m[1],
+        $user['id'],
+        (int)(isset($body['clicks']) ? $body['clicks'] : 0),
+        (int)(isset($body['time']) ? $body['time'] : 0),
+        isset($body['path']) ? $body['path'] : []
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// GET /lobby/:code
+if ($method === 'GET' && preg_match('#^/lobby/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = getLobbyStatus($m[1], $user['id']);
     jsonResponse($result, isset($result['error']) ? 404 : 200);
 }
 

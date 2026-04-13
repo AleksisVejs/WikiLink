@@ -60,20 +60,23 @@ if command -v npm >/dev/null 2>&1; then
   else
     npm install
   fi
+  # Vite empties dist/ before build, so backup the live SQLite DB first (see build.emptyOutDir).
+  preserve_db=""
+  if [[ -f "dist/api/wikilink.db" ]]; then
+    preserve_db="$(mktemp)"
+    cp dist/api/wikilink.db "$preserve_db"
+    echo "[deploy] Preserving dist/api/wikilink.db across vite build ($(wc -c <"$preserve_db") bytes)"
+  fi
+
   npm run build
 
   # Copy PHP API into dist so Apache can serve it
   if [[ -d api ]]; then
-    # Preserve existing database
-    local_db=""
-    if [[ -f "dist/api/wikilink.db" ]]; then
-      local_db="$(mktemp)"
-      cp dist/api/wikilink.db "$local_db"
-    fi
     cp -r api dist/api
     rm -f dist/api/wikilink.db 2>/dev/null || true
-    if [[ -n "$local_db" && -f "$local_db" ]]; then
-      mv "$local_db" dist/api/wikilink.db
+    if [[ -n "$preserve_db" && -f "$preserve_db" ]]; then
+      mv "$preserve_db" dist/api/wikilink.db
+      echo "[deploy] Restored dist/api/wikilink.db"
     fi
   fi
 else
