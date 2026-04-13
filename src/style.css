@@ -361,6 +361,80 @@
     background: rgba(18,19,28,0.95);
   }
 
+  /* ===== SITE NAV (Home/Profile header bar) ===== */
+  .site-nav-group {
+    @apply flex items-center gap-0.5;
+    padding: 3px 4px;
+    border-radius: 10px;
+    background: rgba(18,19,28,0.5);
+    border: 1px solid rgba(37,39,56,0.4);
+  }
+  .site-nav-icon-btn {
+    @apply flex items-center justify-center rounded-lg transition-all duration-150;
+    width: 32px;
+    height: 32px;
+    color: #555770;
+  }
+  .site-nav-icon-btn:hover {
+    color: #00e5ff;
+    background: rgba(0,229,255,0.06);
+  }
+  .site-nav-icon-btn--dim {
+    color: #3a3c52;
+  }
+  .site-nav-icon-btn--dim:hover {
+    color: #ff4444;
+    background: rgba(255,68,68,0.06);
+  }
+
+  .site-nav-user {
+    @apply flex items-center gap-1 sm:gap-1.5;
+    padding: 3px 4px 3px 8px;
+    border-radius: 10px;
+    background: rgba(18,19,28,0.5);
+    border: 1px solid rgba(57,255,20,0.1);
+    transition: border-color 0.2s;
+  }
+  .site-nav-user:hover {
+    border-color: rgba(57,255,20,0.2);
+  }
+
+  .site-nav-profile-link {
+    @apply flex items-center gap-1.5 px-1 sm:px-1.5 py-0.5 rounded-lg transition-all duration-150;
+    text-decoration: none;
+  }
+  .site-nav-profile-link:hover {
+    background: rgba(57,255,20,0.04);
+  }
+  .site-nav-profile-link:hover .site-nav-avatar {
+    border-color: rgba(57,255,20,0.5);
+    box-shadow: 0 0 8px rgba(57,255,20,0.2);
+  }
+
+  .site-nav-avatar {
+    @apply flex items-center justify-center rounded-md shrink-0;
+    width: 24px;
+    height: 24px;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    color: #39ff14;
+    background: rgba(57,255,20,0.08);
+    border: 1px solid rgba(57,255,20,0.2);
+    transition: all 0.15s;
+  }
+
+  .site-nav-login-btn {
+    @apply flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-200;
+    color: #00e5ff;
+    border: 1px solid rgba(0,229,255,0.25);
+    background: rgba(0,229,255,0.04);
+  }
+  .site-nav-login-btn:hover {
+    background: rgba(0,229,255,0.08);
+    border-color: rgba(0,229,255,0.4);
+    box-shadow: 0 0 12px rgba(0,229,255,0.1);
+  }
+
   /* ===== NAV ACTION BUTTONS ===== */
   .nav-action-btn {
     @apply flex items-center justify-center rounded-lg transition-all duration-200 touch-manipulation active:scale-90;

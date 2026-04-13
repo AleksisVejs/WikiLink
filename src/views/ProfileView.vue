@@ -3,25 +3,30 @@
 
     <!-- Top bar -->
     <header class="relative z-20 glass-header shrink-0">
-      <div class="max-w-6xl mx-auto px-4 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <router-link to="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <img src="/favicon.svg" alt="WikiLink" class="w-9 h-9 drop-shadow-[0_0_8px_rgba(57,255,20,0.3)]" />
-            <span class="font-pixel text-[9px] text-crt-white/80 tracking-wider hidden sm:block">WIKILINK</span>
-          </router-link>
-        </div>
-        <div class="flex items-center gap-2">
-          <router-link to="/" class="btn-retro-ghost flex items-center gap-1.5 px-2.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" />
-            </svg>
-            <span class="hidden sm:inline font-mono text-[10px]">HOME</span>
+      <div class="max-w-6xl mx-auto px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between gap-3">
+
+        <!-- Brand -->
+        <router-link to="/" class="flex items-center gap-2.5 shrink-0 group">
+          <img src="/favicon.svg" alt="WikiLink" class="w-8 h-8 sm:w-9 sm:h-9 drop-shadow-[0_0_8px_rgba(57,255,20,0.3)] group-hover:drop-shadow-[0_0_12px_rgba(57,255,20,0.5)] transition-all" />
+          <span class="font-pixel text-[8px] sm:text-[9px] text-crt-white/80 tracking-wider hidden sm:block">WIKILINK</span>
+        </router-link>
+
+        <!-- Right controls -->
+        <div class="flex items-center gap-1.5 sm:gap-2.5">
+          <router-link to="/" class="site-nav-group" style="text-decoration: none;">
+            <div class="site-nav-icon-btn">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" />
+              </svg>
+            </div>
+            <span class="font-mono text-[10px] text-retro-muted hidden sm:inline pr-1">HOME</span>
           </router-link>
           <template v-if="isOwnProfile && auth.user.value">
-            <button @click="handleLogout" class="btn-retro-ghost flex items-center gap-1.5 px-2.5" title="Logout">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button @click="handleLogout" class="site-nav-login-btn" style="border-color: rgba(255,68,68,0.2); color: rgba(255,68,68,0.6);" title="Logout">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
+              <span class="font-mono text-[10px] tracking-wider">LOGOUT</span>
             </button>
           </template>
         </div>
