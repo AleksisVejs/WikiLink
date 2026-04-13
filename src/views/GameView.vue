@@ -314,10 +314,38 @@
               </div>
             </div>
 
+            <!-- Share / challenge buttons -->
+            <div v-if="!freeplayFinished && game.state.targetArticle" class="flex gap-2 mb-4">
+              <button @click="shareChallenge" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-2 text-[10px]">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                SHARE CHALLENGE
+              </button>
+            </div>
+
+            <!-- Daily leaderboard preview -->
+            <div v-if="props.mode === 'daily' && dailyLeaderboard.length" class="mb-4 rounded-lg p-3 text-left" style="background: #12131c; border: 1px solid #252738;">
+              <div class="font-pixel text-[7px] text-crt-amber tracking-[0.15em] mb-2">DAILY LEADERBOARD</div>
+              <div class="space-y-1 font-mono text-xs">
+                <div v-for="entry in dailyLeaderboard.slice(0, 5)" :key="entry.rank" class="flex items-center gap-2">
+                  <span class="text-retro-muted w-4 text-right shrink-0">#{{ entry.rank }}</span>
+                  <span class="text-crt-white flex-1 truncate">{{ entry.username }}</span>
+                  <span class="text-crt-green shrink-0">{{ entry.clicks }}</span>
+                  <span class="text-retro-muted shrink-0">{{ formatLeaderboardTime(entry.time) }}</span>
+                </div>
+              </div>
+            </div>
+
             <div class="flex gap-3">
               <button @click="goHome" class="btn-secondary flex-1">HOME</button>
               <button @click="playAgain" class="btn-primary flex-1">PLAY AGAIN</button>
             </div>
+          </div>
+
+          <!-- Confetti -->
+          <div v-if="game.isWon.value && !freeplayFinished && showConfetti" class="confetti-container" aria-hidden="true">
+            <div v-for="i in 40" :key="i" class="confetti-piece" :style="confettiStyle(i)"></div>
           </div>
         </div>
       </transition>
@@ -352,6 +380,8 @@ import { useWikipedia } from '../composables/useWikipedia'
 import { useGame } from '../composables/useGame'
 import { useSound } from '../composables/useSound'
 import { useToast } from '../composables/useToast'
+import { useAuth } from '../composables/useAuth'
+import { useApi } from '../composables/useApi'
 
 const props = defineProps({
   mode: { type: String, required: true }
@@ -392,7 +422,12 @@ let hoverTimer = null
 let hoveredLink = null
 let previewCache = {}
 
+const auth = useAuth()
+const api = useApi()
+
 const rerolling = ref(false)
+const showConfetti = ref(false)
+const dailyLeaderboard = ref([])
 
 const currentMode = computed(() => game.currentMode.value)
 
@@ -425,10 +460,18 @@ const timerClass = computed(() => {
   return 'text-crt-white'
 })
 
-// Play sounds on game state changes
+// Play sounds on game state changes; submit daily score; show confetti
 watch(() => game.state.status, (val) => {
-  if (val === 'won') sound.playWin()
-  else if (val === 'lost') sound.playLose()
+  if (val === 'won') {
+    sound.playWin()
+    showConfetti.value = true
+    setTimeout(() => showConfetti.value = false, 3500)
+    submitDailyScore()
+    loadDailyLeaderboard()
+  } else if (val === 'lost') {
+    sound.playLose()
+    loadDailyLeaderboard()
+  }
 })
 
 const processedHtml = computed(() => {
@@ -486,13 +529,40 @@ async function initializeGame() {
   setTimeout(() => bootStep.value = 3, 1300)
 
   if (props.mode === 'daily') {
-    const pair = await wiki.getDailyPair()
+    let pair = null
+    // Try server-side daily pair first
+    try {
+      const serverDaily = await api.get('/daily')
+      if (serverDaily.start && serverDaily.end) {
+        pair = { start: serverDaily.start, end: serverDaily.end }
+      }
+    } catch { /* fall through */ }
+    // Fall back to client-side generation, then save to server
+    if (!pair) {
+      pair = await wiki.getDailyPair()
+      if (pair) {
+        try { await api.post('/daily', { start: pair.start, end: pair.end }) } catch { /* ignore */ }
+      }
+    }
     if (!pair) { toast.error('Failed to load daily challenge'); router.push({ name: 'home' }); return }
     game.initGame('daily', pair.start, pair.end, 'random', 'normal')
     await loadArticle(pair.start.title)
   } else if (props.mode === 'custom') {
-    const fromQ = typeof route.query.from === 'string' ? route.query.from.trim() : ''
-    const toQ = typeof route.query.to === 'string' ? route.query.to.trim() : ''
+    // Check for shared challenge code
+    const codeQ = typeof route.query.code === 'string' ? route.query.code.trim() : ''
+    let fromQ = typeof route.query.from === 'string' ? route.query.from.trim() : ''
+    let toQ = typeof route.query.to === 'string' ? route.query.to.trim() : ''
+    if (codeQ && (!fromQ || !toQ)) {
+      try {
+        const ch = await api.get(`/challenge/${codeQ}`)
+        fromQ = ch.start_title || fromQ
+        toQ = ch.end_title || toQ
+      } catch {
+        toast.error('Challenge not found')
+        router.push({ name: 'home' })
+        return
+      }
+    }
     if (!fromQ || !toQ) {
       toast.error('Custom game needs start and target articles')
       router.push({ name: 'home' })
@@ -614,6 +684,59 @@ async function handleGoBack() {
 function finishFreeplay() {
   game.endFreeplay()
   freeplayFinished.value = true
+}
+
+const confettiColors = ['#39ff14', '#00e5ff', '#ffbf00', '#ff2ecc', '#4c9fff', '#ff6b2b']
+function confettiStyle(i) {
+  const color = confettiColors[i % confettiColors.length]
+  const left = Math.random() * 100
+  const delay = Math.random() * 0.5
+  const size = 4 + Math.random() * 6
+  const dur = 1.5 + Math.random() * 1.5
+  return { '--c-color': color, left: `${left}%`, animationDelay: `${delay}s`, width: `${size}px`, height: `${size}px`, animationDuration: `${dur}s` }
+}
+
+function formatLeaderboardTime(seconds) {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+async function shareChallenge() {
+  const start = game.state.startArticle?.title
+  const end = game.state.targetArticle?.title
+  if (!start || !end) return
+  try {
+    const data = await api.post('/challenge', { startTitle: start, endTitle: end })
+    const url = `${window.location.origin}/play/custom?code=${data.code}`
+    await navigator.clipboard.writeText(url)
+    toast.success('Challenge link copied!')
+  } catch {
+    const url = `${window.location.origin}/play/custom?from=${encodeURIComponent(start)}&to=${encodeURIComponent(end)}`
+    await navigator.clipboard.writeText(url).catch(() => {})
+    toast.success('Challenge link copied!')
+  }
+}
+
+async function submitDailyScore() {
+  if (props.mode !== 'daily' || !auth.isLoggedIn()) return
+  try {
+    await api.post('/daily/score', {
+      date: new Date().toISOString().slice(0, 10),
+      clicks: game.state.clicks,
+      time: game.state.elapsed,
+      path: [...game.state.path],
+    })
+    auth.refreshStreak()
+  } catch { /* ignore */ }
+}
+
+async function loadDailyLeaderboard() {
+  if (props.mode !== 'daily') return
+  try {
+    const data = await api.get('/daily/leaderboard')
+    dailyLeaderboard.value = data.scores || []
+  } catch { /* ignore */ }
 }
 
 async function rerollPair() {

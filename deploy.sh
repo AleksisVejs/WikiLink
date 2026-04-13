@@ -61,6 +61,21 @@ if command -v npm >/dev/null 2>&1; then
     npm install
   fi
   npm run build
+
+  # Copy PHP API into dist so Apache can serve it
+  if [[ -d api ]]; then
+    # Preserve existing database
+    local_db=""
+    if [[ -f "dist/api/wikilink.db" ]]; then
+      local_db="$(mktemp)"
+      cp dist/api/wikilink.db "$local_db"
+    fi
+    cp -r api dist/api
+    rm -f dist/api/wikilink.db 2>/dev/null || true
+    if [[ -n "$local_db" && -f "$local_db" ]]; then
+      mv "$local_db" dist/api/wikilink.db
+    fi
+  fi
 else
   cat >&2 <<'EOF'
 [deploy] ERROR: npm not found.

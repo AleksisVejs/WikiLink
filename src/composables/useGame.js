@@ -1,5 +1,6 @@
 import { ref, reactive, computed } from 'vue'
 import { utcDateKey } from '../utils/dailySeed.js'
+import { useApi } from './useApi.js'
 
 const GENRES = {
   random:     { id: 'random',     name: 'Random',      emoji: '🎲', shortName: 'Random',  description: 'Anything goes',                searchTerms: null },
@@ -104,7 +105,7 @@ function getEffectiveLimits(mode, difficulty = 'normal', custom = {}) {
 
 // --- Stats persistence ---
 
-const STATS_KEY = 'wikilink_stats_v2'
+export const STATS_KEY = 'wikilink_stats_v2'
 const HISTORY_KEY = 'wikilink_history'
 const DAILY_KEY = 'wikilink_daily'
 
@@ -135,7 +136,7 @@ function migrateOldStats() {
 
 migrateOldStats()
 
-function loadStats() {
+export function loadStats() {
   try { return JSON.parse(localStorage.getItem(STATS_KEY)) || { modes: {}, genres: {} } }
   catch { return { modes: {}, genres: {} } }
 }
@@ -254,6 +255,21 @@ export function useGame() {
     saveStats(result)
     saveHistory(result)
     if (state.mode === 'daily' && result === 'won') saveDailyResult()
+    try {
+      const api = useApi()
+      const isLoggedIn = !!localStorage.getItem('wikilink_token')
+      if (isLoggedIn) {
+        api.post('/stats/game', {
+          mode: state.mode,
+          genre: state.genre || 'random',
+          clicks: state.clicks,
+          time: state.elapsed,
+          won: result === 'won',
+        }).catch(() => {})
+      } else {
+        api.post('/stats/increment', { clicks: state.clicks, won: result === 'won' }).catch(() => {})
+      }
+    } catch { /* ignore */ }
   }
 
   function saveStats(result) {
