@@ -329,6 +329,18 @@ if ($method === 'GET' && preg_match('#^/match/([A-Za-z0-9]+)$#', $uri, $m)) {
     jsonResponse($result, isset($result['error']) ? 404 : 200);
 }
 
+// POST /multiplayer/leave-current
+if ($method === 'POST' && $uri === '/multiplayer/leave-current') {
+    $user = requireAuth();
+    $matchesLeft = leaveOpenMatchesForUser($user['id']);
+    $lobbiesLeft = leaveOpenLobbiesForUser($user['id']);
+    jsonResponse([
+        'ok' => true,
+        'matches_left' => $matchesLeft,
+        'lobbies_left' => $lobbiesLeft,
+    ]);
+}
+
 // POST /lobby/create
 if ($method === 'POST' && $uri === '/lobby/create') {
     $user = requireAuth();

@@ -108,6 +108,7 @@ function joinMatch($code, $userId) {
     $match = $stmt->fetch();
 
     if (!$match) return ['error' => 'Match not found.'];
+    if ($match['status'] === 'finished') return ['error' => 'Match is closed.'];
 
     if ($match['player1_id'] == $userId) {
         return [
@@ -317,6 +318,45 @@ function getOpenMatchForUser($userId) {
     $stmt->execute([$userId, $userId]);
     $row = $stmt->fetch();
     return $row ?: null;
+}
+
+function leaveOpenMatchesForUser($userId) {
+    ensureMatchTable();
+    $db = getDb();
+    $stmt = $db->prepare("
+        SELECT id, code, player1_id, player2_id, status
+        FROM matches
+        WHERE status != 'finished'
+          AND (
+            (player1_id = ? AND COALESCE(p1_quit, 0) = 0)
+            OR
+            (player2_id = ? AND COALESCE(p2_quit, 0) = 0)
+          )
+    ");
+    $stmt->execute([$userId, $userId]);
+    $rows = $stmt->fetchAll();
+
+    $closed = 0;
+    foreach ($rows as $r) {
+        $isHost = ((int)$r['player1_id'] === (int)$userId);
+        $noOpponent = empty($r['player2_id']);
+
+        // If host cancels an unjoined waiting room, hard-delete so code becomes invalid immediately.
+        if ($isHost && $noOpponent && $r['status'] === 'waiting') {
+            $db->prepare('DELETE FROM matches WHERE id = ?')->execute([(int)$r['id']]);
+            $closed++;
+            continue;
+        }
+
+        if ((int)$r['player1_id'] === (int)$userId) {
+            $db->prepare('UPDATE matches SET p1_quit = 1 WHERE id = ?')->execute([(int)$r['id']]);
+        } elseif ((int)$r['player2_id'] === (int)$userId) {
+            $db->prepare('UPDATE matches SET p2_quit = 1 WHERE id = ?')->execute([(int)$r['id']]);
+        }
+        $db->prepare("UPDATE matches SET status = 'finished' WHERE id = ?")->execute([(int)$r['id']]);
+        $closed++;
+    }
+    return $closed;
 }
 
 function formatMatchResult($match, $userId) {

@@ -720,7 +720,7 @@
     <Teleport to="body">
       <transition name="fade">
         <div v-if="showMatchModal" class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
-          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="showMatchModal = false"></div>
+          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="closeMatchModal"></div>
           <div class="relative rounded-2xl p-5 sm:p-6 max-w-[400px] w-full animate-scale-in"
                style="background: #0d0e15; border: 1.5px solid rgba(180,76,255,0.25); box-shadow: 0 0 60px rgba(0,0,0,0.8), 0 0 30px rgba(180,76,255,0.06);">
             <div class="flex items-center justify-between mb-5">
@@ -728,7 +728,7 @@
                 <div class="w-1 h-4 rounded-full bg-arcade-purple"></div>
                 <h2 class="font-pixel text-[9px] text-arcade-purple tracking-[0.2em]">PVP</h2>
               </div>
-              <button @click="showMatchModal = false" class="btn-ghost p-1.5">
+              <button @click="closeMatchModal" class="btn-ghost p-1.5">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -878,6 +878,11 @@
                 </button>
               </div>
               <p v-if="unifiedJoinError" class="font-mono text-[10px] text-crt-red mt-2">{{ unifiedJoinError }}</p>
+              <button v-if="showLeaveCurrentRoomButton" type="button" @click="leaveCurrentMultiplayerRoom" :disabled="joinBusy"
+                      class="mt-2 w-full px-3 py-2 rounded-lg font-pixel text-[8px] tracking-[0.12em] transition-all touch-manipulation disabled:opacity-40"
+                      style="background: rgba(255,68,68,0.08); border: 1.5px solid rgba(255,68,68,0.35); color: #ff6666;">
+                {{ joinBusy ? 'LEAVING...' : 'LEAVE CURRENT ROOM' }}
+              </button>
             </template>
           </div>
         </div>
@@ -1088,6 +1093,9 @@ const xpEstimate = computed(() => {
 })
 const joinBusy = computed(() => matchLoading.value || groupLoading.value)
 const unifiedJoinError = computed(() => matchError.value || groupError.value || '')
+const showLeaveCurrentRoomButton = computed(() =>
+  unifiedJoinError.value.toLowerCase().includes('already in another')
+)
 
 function toggleModifier(id) {
   const idx = activeModifiers.value.indexOf(id)
@@ -1186,7 +1194,7 @@ function startGame() {
 
 function startDaily() { sound.playStart(); router.push({ name: 'game', params: { mode: 'daily' } }) }
 
-function refreshResumeSession() {
+async function refreshResumeSession() {
   const saved = loadMultiplayerSession()
   if (!saved || !saved.route || !saved.code) {
     resumeMultiplayerSession.value = null
@@ -1202,6 +1210,29 @@ function refreshResumeSession() {
     resumeMultiplayerSession.value = null
     return
   }
+
+  try {
+    if (saved.route?.query?.match) {
+      const m = await api.get(`/match/${saved.code}`)
+      if (!m || m.error || m.status === 'finished' || m.you?.quit) {
+        clearMultiplayerSession()
+        resumeMultiplayerSession.value = null
+        return
+      }
+    } else if (saved.route?.query?.lobby) {
+      const l = await api.get(`/lobby/${saved.code}`)
+      if (!l || l.error || l.status === 'finished') {
+        clearMultiplayerSession()
+        resumeMultiplayerSession.value = null
+        return
+      }
+    }
+  } catch {
+    clearMultiplayerSession()
+    resumeMultiplayerSession.value = null
+    return
+  }
+
   resumeMultiplayerSession.value = saved
 }
 
@@ -1433,6 +1464,44 @@ async function joinByCode(prefer = 'match') {
   }
 }
 
+async function leaveCurrentMultiplayerRoom() {
+  if (!auth.user.value) return
+  matchLoading.value = true
+  groupLoading.value = true
+  try {
+    await api.post('/multiplayer/leave-current')
+    clearMultiplayerSession()
+    resumeMultiplayerSession.value = null
+    matchError.value = ''
+    groupError.value = ''
+    toast.success('Left current multiplayer room')
+  } catch (e) {
+    const msg = e?.message || 'Could not leave current room'
+    matchError.value = msg
+    groupError.value = msg
+  } finally {
+    matchLoading.value = false
+    groupLoading.value = false
+  }
+}
+
+async function closeMatchModal() {
+  const hasOpenRoom = !!(matchCode.value || joinedMatchCode.value || groupLobbyCode.value)
+  if (hasOpenRoom && auth.user.value) {
+    try {
+      await api.post('/multiplayer/leave-current')
+      clearMultiplayerSession()
+      resumeMultiplayerSession.value = null
+      matchError.value = ''
+      groupError.value = ''
+      toast.info('Left multiplayer room')
+    } catch {
+      // If leave call fails, still allow closing modal.
+    }
+  }
+  showMatchModal.value = false
+}
+
 function startCreatedMatch() {
   if (!matchCode.value || matchStatus.value !== 'ready') return
   api.post(`/match/start/${matchCode.value}`).then(match => {
@@ -1459,7 +1528,7 @@ function formatTime(seconds) {
 function handleKeydown(e) {
   if (e.key === 'Enter' && !showStats.value && !showAuthModal.value && !showHowTo.value && !showMatchModal.value) startGame()
   if (e.key === 'Escape') {
-    if (showMatchModal.value) showMatchModal.value = false
+    if (showMatchModal.value) closeMatchModal()
     else if (showStats.value) showStats.value = false
     else if (showAuthModal.value) showAuthModal.value = false
     else if (showHowTo.value) showHowTo.value = false

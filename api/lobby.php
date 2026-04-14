@@ -310,3 +310,55 @@ function getOpenLobbyForUser($userId) {
     $row = $stmt->fetch();
     return $row ?: null;
 }
+
+function leaveOpenLobbiesForUser($userId) {
+    ensureLobbyTables();
+    $db = getDb();
+    $stmt = $db->prepare("
+        SELECT l.id, l.host_id, l.status
+        FROM lobbies l
+        JOIN lobby_players lp ON lp.lobby_id = l.id
+        WHERE lp.user_id = ?
+          AND l.status != 'finished'
+    ");
+    $stmt->execute([$userId]);
+    $rows = $stmt->fetchAll();
+
+    $left = 0;
+    foreach ($rows as $row) {
+        $lobbyId = (int)$row['id'];
+        $isHost = ((int)$row['host_id'] === (int)$userId);
+
+        $db->prepare('DELETE FROM lobby_players WHERE lobby_id = ? AND user_id = ?')->execute([$lobbyId, $userId]);
+
+        $countStmt = $db->prepare('SELECT COUNT(*) FROM lobby_players WHERE lobby_id = ?');
+        $countStmt->execute([$lobbyId]);
+        $remaining = (int)$countStmt->fetchColumn();
+
+        if ($remaining <= 0) {
+            $db->prepare("UPDATE lobbies SET status = 'finished' WHERE id = ?")->execute([$lobbyId]);
+            $left++;
+            continue;
+        }
+
+        if ($isHost) {
+            $nextHostStmt = $db->prepare('SELECT user_id FROM lobby_players WHERE lobby_id = ? ORDER BY joined_at ASC LIMIT 1');
+            $nextHostStmt->execute([$lobbyId]);
+            $nextHostId = (int)$nextHostStmt->fetchColumn();
+            if ($nextHostId > 0) {
+                $db->prepare('UPDATE lobbies SET host_id = ? WHERE id = ?')->execute([$nextHostId, $lobbyId]);
+            } else {
+                $db->prepare("UPDATE lobbies SET status = 'finished' WHERE id = ?")->execute([$lobbyId]);
+                $left++;
+                continue;
+            }
+        }
+
+        if ((int)$row['status'] === 'active' && $remaining < 2) {
+            $db->prepare("UPDATE lobbies SET status = 'finished' WHERE id = ?")->execute([$lobbyId]);
+        }
+        $left++;
+    }
+
+    return $left;
+}
