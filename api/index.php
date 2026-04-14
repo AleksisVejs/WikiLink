@@ -503,6 +503,45 @@ if ($method === 'POST' && $uri === '/friends/remove') {
     jsonResponse($result, isset($result['error']) ? 400 : 200);
 }
 
+// POST /friends/game-invite
+if ($method === 'POST' && $uri === '/friends/game-invite') {
+    $user = requireAuth();
+    requireRateLimit('friend_game_invite', 20, 300);
+    $body = jsonInput();
+    $result = createGameInvite(
+        $user['id'],
+        isset($body['username']) ? $body['username'] : '',
+        isset($body['startTitle']) ? $body['startTitle'] : '',
+        isset($body['endTitle']) ? $body['endTitle'] : ''
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// GET /friends/game-invites
+if ($method === 'GET' && $uri === '/friends/game-invites') {
+    $user = requireAuth();
+    jsonResponse(['incoming' => getIncomingGameInvites($user['id'])]);
+}
+
+// GET /friends/game-invite/:id
+if ($method === 'GET' && preg_match('#^/friends/game-invite/(\d+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = getGameInviteByIdForUser((int)$m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 404 : 200);
+}
+
+// POST /friends/game-invite/respond
+if ($method === 'POST' && $uri === '/friends/game-invite/respond') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = respondToGameInvite(
+        (int)(isset($body['inviteId']) ? $body['inviteId'] : 0),
+        $user['id'],
+        isset($body['action']) ? $body['action'] : ''
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
 // 404 catch-all
 jsonResponse(['error' => 'Not found.'], 404);
 

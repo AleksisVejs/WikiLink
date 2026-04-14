@@ -127,6 +127,166 @@ function getSentRequests($userId) {
     return $stmt->fetchAll();
 }
 
+function areUsersFriends($userId, $otherUserId) {
+    $db = getDb();
+    $stmt = $db->prepare("
+        SELECT 1
+        FROM friendships
+        WHERE status = 'accepted'
+          AND ((user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?))
+        LIMIT 1
+    ");
+    $stmt->execute([$userId, $otherUserId, $otherUserId, $userId]);
+    return (bool)$stmt->fetchColumn();
+}
+
+function createGameInvite($senderUserId, $receiverUsername, $startTitle, $endTitle) {
+    $receiverUsername = trim((string)$receiverUsername);
+    if ($receiverUsername === '') return ['error' => 'Friend username is required.'];
+    if (trim((string)$startTitle) === '' || trim((string)$endTitle) === '') {
+        return ['error' => 'A valid start and end article are required.'];
+    }
+
+    $db = getDb();
+    $stmt = $db->prepare('SELECT id, username FROM users WHERE username = ? COLLATE NOCASE');
+    $stmt->execute([$receiverUsername]);
+    $receiver = $stmt->fetch();
+    if (!$receiver) return ['error' => 'User not found.'];
+
+    $receiverId = (int)$receiver['id'];
+    if ($receiverId === (int)$senderUserId) return ['error' => 'You cannot invite yourself.'];
+    if (!areUsersFriends((int)$senderUserId, $receiverId)) return ['error' => 'You can only invite friends.'];
+
+    if (getOpenMatchForUser((int)$senderUserId) || getOpenLobbyForUser((int)$senderUserId)) {
+        return ['error' => 'You are already in another room.'];
+    }
+    if (getOpenMatchForUser($receiverId) || getOpenLobbyForUser($receiverId)) {
+        return ['error' => $receiver['username'] . ' is already in another room.'];
+    }
+
+    $result = createMatch($startTitle, $endTitle, (int)$senderUserId);
+    if (isset($result['error'])) return $result;
+
+    $db->prepare("
+        INSERT INTO game_invites (sender_user_id, receiver_user_id, match_code, status)
+        VALUES (?, ?, ?, 'pending')
+    ")->execute([(int)$senderUserId, $receiverId, $result['code']]);
+    $inviteId = (int)$db->lastInsertId();
+
+    return [
+        'ok' => true,
+        'invite' => [
+            'id' => $inviteId,
+            'status' => 'pending',
+            'target_username' => $receiver['username'],
+            'match_code' => $result['code'],
+            'start_title' => $result['start_title'],
+            'end_title' => $result['end_title'],
+        ],
+    ];
+}
+
+function getIncomingGameInvites($userId) {
+    $db = getDb();
+    $stmt = $db->prepare("
+        SELECT gi.id, gi.status, gi.created_at, gi.match_code,
+               u.id AS sender_user_id, u.username AS sender_username
+        FROM game_invites gi
+        JOIN users u ON u.id = gi.sender_user_id
+        JOIN matches m ON m.code = gi.match_code
+        WHERE gi.receiver_user_id = ?
+          AND gi.status = 'pending'
+          AND m.status = 'waiting'
+        ORDER BY gi.created_at DESC
+    ");
+    $stmt->execute([(int)$userId]);
+    return $stmt->fetchAll();
+}
+
+function getGameInviteByIdForUser($inviteId, $userId) {
+    $db = getDb();
+    $stmt = $db->prepare("
+        SELECT gi.id, gi.sender_user_id, gi.receiver_user_id, gi.match_code, gi.status, gi.created_at, gi.responded_at,
+               sender.username AS sender_username, receiver.username AS receiver_username,
+               m.start_title, m.end_title, m.status AS match_status
+        FROM game_invites gi
+        JOIN users sender ON sender.id = gi.sender_user_id
+        JOIN users receiver ON receiver.id = gi.receiver_user_id
+        JOIN matches m ON m.code = gi.match_code
+        WHERE gi.id = ?
+          AND (gi.sender_user_id = ? OR gi.receiver_user_id = ?)
+        LIMIT 1
+    ");
+    $stmt->execute([(int)$inviteId, (int)$userId, (int)$userId]);
+    $invite = $stmt->fetch();
+    if (!$invite) return ['error' => 'Invite not found.'];
+
+    return [
+        'id' => (int)$invite['id'],
+        'sender_user_id' => (int)$invite['sender_user_id'],
+        'receiver_user_id' => (int)$invite['receiver_user_id'],
+        'sender_username' => $invite['sender_username'],
+        'receiver_username' => $invite['receiver_username'],
+        'match_code' => $invite['match_code'],
+        'match_status' => $invite['match_status'],
+        'start_title' => $invite['start_title'],
+        'end_title' => $invite['end_title'],
+        'status' => $invite['status'],
+        'created_at' => $invite['created_at'],
+        'responded_at' => $invite['responded_at'],
+    ];
+}
+
+function respondToGameInvite($inviteId, $receiverUserId, $action) {
+    $action = strtolower(trim((string)$action));
+    if ($action !== 'accept' && $action !== 'deny') {
+        return ['error' => 'Invalid invite action.'];
+    }
+
+    $db = getDb();
+    $stmt = $db->prepare("SELECT * FROM game_invites WHERE id = ? AND receiver_user_id = ? LIMIT 1");
+    $stmt->execute([(int)$inviteId, (int)$receiverUserId]);
+    $invite = $stmt->fetch();
+    if (!$invite) return ['error' => 'Invite not found.'];
+    if ($invite['status'] !== 'pending') return ['error' => 'Invite already handled.'];
+
+    ensureMatchTable();
+    $matchLookup = $db->prepare("SELECT status, player2_id FROM matches WHERE code = ? LIMIT 1");
+    $matchLookup->execute([$invite['match_code']]);
+    $match = $matchLookup->fetch();
+    if (!$match || $match['status'] !== 'waiting') {
+        return ['error' => 'This invite is no longer available.'];
+    }
+    if (!empty($match['player2_id']) && (int)$match['player2_id'] !== (int)$receiverUserId) {
+        return ['error' => 'This invite is no longer available.'];
+    }
+
+    if ($action === 'deny') {
+        $db->prepare("UPDATE game_invites SET status = 'declined', responded_at = datetime('now') WHERE id = ?")
+            ->execute([(int)$inviteId]);
+        $db->prepare("UPDATE matches SET status = 'finished' WHERE code = ?")
+            ->execute([$invite['match_code']]);
+        return ['ok' => true, 'status' => 'declined'];
+    }
+
+    $join = joinMatch($invite['match_code'], (int)$receiverUserId);
+    if (isset($join['error'])) return $join;
+
+    $db->prepare("UPDATE game_invites SET status = 'accepted', responded_at = datetime('now') WHERE id = ?")
+        ->execute([(int)$inviteId]);
+
+    return [
+        'ok' => true,
+        'status' => 'accepted',
+        'match' => [
+            'code' => $join['code'],
+            'start_title' => $join['start_title'],
+            'end_title' => $join['end_title'],
+            'status' => $join['status'],
+        ],
+    ];
+}
+
 function getPublicProfile($username) {
     $db = getDb();
     $stmt = $db->prepare('SELECT id, username, created_at FROM users WHERE username = ? COLLATE NOCASE');

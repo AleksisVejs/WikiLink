@@ -408,7 +408,23 @@ function quitMatch($code, $userId) {
     if ($match['player1_id'] == $userId) {
         $db->prepare('UPDATE matches SET p1_quit = 1 WHERE code = ?')->execute([$code]);
     } elseif ($match['player2_id'] == $userId) {
-        $db->prepare('UPDATE matches SET p2_quit = 1 WHERE code = ?')->execute([$code]);
+        // In waiting rooms, guest leaving should not destroy host's room.
+        if ($match['status'] === 'waiting') {
+            $db->prepare("
+                UPDATE matches
+                SET player2_id = NULL,
+                    p2_quit = 0,
+                    p2_clicks = NULL,
+                    p2_time = NULL,
+                    p2_path = NULL,
+                    p2_last_seen_at = NULL,
+                    p2_missed_heartbeats = 0,
+                    p2_disconnected_at = NULL
+                WHERE code = ?
+            ")->execute([$code]);
+        } else {
+            $db->prepare('UPDATE matches SET p2_quit = 1 WHERE code = ?')->execute([$code]);
+        }
     } else {
         return ['error' => 'You are not in this match.'];
     }
@@ -519,10 +535,29 @@ function leaveOpenMatchesForUser($userId) {
     foreach ($rows as $r) {
         $isHost = ((int)$r['player1_id'] === (int)$userId);
         $noOpponent = empty($r['player2_id']);
+        $isGuest = ((int)$r['player2_id'] === (int)$userId);
 
         // If host cancels an unjoined waiting room, hard-delete so code becomes invalid immediately.
         if ($isHost && $noOpponent && $r['status'] === 'waiting') {
             $db->prepare('DELETE FROM matches WHERE id = ?')->execute([(int)$r['id']]);
+            $closed++;
+            continue;
+        }
+
+        // If a guest leaves a waiting room, keep host room alive and free the slot.
+        if ($isGuest && $r['status'] === 'waiting') {
+            $db->prepare("
+                UPDATE matches
+                SET player2_id = NULL,
+                    p2_quit = 0,
+                    p2_clicks = NULL,
+                    p2_time = NULL,
+                    p2_path = NULL,
+                    p2_last_seen_at = NULL,
+                    p2_missed_heartbeats = 0,
+                    p2_disconnected_at = NULL
+                WHERE id = ?
+            ")->execute([(int)$r['id']]);
             $closed++;
             continue;
         }

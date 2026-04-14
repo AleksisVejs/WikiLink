@@ -505,63 +505,19 @@
       </div>
     </main>
 
-    <!-- 1v1 Invite Modal -->
-    <Teleport to="body">
-      <transition name="fade">
-        <div v-if="showInviteModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="showInviteModal = false"></div>
-          <div class="relative rounded-xl p-6 max-w-sm w-full animate-scale-in"
-               style="background: #0d0e15; border: 2px solid rgba(180,76,255,0.35); box-shadow: 0 0 60px rgba(0,0,0,0.8);">
-            <div class="flex items-center justify-between mb-5">
-              <div class="flex items-center gap-2.5">
-                <div class="w-1 h-4 rounded-full bg-arcade-purple"></div>
-                <h2 class="font-pixel text-[9px] text-arcade-purple tracking-[0.2em]">1v1 INVITE</h2>
-              </div>
-              <button @click="showInviteModal = false" class="btn-ghost p-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <template v-if="inviteStep === 'creating'">
-              <div class="text-center py-6">
-                <div class="w-8 h-8 border-2 border-arcade-purple/30 border-t-arcade-purple rounded-full animate-spin mx-auto mb-3"></div>
-                <span class="font-mono text-xs text-retro-muted">Creating match...</span>
-              </div>
-            </template>
-
-            <template v-else-if="inviteStep === 'created'">
-              <div class="text-center py-2">
-                <p class="font-mono text-xs text-retro-muted mb-3">Match created! Share the code with <span class="text-crt-cyan">{{ inviteTargetUser }}</span>:</p>
-                <div class="font-terminal text-4xl text-arcade-purple mb-4 tracking-[0.3em]">{{ inviteMatchCode }}</div>
-                <div class="flex gap-2">
-                  <button @click="copyInviteCode" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-2 text-[10px]">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                    COPY CODE
-                  </button>
-                  <button @click="startInviteMatch" class="btn-retro-primary flex-1 !py-2 !text-[9px]">
-                    START PLAYING
-                  </button>
-                </div>
-              </div>
-            </template>
-
-            <template v-else-if="inviteStep === 'error'">
-              <div class="text-center py-4">
-                <div class="font-mono text-[11px] text-crt-red mb-3">{{ inviteError }}</div>
-                <button @click="showInviteModal = false" class="btn-retro-ghost px-4 py-2">CLOSE</button>
-              </div>
-            </template>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
+    <ProfileInviteModal
+      :open="showInviteModal"
+      :step="inviteStep"
+      :target-user="inviteTargetUser"
+      :error="inviteError"
+      @close="showInviteModal = false"
+      @start-match="startInviteMatch"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useApi } from '../composables/useApi'
@@ -571,6 +527,7 @@ import { useProgression } from '../composables/useProgression'
 import { useAchievements } from '../composables/useAchievements'
 import { useFriends } from '../composables/useFriends'
 import { useWikipedia } from '../composables/useWikipedia'
+import ProfileInviteModal from '../components/profile/ProfileInviteModal.vue'
 
 const props = defineProps({ username: String })
 
@@ -711,8 +668,10 @@ let searchTimeout = null
 const showInviteModal = ref(false)
 const inviteStep = ref('creating')
 const inviteTargetUser = ref('')
-const inviteMatchCode = ref('')
+const inviteId = ref(null)
+const inviteMatchData = ref(null)
 const inviteError = ref('')
+let invitePollInterval = null
 
 function getModeLabel(modeId) {
   return GAME_MODES[modeId]?.name?.toUpperCase() || modeId?.toUpperCase() || 'UNKNOWN'
@@ -925,38 +884,86 @@ async function inviteTo1v1() {
 }
 
 async function inviteFriendTo1v1(username) {
-  inviteTargetUser.value = username
-  inviteStep.value = 'creating'
-  inviteError.value = ''
-  showInviteModal.value = true
-
   try {
     const pair = await wiki.getRandomPairByGenre(null)
     if (!pair) throw new Error('Could not generate articles')
-    const result = await api.post('/match/create', { startTitle: pair.start.title, endTitle: pair.end.title })
+    const result = await api.post('/friends/game-invite', {
+      username,
+      startTitle: pair.start.title,
+      endTitle: pair.end.title,
+    })
     if (result.error) throw new Error(result.error)
-    inviteMatchCode.value = result.code
-    inviteStep.value = 'created'
-    toast.success(`Match created! Share code ${result.code} with ${username}`)
+    const matchCode = result.invite?.match_code || ''
+    if (!matchCode) throw new Error('Invite created but missing match code')
+    const inviteIdFromResult = result.invite?.id
+    toast.success(`Invite sent to ${username}`)
+    router.push({
+      name: 'home',
+      query: {
+        hostMatch: matchCode,
+        hostInviteId: inviteIdFromResult ? String(inviteIdFromResult) : '',
+        hostInviteUser: username,
+      },
+    })
   } catch (e) {
-    inviteError.value = e.message || 'Failed to create match'
-    inviteStep.value = 'error'
+    toast.error(e.message || 'Failed to create invite')
   }
 }
 
-function copyInviteCode() {
-  if (!inviteMatchCode.value) return
-  navigator.clipboard.writeText(inviteMatchCode.value)
-    .then(() => toast.success('Code copied!'))
-    .catch(() => toast.warn('Could not copy'))
+function clearInvitePolling() {
+  if (invitePollInterval) {
+    clearInterval(invitePollInterval)
+    invitePollInterval = null
+  }
+}
+
+function startInvitePolling() {
+  clearInvitePolling()
+  if (!inviteId.value) return
+  invitePollInterval = setInterval(checkInviteStatus, 2000)
+}
+
+async function checkInviteStatus() {
+  if (!inviteId.value || inviteStep.value !== 'pending') return
+  try {
+    const result = await api.get(`/friends/game-invite/${inviteId.value}`)
+    inviteMatchData.value = {
+      code: result.match_code || inviteMatchData.value?.code || '',
+      start_title: result.start_title || inviteMatchData.value?.start_title || '',
+      end_title: result.end_title || inviteMatchData.value?.end_title || '',
+    }
+    if (result.status === 'accepted') {
+      inviteStep.value = 'accepted'
+      clearInvitePolling()
+      toast.success(`${inviteTargetUser.value} accepted your invite!`)
+      return
+    }
+    if (result.status === 'declined') {
+      inviteStep.value = 'declined'
+      clearInvitePolling()
+      toast.info(`${inviteTargetUser.value} declined your invite.`)
+      return
+    }
+  } catch (e) {
+    inviteError.value = e.message || 'Failed to check invite status'
+    inviteStep.value = 'error'
+    clearInvitePolling()
+  }
 }
 
 function startInviteMatch() {
-  if (!inviteMatchCode.value) return
+  if (!inviteMatchData.value?.code) return
+  clearInvitePolling()
   showInviteModal.value = false
-  api.get(`/match/${inviteMatchCode.value}`).then(match => {
-    router.push({ name: 'game', params: { mode: 'custom' }, query: { from: match.start_title, to: match.end_title, match: inviteMatchCode.value } })
-  }).catch(() => toast.error('Failed to start match'))
+  router.push({
+    name: 'game',
+    params: { mode: 'custom' },
+    query: {
+      from: inviteMatchData.value.start_title,
+      to: inviteMatchData.value.end_title,
+      match: inviteMatchData.value.code,
+    },
+  })
 }
 
 function handleGlobalClick(e) {
@@ -968,6 +975,11 @@ function handleGlobalClick(e) {
 onMounted(() => {
   loadProfile()
   document.addEventListener('click', handleGlobalClick)
+})
+
+onBeforeUnmount(() => {
+  clearInvitePolling()
+  document.removeEventListener('click', handleGlobalClick)
 })
 
 watch(() => props.username, () => {

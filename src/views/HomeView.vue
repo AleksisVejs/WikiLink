@@ -528,427 +528,82 @@
       </div>
     </footer>
 
-    <!-- Stats Modal -->
-    <Teleport to="body">
-      <transition name="fade">
-        <div v-if="showStats" class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 max-h-[100dvh]">
-          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="showStats = false"></div>
-          <div class="relative rounded-2xl p-4 sm:p-6 max-w-lg w-full max-h-[min(92dvh,640px)] overflow-y-auto overscroll-contain animate-scale-in"
-               style="background: #0d0e15; border: 1.5px solid rgba(37,39,56,0.7); box-shadow: 0 0 60px rgba(0,0,0,0.8), 0 0 30px rgba(0,229,255,0.04);">
+    <HomeStatsModal
+      :open="showStats"
+      :tab="statsTab"
+      :has-stats="hasStats"
+      :has-genre-stats="hasGenreStats"
+      :stats="stats"
+      :game-modes="GAME_MODES"
+      :genres="GENRES"
+      :achievements="achievements"
+      :achievement-svg-path="achievementSvgPath"
+      :format-time="formatTime"
+      @close="showStats = false"
+      @set-tab="statsTab = $event"
+    />
 
-            <div class="flex items-center justify-between mb-3 sm:mb-5 gap-2">
-              <div class="flex items-center gap-2.5 shrink-0">
-                <div class="w-1 h-4 rounded-full bg-crt-amber"></div>
-                <h2 class="font-pixel text-[9px] text-crt-amber tracking-[0.2em]">YOUR STATS</h2>
-              </div>
-              <button @click="showStats = false" class="btn-ghost p-1.5 shrink-0">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div class="flex items-center gap-1 mb-4 overflow-x-auto pb-1 -mb-1 sm:mb-4 sm:pb-0">
-              <button @click="statsTab = 'modes'" class="font-mono text-[10px] px-2 py-1 rounded transition-all whitespace-nowrap shrink-0"
-                      :class="statsTab === 'modes' ? 'text-crt-cyan bg-crt-cyan/10' : 'text-retro-muted hover:text-crt-white'">Modes</button>
-              <button @click="statsTab = 'genres'" class="font-mono text-[10px] px-2 py-1 rounded transition-all whitespace-nowrap shrink-0"
-                      :class="statsTab === 'genres' ? 'text-crt-cyan bg-crt-cyan/10' : 'text-retro-muted hover:text-crt-white'">Genres</button>
-              <button @click="statsTab = 'badges'" class="font-mono text-[10px] px-2 py-1 rounded transition-all whitespace-nowrap shrink-0"
-                      :class="statsTab === 'badges' ? 'text-arcade-gold bg-arcade-gold/10' : 'text-retro-muted hover:text-crt-white'">
-                Badges <span class="text-[8px] opacity-60">{{ achievements.unlockedCount.value }}/{{ achievements.totalCount.value }}</span>
-              </button>
-            </div>
+    <HomeAuthModal
+      :open="showAuthModal"
+      :mode="authMode"
+      :username="authUsername"
+      :password="authPassword"
+      :confirm-password="authConfirmPassword"
+      :show-password="showPassword"
+      :show-confirm-password="showConfirmPassword"
+      :error="authError"
+      :loading="auth.loading.value"
+      @close="showAuthModal = false"
+      @set-mode="authMode = $event"
+      @submit="handleAuth"
+      @update:username="authUsername = $event"
+      @update:password="authPassword = $event"
+      @update:confirm-password="authConfirmPassword = $event"
+      @toggle-password="showPassword = !showPassword"
+      @toggle-confirm-password="showConfirmPassword = !showConfirmPassword"
+    />
 
-            <!-- Modes tab -->
-            <div v-if="statsTab === 'modes'">
-              <div v-if="hasStats" class="space-y-3">
-                <div v-for="(modeStats, modeId) in stats.modes" :key="modeId" class="rounded-lg p-4" style="background: #12131c; border: 1px solid #252738;">
-                  <h3 class="font-pixel text-[7px] text-crt-cyan mb-2 sm:mb-3 tracking-wider">{{ GAME_MODES[modeId]?.name?.toUpperCase() || modeId }}</h3>
-                  <div class="grid grid-cols-4 gap-2 sm:gap-3">
-                    <div class="text-center">
-                      <div class="font-terminal text-lg sm:text-xl text-crt-green tabular-nums">{{ modeStats.gamesWon }}</div>
-                      <div class="font-mono text-[8px] sm:text-[9px] text-retro-muted">WON</div>
-                    </div>
-                    <div class="text-center">
-                      <div class="font-terminal text-lg sm:text-xl text-crt-red tabular-nums">{{ modeStats.gamesLost || 0 }}</div>
-                      <div class="font-mono text-[8px] sm:text-[9px] text-retro-muted">LOST</div>
-                    </div>
-                    <div class="text-center">
-                      <div class="font-terminal text-lg sm:text-xl text-crt-amber tabular-nums">{{ modeStats.bestClicks ?? '-' }}</div>
-                      <div class="font-mono text-[8px] sm:text-[9px] text-retro-muted">BEST</div>
-                    </div>
-                    <div class="text-center">
-                      <div class="font-terminal text-lg sm:text-xl text-crt-cyan tabular-nums">{{ formatTime(modeStats.bestTime) }}</div>
-                      <div class="font-mono text-[8px] sm:text-[9px] text-retro-muted">TIME</div>
-                    </div>
-                  </div>
-                  <div v-if="modeStats.bestStreak" class="mt-2 pt-2 border-t border-retro-border/20 flex items-center justify-center gap-1">
-                    <span class="font-mono text-[9px] text-retro-muted">BEST STREAK:</span>
-                    <span class="font-terminal text-sm text-arcade-gold">{{ modeStats.bestStreak }}</span>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="text-center py-10">
-                <div class="font-pixel text-[8px] text-retro-muted/50 mb-2">NO DATA YET</div>
-                <p class="font-mono text-xs text-retro-muted/30">Play a game to see your stats here</p>
-              </div>
-            </div>
+    <HomePvpModal
+      :open="showMatchModal"
+      :match-tab="matchTab"
+      :group-view="groupView"
+      :group-lobby-code="groupLobbyCode"
+      :group-lobby-data="groupLobbyData"
+      :current-user-id="auth.user.value?.id ?? null"
+      :group-start-loading="groupStartLoading"
+      :group-error="groupError"
+      :match-status="matchStatus"
+      :match-code="matchCode"
+      :joined-match-code="joinedMatchCode"
+      :match-opponent-username="matchOpponentUsername"
+      :match-loading="matchLoading"
+      :group-max-players="groupMaxPlayers"
+      :group-loading="groupLoading"
+      :join-room-code="joinRoomCode"
+      :join-busy="joinBusy"
+      :unified-join-error="unifiedJoinError"
+      :show-leave-current-room-button="showLeaveCurrentRoomButton"
+      @close="closeMatchModal"
+      @copy-group-code="copyGroupLobbyCode"
+      @start-group="postStartGroupLobby"
+      @copy-match-code="copyMatchCode"
+      @start-created-match="startCreatedMatch"
+      @switch-hub="switchPvpHub"
+      @create-match="createMatch"
+      @create-group-lobby="createGroupLobby"
+      @update:group-max-players="groupMaxPlayers = $event"
+      @update:join-room-code="joinRoomCode = $event"
+      @join-by-code="joinByCode"
+      @leave-current-room="leaveCurrentMultiplayerRoom"
+    />
 
-            <!-- Genres tab -->
-            <div v-if="statsTab === 'genres'">
-              <div v-if="hasGenreStats" class="space-y-2">
-                <div v-for="(gs, gId) in stats.genres" :key="gId" class="rounded-lg px-4 py-3 flex items-center justify-between" style="background: #12131c; border: 1px solid #252738;">
-                  <div class="flex items-center gap-2.5">
-                    <svg class="w-4.5 h-4.5 text-crt-cyan/60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" v-html="GENRES[gId]?.svgIcon || ''"></svg>
-                    <span class="font-pixel text-[7px] text-crt-white tracking-wider">{{ GENRES[gId]?.name?.toUpperCase() || gId }}</span>
-                  </div>
-                  <div class="flex items-center gap-4 text-center">
-                    <div>
-                      <div class="font-terminal text-sm text-crt-green">{{ gs.gamesWon }}</div>
-                      <div class="font-mono text-[8px] text-retro-muted">W</div>
-                    </div>
-                    <div>
-                      <div class="font-terminal text-sm text-crt-red">{{ gs.gamesLost || 0 }}</div>
-                      <div class="font-mono text-[8px] text-retro-muted">L</div>
-                    </div>
-                    <div>
-                      <div class="font-terminal text-sm text-crt-cyan">{{ gs.gamesPlayed }}</div>
-                      <div class="font-mono text-[8px] text-retro-muted">GP</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="text-center py-10">
-                <div class="font-pixel text-[8px] text-retro-muted/50 mb-2">NO GENRE DATA</div>
-                <p class="font-mono text-xs text-retro-muted/30">Play games with different genres to see stats here</p>
-              </div>
-            </div>
-
-            <!-- Badges tab -->
-            <div v-if="statsTab === 'badges'">
-              <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                <div v-for="badge in achievements.getAllAchievements()" :key="badge.id"
-                     class="achievement-badge" :class="badge.unlocked ? 'unlocked' : 'locked'"
-                     :title="badge.unlocked ? badge.description : '???'">
-                  <div class="w-8 h-8 rounded-lg mx-auto mb-1.5 flex items-center justify-center"
-                       :style="badge.unlocked ? 'background: rgba(255,215,0,0.08); border: 1px solid rgba(255,215,0,0.2);' : 'background: #181a25; border: 1px solid #252738;'">
-                    <svg class="w-4 h-4" :class="badge.unlocked ? 'text-arcade-gold' : 'text-retro-muted/30'" fill="none" stroke="currentColor" viewBox="0 0 24 24" v-html="achievementSvgPath(badge.category)"></svg>
-                  </div>
-                  <div class="font-pixel text-[6px] tracking-wider" :class="badge.unlocked ? 'text-arcade-gold' : 'text-retro-muted/40'">{{ badge.unlocked ? badge.name : '???' }}</div>
-                  <div v-if="badge.unlocked" class="font-mono text-[8px] text-crt-green mt-0.5">+{{ badge.xp }} XP</div>
-                </div>
-              </div>
-              <div class="mt-3 text-center">
-                <div class="font-terminal text-lg text-arcade-gold">{{ achievements.unlockedCount.value }} / {{ achievements.totalCount.value }}</div>
-                <div class="font-mono text-[9px] text-retro-muted">achievements unlocked</div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </transition>
-    </Teleport>
-
-    <!-- Auth Modal -->
-    <Teleport to="body">
-      <transition name="fade">
-        <div v-if="showAuthModal" class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
-          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="showAuthModal = false"></div>
-          <div class="relative rounded-2xl p-6 max-w-sm w-full animate-scale-in"
-               style="background: #0d0e15; border: 1.5px solid rgba(37,39,56,0.7); box-shadow: 0 0 60px rgba(0,0,0,0.8), 0 0 30px rgba(0,229,255,0.04);">
-            <div class="flex items-center justify-between mb-5">
-              <div class="flex items-center gap-1 rounded-lg p-0.5" style="background: rgba(18,19,28,0.6); border: 1px solid rgba(37,39,56,0.4);">
-                <button @click="authMode = 'login'" class="font-pixel text-[8px] px-3 py-1.5 rounded-md transition-all"
-                        :class="authMode === 'login' ? 'text-crt-green bg-crt-green/10' : 'text-retro-muted hover:text-crt-white'">LOGIN</button>
-                <button @click="authMode = 'register'" class="font-pixel text-[8px] px-3 py-1.5 rounded-md transition-all"
-                        :class="authMode === 'register' ? 'text-crt-cyan bg-crt-cyan/10' : 'text-retro-muted hover:text-crt-white'">REGISTER</button>
-              </div>
-              <button @click="showAuthModal = false" class="btn-ghost p-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <form @submit.prevent="handleAuth" class="space-y-3">
-              <div>
-                <label class="font-mono text-[10px] text-retro-muted block mb-1">Username</label>
-                <input v-model="authUsername" type="text" autocomplete="username" required minlength="2" maxlength="24"
-                       class="w-full px-3 py-2 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
-              </div>
-              <div>
-                <label class="font-mono text-[10px] text-retro-muted block mb-1">Password</label>
-                <div class="relative">
-                  <input v-model="authPassword" :type="showPassword ? 'text' : 'password'" :autocomplete="authMode === 'login' ? 'current-password' : 'new-password'" required minlength="6"
-                         class="w-full px-3 py-2 pr-10 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
-                  <button type="button" @click="showPassword = !showPassword" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-retro-muted hover:text-crt-white transition-colors" tabindex="-1">
-                    <svg v-if="!showPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <div v-if="authMode === 'register'">
-                <label class="font-mono text-[10px] text-retro-muted block mb-1">Confirm Password</label>
-                <div class="relative">
-                  <input v-model="authConfirmPassword" :type="showConfirmPassword ? 'text' : 'password'" autocomplete="new-password" required minlength="6"
-                         class="w-full px-3 py-2 pr-10 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
-                  <button type="button" @click="showConfirmPassword = !showConfirmPassword" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-retro-muted hover:text-crt-white transition-colors" tabindex="-1">
-                    <svg v-if="!showConfirmPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <div v-if="authError" class="font-mono text-[11px] text-crt-red">{{ authError }}</div>
-              <button type="submit" :disabled="auth.loading.value" class="btn-retro-primary w-full !py-2.5">
-                {{ auth.loading.value ? 'LOADING...' : authMode === 'login' ? 'LOGIN' : 'CREATE ACCOUNT' }}
-              </button>
-            </form>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
-
-    <!-- 1v1 Match Modal -->
-    <Teleport to="body">
-      <transition name="fade">
-        <div v-if="showMatchModal" class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
-          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="closeMatchModal"></div>
-          <div class="relative rounded-2xl p-5 sm:p-6 max-w-[400px] w-full animate-scale-in"
-               style="background: #0d0e15; border: 1.5px solid rgba(180,76,255,0.25); box-shadow: 0 0 60px rgba(0,0,0,0.8), 0 0 30px rgba(180,76,255,0.06);">
-            <div class="flex items-center justify-between mb-5">
-              <div class="flex items-center gap-2.5">
-                <div class="w-1 h-4 rounded-full bg-arcade-purple"></div>
-                <h2 class="font-pixel text-[9px] text-arcade-purple tracking-[0.2em]">PVP</h2>
-              </div>
-              <button @click="closeMatchModal" class="btn-ghost p-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <template v-if="matchTab === 'group' && groupView === 'waiting'">
-              <div class="text-center py-3">
-                <div class="font-pixel text-[8px] mb-2 tracking-wider text-crt-cyan">GROUP LOBBY</div>
-                <div class="font-terminal text-3xl text-arcade-purple mb-2 tracking-[0.25em]">{{ groupLobbyCode }}</div>
-                <p class="font-mono text-[10px] text-retro-muted mb-3">Share the code. Host starts when everyone is ready (min. 2 players).</p>
-                <div class="rounded-lg px-3 py-2 mb-3 text-left" style="background: #12131c; border: 1px solid #252738;">
-                  <div class="font-pixel text-[6px] text-retro-muted mb-1.5 tracking-wider">PLAYERS ({{ groupLobbyData?.players?.length || 0 }} / {{ groupLobbyData?.max_players || '—' }})</div>
-                  <ul class="font-mono text-[11px] text-crt-white space-y-1 max-h-[140px] overflow-y-auto">
-                    <li v-for="p in groupLobbyData?.players || []" :key="p.user_id" class="flex items-center justify-between gap-2">
-                      <span class="truncate">{{ p.username }}<span v-if="p.user_id === auth.user.value?.id" class="text-crt-green/60 text-[9px] ml-1">(you)</span></span>
-                      <span v-if="groupLobbyData?.host_id === p.user_id" class="font-pixel text-[6px] text-crt-amber shrink-0">HOST</span>
-                    </li>
-                  </ul>
-                </div>
-                <div v-if="groupLobbyData?.status === 'waiting'" class="flex flex-col gap-2">
-                  <div v-if="groupLobbyData?.is_host" class="flex gap-2">
-                    <button type="button" @click="copyGroupLobbyCode" class="btn-retro-ghost flex-1 !py-2 text-[10px]">COPY CODE</button>
-                    <button type="button" @click="postStartGroupLobby" :disabled="groupStartLoading || (groupLobbyData?.players?.length || 0) < 2"
-                            class="flex-1 !py-2 !text-[9px]"
-                            :class="(groupLobbyData?.players?.length || 0) >= 2 ? 'btn-retro-primary' : 'btn-retro-ghost opacity-40 cursor-not-allowed'">
-                      {{ groupStartLoading ? '...' : 'START' }}
-                    </button>
-                  </div>
-                  <div v-else class="font-mono text-[10px] text-crt-amber/80 animate-blink-slow">Waiting for host to start...</div>
-                </div>
-                <div v-if="groupError" class="font-mono text-[11px] text-crt-red mt-2">{{ groupError }}</div>
-              </div>
-            </template>
-
-            <template v-else-if="matchTab === 'waiting'">
-              <div class="text-center py-4">
-                <div class="font-pixel text-[8px] mb-3 tracking-wider"
-                     :class="matchStatus === 'ready' ? 'text-crt-green' : 'text-crt-amber'">
-                  {{ matchStatus === 'joined_waiting' ? 'WAITING FOR HOST' : (matchStatus === 'ready' ? 'OPPONENT JOINED!' : 'WAITING FOR OPPONENT') }}
-                </div>
-                <div class="font-terminal text-4xl text-arcade-purple mb-3 tracking-[0.3em]">{{ matchCode || joinedMatchCode }}</div>
-                <p class="font-mono text-xs text-retro-muted mb-2">
-                  {{ matchStatus === 'joined_waiting' ? 'Host will start the match for both players' : 'Share this code with your opponent' }}
-                </p>
-
-                <!-- Waiting indicator -->
-                <div v-if="matchStatus !== 'ready' && matchStatus !== 'joined_waiting'" class="flex items-center justify-center gap-2 mb-4 py-2">
-                  <span class="w-2 h-2 rounded-full bg-crt-amber animate-blink"></span>
-                  <span class="font-mono text-[11px] text-crt-amber/70 animate-blink-slow">Scanning for opponent...</span>
-                </div>
-                <div v-if="matchStatus === 'joined_waiting'" class="flex items-center justify-center gap-2 mb-4 py-2">
-                  <span class="w-2 h-2 rounded-full bg-crt-cyan animate-blink"></span>
-                  <span class="font-mono text-[11px] text-crt-cyan/80 animate-blink-slow">Waiting for host to press Start...</span>
-                </div>
-
-                <!-- Ready indicator -->
-                <div v-else class="flex flex-col items-center justify-center gap-1 mb-4 py-2">
-                  <div class="flex items-center justify-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-crt-green" style="box-shadow: 0 0 6px rgba(57,255,20,0.5);"></span>
-                    <span class="font-mono text-[11px] text-crt-green">Opponent is ready!</span>
-                  </div>
-                  <span v-if="matchOpponentUsername" class="font-mono text-[10px] text-arcade-purple/80">{{ matchOpponentUsername }}</span>
-                </div>
-
-                <div class="flex gap-2">
-                  <button @click="copyMatchCode" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-2 text-[10px]">
-                    COPY CODE
-                  </button>
-                  <button v-if="matchStatus !== 'joined_waiting'" @click="startCreatedMatch"
-                          :disabled="matchStatus !== 'ready'"
-                          class="flex-1 !py-2 !px-4 !text-[9px]"
-                          :class="matchStatus === 'ready' ? 'btn-retro-primary' : 'btn-retro-ghost opacity-40 cursor-not-allowed'">
-                    {{ matchStatus === 'ready' ? 'START' : 'WAITING...' }}
-                  </button>
-                  <button v-else type="button"
-                          class="flex-1 !py-2 !px-4 !text-[9px] btn-retro-ghost opacity-60 cursor-not-allowed">
-                    HOST STARTS
-                  </button>
-                </div>
-              </div>
-            </template>
-
-            <template v-else>
-              <!-- One choice: duel vs group (no separate create/join tabs) -->
-              <div class="flex p-1 mb-5 rounded-xl gap-1" style="background: #12131c; border: 1px solid #252738;">
-                <button type="button"
-                        class="flex-1 font-pixel text-[8px] tracking-[0.12em] py-2.5 rounded-lg transition-all duration-200"
-                        :class="matchTab === 'duel'
-                          ? 'text-crt-white'
-                          : 'text-retro-muted hover:text-crt-white/75'"
-                        :style="matchTab === 'duel'
-                          ? 'background: linear-gradient(180deg, rgba(180,76,255,0.28), rgba(180,76,255,0.08)); border: 1px solid rgba(180,76,255,0.4); box-shadow: 0 0 16px rgba(180,76,255,0.12);'
-                          : 'border: 1px solid transparent;'"
-                        @click="switchPvpHub('duel')">1v1 DUEL</button>
-                <button type="button"
-                        class="flex-1 font-pixel text-[8px] tracking-[0.12em] py-2.5 rounded-lg transition-all duration-200"
-                        :class="matchTab === 'group' && groupView === 'menu'
-                          ? 'text-crt-white'
-                          : 'text-retro-muted hover:text-crt-white/75'"
-                        :style="matchTab === 'group' && groupView === 'menu'
-                          ? 'background: linear-gradient(180deg, rgba(57,255,20,0.22), rgba(57,255,20,0.06)); border: 1px solid rgba(57,255,20,0.38); box-shadow: 0 0 16px rgba(57,255,20,0.1);'
-                          : 'border: 1px solid transparent;'"
-                        @click="switchPvpHub('group')">GROUP</button>
-              </div>
-
-              <div v-if="matchTab === 'duel'" class="space-y-4">
-                <p class="font-mono text-[11px] text-retro-muted leading-relaxed">
-                  Same random article pair for two players. Fewest link-clicks wins; faster time breaks ties.
-                </p>
-                <button type="button" @click="createMatch" :disabled="matchLoading"
-                        class="btn-retro-primary w-full !py-3 font-pixel text-[8px] tracking-[0.15em]">
-                  {{ matchLoading ? 'CREATING...' : 'CREATE ROOM' }}
-                </button>
-              </div>
-
-              <div v-if="matchTab === 'group' && groupView === 'menu'" class="space-y-4">
-                <p class="font-mono text-[11px] text-retro-muted leading-relaxed">
-                  2–8 players, same pair. When everyone finishes, the leaderboard ranks by clicks, then time.
-                </p>
-                <div class="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5" style="background: #12131c; border: 1px solid #252738;">
-                  <span class="font-mono text-[10px] text-retro-muted">Max players</span>
-                  <select v-model.number="groupMaxPlayers"
-                          class="min-w-[4.5rem] px-2 py-1.5 rounded-lg font-terminal text-sm bg-[#0a0b11] border border-retro-border text-crt-green focus:border-crt-green focus:outline-none">
-                    <option v-for="n in 7" :key="n + 1" :value="n + 1">{{ n + 1 }}</option>
-                  </select>
-                </div>
-                <button type="button" @click="createGroupLobby" :disabled="groupLoading"
-                        class="btn-retro-primary w-full !py-3 font-pixel text-[8px] tracking-[0.15em]" style="border-color: rgba(57,255,20,0.45);">
-                  {{ groupLoading ? 'CREATING...' : 'CREATE LOBBY' }}
-                </button>
-              </div>
-
-              <div class="relative py-0.5 mt-4">
-                <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-retro-border/20"></div>
-                <div class="relative flex justify-center">
-                  <span class="font-pixel text-[6px] tracking-[0.2em] text-retro-muted/80 px-2" style="background: #0d0e15;">ENTER CODE</span>
-                </div>
-              </div>
-              <div class="flex gap-2 mt-3">
-                <input v-model="joinRoomCode" type="text" placeholder="ROOM CODE" maxlength="6" autocomplete="off"
-                       class="min-w-0 flex-1 px-3 py-2.5 rounded-lg font-terminal text-lg text-center tracking-[0.28em] bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none uppercase" />
-                <button type="button" @click="joinByCode(matchTab === 'group' ? 'lobby' : 'match')" :disabled="joinBusy"
-                        class="shrink-0 px-4 py-2.5 rounded-lg font-pixel text-[8px] tracking-[0.15em] transition-all touch-manipulation disabled:opacity-40"
-                        style="background: rgba(0,229,255,0.08); border: 1.5px solid rgba(0,229,255,0.35); color: #00e5ff;">
-                  {{ joinBusy ? '...' : 'JOIN' }}
-                </button>
-              </div>
-              <p v-if="unifiedJoinError" class="font-mono text-[10px] text-crt-red mt-2">{{ unifiedJoinError }}</p>
-              <button v-if="showLeaveCurrentRoomButton" type="button" @click="leaveCurrentMultiplayerRoom" :disabled="joinBusy"
-                      class="mt-2 w-full px-3 py-2 rounded-lg font-pixel text-[8px] tracking-[0.12em] transition-all touch-manipulation disabled:opacity-40"
-                      style="background: rgba(255,68,68,0.08); border: 1.5px solid rgba(255,68,68,0.35); color: #ff6666;">
-                {{ joinBusy ? 'LEAVING...' : 'LEAVE CURRENT ROOM' }}
-              </button>
-            </template>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
-
-    <!-- How to Play Modal -->
-    <Teleport to="body">
-      <transition name="fade">
-        <div v-if="showHowTo" class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 max-h-[100dvh]">
-          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="showHowTo = false"></div>
-          <div class="relative rounded-2xl p-5 sm:p-6 max-w-lg w-full max-h-[min(92dvh,600px)] overflow-y-auto overscroll-contain animate-scale-in"
-               style="background: #0d0e15; border: 1.5px solid rgba(37,39,56,0.7); box-shadow: 0 0 60px rgba(0,0,0,0.8);">
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex items-center gap-2.5">
-                <div class="w-1 h-4 rounded-full bg-crt-cyan"></div>
-                <h2 class="font-pixel text-[9px] text-crt-cyan tracking-[0.2em]">HOW TO PLAY</h2>
-              </div>
-              <button @click="showHowTo = false" class="btn-ghost p-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div class="space-y-4 font-mono text-sm text-retro-light leading-relaxed">
-              <div>
-                <h3 class="font-pixel text-[8px] text-crt-green mb-1.5 tracking-wider">THE GOAL</h3>
-                <p class="text-[12px]">Navigate from a <span class="text-crt-green">starting Wikipedia article</span> to a <span class="text-crt-magenta">target article</span> by clicking only the links within each page.</p>
-              </div>
-              <div>
-                <h3 class="font-pixel text-[8px] text-crt-amber mb-1.5 tracking-wider">GAME MODES</h3>
-                <ul class="space-y-1 text-[12px]">
-                  <li><span class="text-crt-blue">Classic</span> -- fewest clicks, no timer</li>
-                  <li><span class="text-arcade-orange">Sprint</span> -- beat the clock</li>
-                  <li><span class="text-crt-magenta">Click Limit</span> -- limited number of clicks</li>
-                  <li><span style="color:#ff5c3a">Trending</span> -- navigate between trending articles</li>
-                  <li><span class="text-arcade-gold">Custom</span> -- choose your own articles</li>
-                  <li><span class="text-crt-green">Freeplay</span> -- explore with no target</li>
-                  <li><span class="text-crt-amber">Daily</span> -- same pair for everyone, once per day</li>
-                </ul>
-              </div>
-              <div>
-                <h3 class="font-pixel text-[8px] text-crt-cyan mb-1.5 tracking-wider">CONTROLS</h3>
-                <ul class="space-y-1 text-[12px]">
-                  <li><span class="text-crt-green">Green links</span> = clickable Wikipedia links</li>
-                  <li><span class="text-retro-muted">Gray links</span> = disabled (external or excluded)</li>
-                  <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-cyan">Backspace</kbd> Go back one page</li>
-                  <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-amber">R</kbd> Reroll for a new pair</li>
-                  <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-red">Esc</kbd> Quit current game</li>
-                </ul>
-              </div>
-              <div>
-                <h3 class="font-pixel text-[8px] text-crt-magenta mb-1.5 tracking-wider">TIPS</h3>
-                <p class="text-[12px]">Hover over green links to preview the article before clicking. Look for broad topics like countries, dates, or people to bridge between unrelated subjects.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
+    <HomeHowToModal :open="showHowTo" @close="showHowTo = false" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useGame } from '../composables/useGame'
 import { useSound } from '../composables/useSound'
 import { useToast } from '../composables/useToast'
@@ -959,10 +614,15 @@ import { useProgression } from '../composables/useProgression'
 import { useAchievements } from '../composables/useAchievements'
 import { useWikipedia } from '../composables/useWikipedia'
 import WikiTitleInput from '../components/WikiTitleInput.vue'
+import HomeAuthModal from '../components/home/HomeAuthModal.vue'
+import HomeHowToModal from '../components/home/HomeHowToModal.vue'
+import HomeStatsModal from '../components/home/HomeStatsModal.vue'
+import HomePvpModal from '../components/home/HomePvpModal.vue'
 import { APP_VERSION } from '../version.js'
 import { loadMultiplayerSession, buildSessionRoute, clearMultiplayerSession } from '../utils/multiplayerSession'
 
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 const { GAME_MODES, GENRES, MODIFIERS, DIFFICULTIES, getStats, getDailyStatus, LIMIT_BOUNDS } = useGame()
 const sound = useSound()
@@ -1006,7 +666,12 @@ const matchError = ref('')
 const matchStatus = ref(null)
 const matchOpponentUsername = ref('')
 const joinedMatchCode = ref('')
+const matchOpponentLeftNotified = ref(false)
 let matchPollTimer = null
+let handlingInviteJoin = false
+let handlingHostMatch = false
+const hostInviteId = ref(null)
+const hostInviteUser = ref('')
 
 const groupView = ref('menu')
 const groupLobbyCode = ref('')
@@ -1277,16 +942,51 @@ function startMatchPolling() {
     if (!code) { stopMatchPolling(); return }
     try {
       const result = await api.get(`/match/${code}`)
-      if (result.opponent?.username) matchOpponentUsername.value = result.opponent.username
-      if (result.status === 'active' || result.status === 'finished') {
+      if (result.opponent?.username) {
+        matchOpponentUsername.value = result.opponent.username
+      }
+      if (result.status === 'active') {
         stopMatchPolling()
         sound.playStart()
         showMatchModal.value = false
         router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, match: code } })
         return
       }
+      if (result.status === 'finished') {
+        stopMatchPolling()
+        showMatchModal.value = false
+        matchCode.value = ''
+        joinedMatchCode.value = ''
+        matchStatus.value = null
+        matchOpponentUsername.value = ''
+        if (hostInviteId.value) {
+          try {
+            const inviteStatus = await api.get(`/friends/game-invite/${hostInviteId.value}`)
+            if (inviteStatus.status === 'declined') {
+              toast.info(`${hostInviteUser.value || 'Invited player'} denied the invite.`)
+            } else {
+              toast.info('1v1 room closed.')
+            }
+          } catch {
+            toast.info('1v1 room closed.')
+          }
+        } else {
+          toast.info('1v1 room closed.')
+        }
+        hostInviteId.value = null
+        hostInviteUser.value = ''
+        return
+      }
       if (matchCode.value) {
-        matchStatus.value = result.opponent?.username ? 'ready' : 'waiting'
+        const hasOpponent = !!result.opponent?.username
+        if (hasOpponent) {
+          matchOpponentLeftNotified.value = false
+        } else if (matchStatus.value === 'ready' && !matchOpponentLeftNotified.value) {
+          toast.info('Opponent left the room.')
+          matchOpponentLeftNotified.value = true
+          matchOpponentUsername.value = ''
+        }
+        matchStatus.value = hasOpponent ? 'ready' : 'waiting'
       }
     } catch { /* ignore */ }
   }, 3000)
@@ -1415,7 +1115,11 @@ async function joinByCode(prefer = 'match') {
           if (result.error) {
             errors.match = result.error
           } else {
-            if (result.status === 'active' || result.status === 'finished') {
+            if (result.status === 'finished') {
+              errors.match = 'Match is closed.'
+              continue
+            }
+            if (result.status === 'active') {
               sound.playStart()
               showMatchModal.value = false
               router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, match: result.code } })
@@ -1425,6 +1129,7 @@ async function joinByCode(prefer = 'match') {
             matchCode.value = ''
             matchStatus.value = 'joined_waiting'
             matchOpponentUsername.value = ''
+            matchOpponentLeftNotified.value = false
             matchTab.value = 'waiting'
             toast.success('Joined match. Waiting for host to start...')
             startMatchPolling()
@@ -1462,6 +1167,61 @@ async function joinByCode(prefer = 'match') {
     matchLoading.value = false
     groupLoading.value = false
   }
+}
+
+async function joinInvitedMatchFromRoute() {
+  const inviteCodeRaw = typeof route.query.inviteMatch === 'string' ? route.query.inviteMatch : ''
+  const inviteCode = inviteCodeRaw.trim().toUpperCase()
+  if (!inviteCode || handlingInviteJoin) return
+  if (!auth.user.value) {
+    showAuthModal.value = true
+    toast.warn('Login required to join the invite')
+    return
+  }
+
+  handlingInviteJoin = true
+  showMatchModal.value = true
+  matchTab.value = 'duel'
+  joinRoomCode.value = inviteCode
+  try {
+    await joinByCode('match')
+  } finally {
+    const nextQuery = { ...route.query }
+    delete nextQuery.inviteMatch
+    router.replace({ name: 'home', query: nextQuery })
+    handlingInviteJoin = false
+  }
+}
+
+async function openHostedMatchFromRoute() {
+  const hostCodeRaw = typeof route.query.hostMatch === 'string' ? route.query.hostMatch : ''
+  const hostCode = hostCodeRaw.trim().toUpperCase()
+  if (!hostCode || handlingHostMatch) return
+  if (!auth.user.value) {
+    showAuthModal.value = true
+    toast.warn('Login required to host the invite match')
+    return
+  }
+
+  handlingHostMatch = true
+  showMatchModal.value = true
+  matchTab.value = 'waiting'
+  matchCode.value = hostCode
+  joinedMatchCode.value = ''
+  matchStatus.value = 'waiting'
+  matchOpponentUsername.value = ''
+  matchError.value = ''
+  hostInviteId.value = Number(route.query.hostInviteId) || null
+  hostInviteUser.value = typeof route.query.hostInviteUser === 'string' ? route.query.hostInviteUser : ''
+  startMatchPolling()
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.hostMatch
+  delete nextQuery.hostInviteId
+  delete nextQuery.hostInviteUser
+  router.replace({ name: 'home', query: nextQuery }).finally(() => {
+    handlingHostMatch = false
+  })
 }
 
 async function leaveCurrentMultiplayerRoom() {
@@ -1566,10 +1326,25 @@ onMounted(() => {
   api.get('/daily/leaderboard').then(d => dailyLeaderboard.value = d.scores || []).catch(() => {})
   trending.fetchTrending()
   refreshResumeSession()
+  openHostedMatchFromRoute()
+  joinInvitedMatchFromRoute()
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   stopMatchPolling()
   stopGroupLobbyPolling()
 })
+
+watch(
+  () => [route.query.inviteMatch, auth.user.value?.id],
+  () => {
+    joinInvitedMatchFromRoute()
+  }
+)
+watch(
+  () => [route.query.hostMatch, auth.user.value?.id],
+  () => {
+    openHostedMatchFromRoute()
+  }
+)
 </script>

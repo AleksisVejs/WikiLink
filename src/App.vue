@@ -37,10 +37,99 @@
         </div>
       </transition-group>
     </div>
+
+    <Teleport to="body">
+      <transition name="fade">
+        <div v-if="incomingInvite" class="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm"></div>
+          <div class="relative rounded-xl p-6 max-w-sm w-full animate-scale-in" style="background: #0d0e15; border: 2px solid rgba(0,229,255,0.35); box-shadow: 0 0 60px rgba(0,0,0,0.8);">
+            <div class="flex items-center gap-2.5 mb-4">
+              <div class="w-1 h-4 rounded-full bg-crt-cyan"></div>
+              <h2 class="font-pixel text-[9px] text-crt-cyan tracking-[0.2em]">GAME INVITE</h2>
+            </div>
+            <p class="font-mono text-xs text-retro-muted mb-4">
+              <span class="text-crt-cyan">{{ incomingInvite.sender_username }}</span> invited you to a 1v1 match.
+            </p>
+            <div class="flex gap-2">
+              <button :disabled="inviteActionLoading" @click="respondToInvite('deny')" class="btn-retro-ghost flex-1 !py-2 !text-[9px]">DENY</button>
+              <button :disabled="inviteActionLoading" @click="respondToInvite('accept')" class="btn-retro-primary flex-1 !py-2 !text-[9px]">
+                {{ inviteActionLoading ? '...' : 'ACCEPT' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useApi } from './composables/useApi'
+import { useAuth } from './composables/useAuth'
 import { useToast } from './composables/useToast'
+
+const router = useRouter()
+const api = useApi()
+const auth = useAuth()
 const { toasts } = useToast()
+const toast = useToast()
+
+const incomingInvite = ref(null)
+const inviteActionLoading = ref(false)
+let invitePollInterval = null
+
+async function pollIncomingInvites() {
+  if (!auth.user.value) {
+    incomingInvite.value = null
+    return
+  }
+  if (inviteActionLoading.value) return
+  try {
+    const result = await api.get('/friends/game-invites')
+    incomingInvite.value = result.incoming?.[0] || null
+  } catch {
+    incomingInvite.value = null
+  }
+}
+
+async function respondToInvite(action) {
+  if (!incomingInvite.value || inviteActionLoading.value) return
+  inviteActionLoading.value = true
+  try {
+    const result = await api.post('/friends/game-invite/respond', {
+      inviteId: incomingInvite.value.id,
+      action,
+    })
+    const acceptedInvite = incomingInvite.value
+    incomingInvite.value = null
+    if (action === 'accept' && result.match) {
+      toast.success(`Joining ${acceptedInvite.sender_username}'s 1v1...`)
+      router.push({
+        name: 'home',
+        query: { inviteMatch: result.match.code },
+      })
+    } else {
+      toast.info(`Invite from ${acceptedInvite.sender_username} declined.`)
+    }
+  } catch (e) {
+    toast.error(e.message || 'Failed to respond to invite')
+  } finally {
+    inviteActionLoading.value = false
+    pollIncomingInvites()
+  }
+}
+
+onMounted(() => {
+  pollIncomingInvites()
+  invitePollInterval = setInterval(pollIncomingInvites, 3000)
+})
+
+onBeforeUnmount(() => {
+  if (invitePollInterval) {
+    clearInterval(invitePollInterval)
+    invitePollInterval = null
+  }
+})
 </script>
