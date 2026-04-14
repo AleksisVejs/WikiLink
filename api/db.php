@@ -22,6 +22,12 @@ function initSchema($db) {
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             username      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
             password_hash TEXT    NOT NULL,
+            profile_icon  TEXT    NOT NULL DEFAULT 'rookie',
+            profile_accent TEXT   NOT NULL DEFAULT 'rank',
+            profile_title TEXT    NOT NULL DEFAULT 'newcomer',
+            profile_banner TEXT   NOT NULL DEFAULT 'default',
+            profile_nameplate_border TEXT NOT NULL DEFAULT 'default',
+            profile_pinned_badge TEXT NOT NULL DEFAULT '',
             created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
         )",
 
@@ -122,6 +128,30 @@ function initSchema($db) {
     }
     if (!isset($inviteColumns['room_code'])) {
         $db->exec("ALTER TABLE game_invites ADD COLUMN room_code TEXT");
+    }
+
+    // User cosmetics migration.
+    $userColumns = [];
+    foreach ($db->query("PRAGMA table_info(users)") as $col) {
+        $userColumns[$col['name']] = true;
+    }
+    if (!isset($userColumns['profile_icon'])) {
+        $db->exec("ALTER TABLE users ADD COLUMN profile_icon TEXT NOT NULL DEFAULT 'rookie'");
+    }
+    if (!isset($userColumns['profile_accent'])) {
+        $db->exec("ALTER TABLE users ADD COLUMN profile_accent TEXT NOT NULL DEFAULT 'rank'");
+    }
+    if (!isset($userColumns['profile_title'])) {
+        $db->exec("ALTER TABLE users ADD COLUMN profile_title TEXT NOT NULL DEFAULT 'newcomer'");
+    }
+    if (!isset($userColumns['profile_banner'])) {
+        $db->exec("ALTER TABLE users ADD COLUMN profile_banner TEXT NOT NULL DEFAULT 'default'");
+    }
+    if (!isset($userColumns['profile_nameplate_border'])) {
+        $db->exec("ALTER TABLE users ADD COLUMN profile_nameplate_border TEXT NOT NULL DEFAULT 'default'");
+    }
+    if (!isset($userColumns['profile_pinned_badge'])) {
+        $db->exec("ALTER TABLE users ADD COLUMN profile_pinned_badge TEXT NOT NULL DEFAULT ''");
     }
 }
 

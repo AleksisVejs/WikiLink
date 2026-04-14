@@ -579,15 +579,19 @@ function reseedMatchPair($code, $userId, $startTitle, $endTitle) {
     return formatMatchResult($stmt->fetch(), $userId);
 }
 
-function getUsernamesByIds($db, $ids) {
+function getUsersByIds($db, $ids) {
     $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
     if (empty($ids)) return [];
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $stmt = $db->prepare("SELECT id, username FROM users WHERE id IN ($placeholders)");
+    $stmt = $db->prepare("SELECT id, username, profile_icon, profile_accent FROM users WHERE id IN ($placeholders)");
     $stmt->execute($ids);
     $map = [];
     while ($row = $stmt->fetch()) {
-        $map[(int)$row['id']] = $row['username'];
+        $map[(int)$row['id']] = [
+            'username' => $row['username'],
+            'profile_icon' => !empty($row['profile_icon']) ? $row['profile_icon'] : 'rookie',
+            'profile_accent' => !empty($row['profile_accent']) ? $row['profile_accent'] : 'rank',
+        ];
     }
     return $map;
 }
@@ -720,7 +724,7 @@ function leaveOpenMatchesForUser($userId) {
 function formatMatchResult($match, $userId) {
     $isP1 = ($match['player1_id'] == $userId);
     $db = getDb();
-    $names = getUsernamesByIds($db, [$match['player1_id'], $match['player2_id']]);
+    $users = getUsersByIds($db, [$match['player1_id'], $match['player2_id']]);
     $oppId = $isP1 ? (int)$match['player2_id'] : (int)$match['player1_id'];
 
     $result = [
@@ -743,7 +747,9 @@ function formatMatchResult($match, $userId) {
     if ($oppDisc) $oppGraceLeft = max(0, MATCH_RECONNECT_GRACE_SECONDS - (secondsSinceTimestamp($oppDisc) ?? MATCH_RECONNECT_GRACE_SECONDS));
 
     $result['you'] = [
-        'username' => isset($names[$uid]) ? $names[$uid] : null,
+        'username' => isset($users[$uid]['username']) ? $users[$uid]['username'] : null,
+        'profile_icon' => isset($users[$uid]['profile_icon']) ? $users[$uid]['profile_icon'] : 'rookie',
+        'profile_accent' => isset($users[$uid]['profile_accent']) ? $users[$uid]['profile_accent'] : 'rank',
         'clicks' => $isP1 ? $match['p1_clicks'] : $match['p2_clicks'],
         'time' => $isP1 ? $match['p1_time'] : $match['p2_time'],
         'path' => json_decode($isP1 ? ($match['p1_path'] ?: '[]') : ($match['p2_path'] ?: '[]'), true),
@@ -757,7 +763,9 @@ function formatMatchResult($match, $userId) {
     ];
 
     $result['opponent'] = [
-        'username' => $oppId ? (isset($names[$oppId]) ? $names[$oppId] : null) : null,
+        'username' => $oppId ? (isset($users[$oppId]['username']) ? $users[$oppId]['username'] : null) : null,
+        'profile_icon' => $oppId && isset($users[$oppId]['profile_icon']) ? $users[$oppId]['profile_icon'] : 'rookie',
+        'profile_accent' => $oppId && isset($users[$oppId]['profile_accent']) ? $users[$oppId]['profile_accent'] : 'rank',
         'clicks' => $isP1 ? $match['p2_clicks'] : $match['p1_clicks'],
         'time' => $isP1 ? $match['p2_time'] : $match['p1_time'],
         'submitted' => ($isP1 ? $match['p2_clicks'] : $match['p1_clicks']) !== null,

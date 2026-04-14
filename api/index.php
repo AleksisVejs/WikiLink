@@ -138,11 +138,39 @@ if ($method === 'GET' && $uri === '/me') {
         'user' => [
             'id' => $user['id'],
             'username' => $user['username'],
+            'profile_icon' => $user['profile_icon'] ?: 'rookie',
+            'profile_accent' => $user['profile_accent'] ?: 'rank',
+            'profile_title' => $user['profile_title'] ?: 'newcomer',
+            'profile_banner' => $user['profile_banner'] ?: 'default',
+            'profile_nameplate_border' => $user['profile_nameplate_border'] ?: 'default',
+            'profile_pinned_badge' => isset($user['profile_pinned_badge']) ? $user['profile_pinned_badge'] : '',
             'created_at' => $user['created_at'],
         ],
         'streak' => $streak,
         'stats' => getUserStats($user['id']),
     ]);
+}
+
+// POST /profile/icon
+if ($method === 'POST' && $uri === '/profile/icon') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = updateProfileCustomization($user['id'], isset($body['icon']) ? $body['icon'] : null, null);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /profile/customization
+if ($method === 'POST' && $uri === '/profile/customization') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $icon = array_key_exists('icon', $body) ? $body['icon'] : null;
+    $accent = array_key_exists('accent', $body) ? $body['accent'] : null;
+    $title = array_key_exists('title', $body) ? $body['title'] : null;
+    $banner = array_key_exists('banner', $body) ? $body['banner'] : null;
+    $nameplateBorder = array_key_exists('nameplateBorder', $body) ? $body['nameplateBorder'] : null;
+    $pinnedBadge = array_key_exists('pinnedBadge', $body) ? $body['pinnedBadge'] : null;
+    $result = updateProfileCustomization($user['id'], $icon, $accent, $title, $banner, $nameplateBorder, $pinnedBadge);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
 }
 
 // POST /logout

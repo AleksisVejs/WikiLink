@@ -83,6 +83,21 @@ export function useAuth() {
     } catch { /* ignore */ }
   }
 
+  function setProfileIcon(iconId) {
+    if (!user.value) return
+    user.value = { ...user.value, profile_icon: iconId }
+  }
+
+  function setProfileAccent(accentId) {
+    if (!user.value) return
+    user.value = { ...user.value, profile_accent: accentId }
+  }
+
+  function setProfileCustomization(customization = {}) {
+    if (!user.value) return
+    user.value = { ...user.value, ...customization }
+  }
+
   return {
     user,
     streak,
@@ -92,6 +107,9 @@ export function useAuth() {
     login,
     logout,
     refreshStreak,
+    setProfileIcon,
+    setProfileAccent,
+    setProfileCustomization,
     init,
   }
 }

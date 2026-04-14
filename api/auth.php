@@ -33,17 +33,26 @@ function registerUser($username, $password) {
     }
 
     $hash = password_hash($password, PASSWORD_BCRYPT);
-    $stmt = $db->prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)');
+    $stmt = $db->prepare("INSERT INTO users (username, password_hash, profile_icon, profile_accent, profile_title, profile_banner, profile_nameplate_border, profile_pinned_badge) VALUES (?, ?, 'rookie', 'rank', 'newcomer', 'default', 'default', '')");
     $stmt->execute([$username, $hash]);
     $userId = (int)$db->lastInsertId();
 
     $token = createSession($userId);
-    return ['user' => ['id' => $userId, 'username' => $username], 'token' => $token];
+    return ['user' => [
+        'id' => $userId,
+        'username' => $username,
+        'profile_icon' => 'rookie',
+        'profile_accent' => 'rank',
+        'profile_title' => 'newcomer',
+        'profile_banner' => 'default',
+        'profile_nameplate_border' => 'default',
+        'profile_pinned_badge' => '',
+    ], 'token' => $token];
 }
 
 function loginUser($username, $password) {
     $db = getDb();
-    $stmt = $db->prepare('SELECT id, username, password_hash, created_at FROM users WHERE username = ?');
+    $stmt = $db->prepare('SELECT id, username, password_hash, profile_icon, profile_accent, profile_title, profile_banner, profile_nameplate_border, profile_pinned_badge, created_at FROM users WHERE username = ?');
     $stmt->execute([trim($username)]);
     $user = $stmt->fetch();
 
@@ -53,8 +62,101 @@ function loginUser($username, $password) {
 
     $token = createSession((int)$user['id']);
     return [
-        'user' => ['id' => (int)$user['id'], 'username' => $user['username'], 'created_at' => $user['created_at']],
+        'user' => [
+            'id' => (int)$user['id'],
+            'username' => $user['username'],
+            'profile_icon' => $user['profile_icon'] ?: 'rookie',
+            'profile_accent' => $user['profile_accent'] ?: 'rank',
+            'profile_title' => $user['profile_title'] ?: 'newcomer',
+            'profile_banner' => $user['profile_banner'] ?: 'default',
+            'profile_nameplate_border' => $user['profile_nameplate_border'] ?: 'default',
+            'profile_pinned_badge' => isset($user['profile_pinned_badge']) ? $user['profile_pinned_badge'] : '',
+            'created_at' => $user['created_at'],
+        ],
         'token' => $token,
+    ];
+}
+
+function updateProfileCustomization($userId, $iconId = null, $accentId = null, $titleId = null, $bannerId = null, $nameplateBorderId = null, $pinnedBadgeId = null) {
+    $allowedIcons = ['rookie', 'compass', 'spark', 'crown', 'star'];
+    $allowedAccents = ['rank', 'neon', 'cyan', 'amber', 'purple'];
+    $allowedTitles = ['newcomer', 'pathfinder', 'specialist', 'veteran', 'expert', 'master', 'grandmaster', 'legend'];
+    $allowedBanners = ['default', 'matrix', 'sunset', 'royal'];
+    $allowedNameplateBorders = ['default', 'dashed', 'double', 'glow'];
+
+    $sets = [];
+    $values = [];
+
+    if ($iconId !== null) {
+        $iconId = strtolower(trim((string)$iconId));
+        if (!in_array($iconId, $allowedIcons, true)) {
+            return ['error' => 'Invalid profile icon.'];
+        }
+        $sets[] = 'profile_icon = ?';
+        $values[] = $iconId;
+    }
+
+    if ($accentId !== null) {
+        $accentId = strtolower(trim((string)$accentId));
+        if (!in_array($accentId, $allowedAccents, true)) {
+            return ['error' => 'Invalid profile accent.'];
+        }
+        $sets[] = 'profile_accent = ?';
+        $values[] = $accentId;
+    }
+    if ($titleId !== null) {
+        $titleId = strtolower(trim((string)$titleId));
+        if (!in_array($titleId, $allowedTitles, true)) {
+            return ['error' => 'Invalid profile title.'];
+        }
+        $sets[] = 'profile_title = ?';
+        $values[] = $titleId;
+    }
+    if ($bannerId !== null) {
+        $bannerId = strtolower(trim((string)$bannerId));
+        if (!in_array($bannerId, $allowedBanners, true)) {
+            return ['error' => 'Invalid profile banner.'];
+        }
+        $sets[] = 'profile_banner = ?';
+        $values[] = $bannerId;
+    }
+    if ($nameplateBorderId !== null) {
+        $nameplateBorderId = strtolower(trim((string)$nameplateBorderId));
+        if (!in_array($nameplateBorderId, $allowedNameplateBorders, true)) {
+            return ['error' => 'Invalid profile nameplate border.'];
+        }
+        $sets[] = 'profile_nameplate_border = ?';
+        $values[] = $nameplateBorderId;
+    }
+    if ($pinnedBadgeId !== null) {
+        $pinnedBadgeId = trim((string)$pinnedBadgeId);
+        if (strlen($pinnedBadgeId) > 64) {
+            return ['error' => 'Pinned badge id is too long.'];
+        }
+        $sets[] = 'profile_pinned_badge = ?';
+        $values[] = $pinnedBadgeId;
+    }
+
+    if (empty($sets)) {
+        return ['error' => 'No customization changes provided.'];
+    }
+
+    $db = getDb();
+    $values[] = (int)$userId;
+    $sql = 'UPDATE users SET ' . implode(', ', $sets) . ' WHERE id = ?';
+    $db->prepare($sql)->execute($values);
+
+    $read = $db->prepare('SELECT profile_icon, profile_accent, profile_title, profile_banner, profile_nameplate_border, profile_pinned_badge FROM users WHERE id = ?');
+    $read->execute([(int)$userId]);
+    $row = $read->fetch();
+    return [
+        'ok' => true,
+        'profile_icon' => ($row['profile_icon'] ?? 'rookie') ?: 'rookie',
+        'profile_accent' => ($row['profile_accent'] ?? 'rank') ?: 'rank',
+        'profile_title' => ($row['profile_title'] ?? 'newcomer') ?: 'newcomer',
+        'profile_banner' => ($row['profile_banner'] ?? 'default') ?: 'default',
+        'profile_nameplate_border' => ($row['profile_nameplate_border'] ?? 'default') ?: 'default',
+        'profile_pinned_badge' => isset($row['profile_pinned_badge']) ? $row['profile_pinned_badge'] : '',
     ];
 }
 
@@ -114,7 +216,7 @@ function authenticateRequest() {
 
     $db = getDb();
     $stmt = $db->prepare("
-        SELECT u.id, u.username, u.created_at, s.id as session_id
+        SELECT u.id, u.username, u.profile_icon, u.profile_accent, u.profile_title, u.profile_banner, u.profile_nameplate_border, u.profile_pinned_badge, u.created_at, s.id as session_id
         FROM sessions s JOIN users u ON u.id = s.user_id
         WHERE s.token = ? AND s.expires_at > datetime('now')
     ");
@@ -123,6 +225,12 @@ function authenticateRequest() {
     return $row ? [
         'id' => (int)$row['id'],
         'username' => $row['username'],
+        'profile_icon' => $row['profile_icon'] ?: 'rookie',
+        'profile_accent' => $row['profile_accent'] ?: 'rank',
+        'profile_title' => $row['profile_title'] ?: 'newcomer',
+        'profile_banner' => $row['profile_banner'] ?: 'default',
+        'profile_nameplate_border' => $row['profile_nameplate_border'] ?: 'default',
+        'profile_pinned_badge' => isset($row['profile_pinned_badge']) ? $row['profile_pinned_badge'] : '',
         'created_at' => $row['created_at'],
         'session_id' => (int)$row['session_id'],
     ] : null;

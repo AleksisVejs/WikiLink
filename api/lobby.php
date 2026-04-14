@@ -180,7 +180,8 @@ function lobbyIsMember($db, $lobbyId, $userId) {
 
 function lobbyPlayersWithNames($db, $lobbyId) {
     $stmt = $db->prepare('
-        SELECT lp.user_id, lp.clicks, lp.time_seconds, lp.path, lp.missed_heartbeats, lp.disconnected_at, lp.replay_ready, u.username
+        SELECT lp.user_id, lp.clicks, lp.time_seconds, lp.path, lp.missed_heartbeats, lp.disconnected_at, lp.replay_ready,
+               u.username, u.profile_icon, u.profile_accent, u.profile_title, u.profile_nameplate_border, u.profile_pinned_badge
         FROM lobby_players lp
         JOIN users u ON u.id = lp.user_id
         WHERE lp.lobby_id = ?
@@ -230,6 +231,9 @@ function buildLobbyLeaderboard($players, $targetTitle) {
                 'rank' => 1,
                 'user_id' => (int)$p['user_id'],
                 'username' => $p['username'],
+                'profile_title' => !empty($p['profile_title']) ? $p['profile_title'] : 'newcomer',
+                'profile_nameplate_border' => !empty($p['profile_nameplate_border']) ? $p['profile_nameplate_border'] : 'default',
+                'profile_pinned_badge' => isset($p['profile_pinned_badge']) ? (string)$p['profile_pinned_badge'] : '',
                 'clicks' => (int)$p['clicks'],
                 'time' => (int)$p['time_seconds'],
                 'reached_target' => false,
@@ -244,6 +248,9 @@ function buildLobbyLeaderboard($players, $targetTitle) {
             'rank' => $rank++,
             'user_id' => (int)$p['user_id'],
             'username' => $p['username'],
+            'profile_title' => !empty($p['profile_title']) ? $p['profile_title'] : 'newcomer',
+            'profile_nameplate_border' => !empty($p['profile_nameplate_border']) ? $p['profile_nameplate_border'] : 'default',
+            'profile_pinned_badge' => isset($p['profile_pinned_badge']) ? (string)$p['profile_pinned_badge'] : '',
             'clicks' => (int)$p['clicks'],
             'time' => (int)$p['time_seconds'],
             'reached_target' => true,
@@ -255,6 +262,9 @@ function buildLobbyLeaderboard($players, $targetTitle) {
             'rank' => $dnfRank,
             'user_id' => (int)$p['user_id'],
             'username' => $p['username'],
+            'profile_title' => !empty($p['profile_title']) ? $p['profile_title'] : 'newcomer',
+            'profile_nameplate_border' => !empty($p['profile_nameplate_border']) ? $p['profile_nameplate_border'] : 'default',
+            'profile_pinned_badge' => isset($p['profile_pinned_badge']) ? (string)$p['profile_pinned_badge'] : '',
             'clicks' => (int)$p['clicks'],
             'time' => (int)$p['time_seconds'],
             'reached_target' => false,
@@ -275,6 +285,11 @@ function formatLobbyResponse($lobby, $userId) {
         $players[] = [
             'user_id' => (int)$p['user_id'],
             'username' => $p['username'],
+            'profile_icon' => !empty($p['profile_icon']) ? $p['profile_icon'] : 'rookie',
+            'profile_accent' => !empty($p['profile_accent']) ? $p['profile_accent'] : 'rank',
+            'profile_title' => !empty($p['profile_title']) ? $p['profile_title'] : 'newcomer',
+            'profile_nameplate_border' => !empty($p['profile_nameplate_border']) ? $p['profile_nameplate_border'] : 'default',
+            'profile_pinned_badge' => isset($p['profile_pinned_badge']) ? (string)$p['profile_pinned_badge'] : '',
             'clicks' => $p['clicks'] !== null ? (int)$p['clicks'] : null,
             'time' => $p['time_seconds'] !== null ? (int)$p['time_seconds'] : null,
             'submitted' => $p['clicks'] !== null,

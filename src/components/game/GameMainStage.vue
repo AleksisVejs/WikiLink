@@ -37,7 +37,7 @@
       </div>
     </div>
 
-    <div v-else class="max-w-4xl mx-auto px-3 sm:px-5 py-4 sm:py-8">
+    <div v-else class="max-w-4xl mx-auto px-2.5 sm:px-5 py-3 sm:py-8">
       <div v-if="loading" class="space-y-4 animate-fade-in">
         <div class="skeleton h-10 w-3/4 rounded-lg"></div>
         <div class="skeleton h-px w-full"></div>
@@ -62,9 +62,10 @@
         <button @click="$emit('retry')" class="btn-retro-secondary">RETRY</button>
       </div>
 
-      <article v-else-if="articleData" class="animate-fade-in">
-        <h1 class="font-terminal text-2xl sm:text-4xl text-crt-cyan mb-4 sm:mb-5 pb-3 sm:pb-4 relative" style="text-shadow: 0 0 12px rgba(0,229,255,0.25);" v-html="articleData.displayTitle"></h1>
-        <div class="retro-divider mb-5 -mt-1"></div>
+      <article v-else-if="articleData" class="animate-fade-in rounded-xl sm:rounded-2xl p-3 sm:p-5"
+               style="background: linear-gradient(180deg, #0f111a, #0b0c13); border: 1px solid rgba(37,39,56,0.75); box-shadow: 0 8px 24px rgba(0,0,0,0.35);">
+        <h1 class="font-terminal text-xl sm:text-4xl text-crt-cyan mb-3 sm:mb-5 pb-2.5 sm:pb-4 relative leading-tight" style="text-shadow: 0 0 12px rgba(0,229,255,0.25);" v-html="articleData.displayTitle"></h1>
+        <div class="retro-divider mb-4 sm:mb-5 -mt-1"></div>
         <div
           class="wiki-content"
           :class="{ 'fog-mode': hasFogModifier }"

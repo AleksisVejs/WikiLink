@@ -72,7 +72,7 @@ function getFriendsList($userId) {
     $stmt = $db->prepare("
         SELECT f.id as friendship_id, f.status, f.created_at,
                CASE WHEN f.user_id = ? THEN f.friend_id ELSE f.user_id END as friend_user_id,
-               u.username, u.created_at as member_since
+               u.username, u.profile_icon, u.profile_accent, u.profile_title, u.profile_banner, u.profile_nameplate_border, u.profile_pinned_badge, u.created_at as member_since
         FROM friendships f
         JOIN users u ON u.id = CASE WHEN f.user_id = ? THEN f.friend_id ELSE f.user_id END
         WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted'
@@ -95,6 +95,12 @@ function getFriendsList($userId) {
         }
         $f['total_games'] = $totalGames;
         $f['total_wins'] = $totalWins;
+        $f['profile_icon'] = $f['profile_icon'] ?: 'rookie';
+        $f['profile_accent'] = $f['profile_accent'] ?: 'rank';
+        $f['profile_title'] = $f['profile_title'] ?: 'newcomer';
+        $f['profile_banner'] = $f['profile_banner'] ?: 'default';
+        $f['profile_nameplate_border'] = $f['profile_nameplate_border'] ?: 'default';
+        $f['profile_pinned_badge'] = isset($f['profile_pinned_badge']) ? $f['profile_pinned_badge'] : '';
         $f['friend_user_id'] = (int)$f['friend_user_id'];
     }
 
@@ -396,7 +402,7 @@ function respondToGameInvite($inviteId, $receiverUserId, $action) {
 
 function getPublicProfile($username) {
     $db = getDb();
-    $stmt = $db->prepare('SELECT id, username, created_at FROM users WHERE username = ? COLLATE NOCASE');
+    $stmt = $db->prepare('SELECT id, username, profile_icon, profile_accent, profile_title, profile_banner, profile_nameplate_border, profile_pinned_badge, created_at FROM users WHERE username = ? COLLATE NOCASE');
     $stmt->execute([trim($username)]);
     $user = $stmt->fetch();
 
@@ -417,16 +423,99 @@ function getPublicProfile($username) {
     }
 
     $streak = getUserDailyStreak($userId);
+    $dailyStmt = $db->prepare('SELECT COUNT(*) as total FROM daily_scores WHERE user_id = ?');
+    $dailyStmt->execute([$userId]);
+    $dailyCompletions = (int)($dailyStmt->fetch()['total'] ?? 0);
+    $achievementIds = getPublicAchievementIds($stats, $streak, $dailyCompletions);
 
     return [
         'id' => $userId,
         'username' => $user['username'],
+        'profile_icon' => $user['profile_icon'] ?: 'rookie',
+        'profile_accent' => $user['profile_accent'] ?: 'rank',
+        'profile_title' => $user['profile_title'] ?: 'newcomer',
+        'profile_banner' => $user['profile_banner'] ?: 'default',
+        'profile_nameplate_border' => $user['profile_nameplate_border'] ?: 'default',
+        'profile_pinned_badge' => isset($user['profile_pinned_badge']) ? $user['profile_pinned_badge'] : '',
         'created_at' => $user['created_at'],
         'total_games' => $totalGames,
         'total_wins' => $totalWins,
         'streak' => $streak,
         'stats' => $stats,
+        'friends' => getFriendsList($userId),
+        'achievements' => [
+            'unlocked_ids' => $achievementIds,
+            'unlocked_count' => count($achievementIds),
+        ],
     ];
+}
+
+function getPublicAchievementIds($stats, $streak, $dailyCompletions = 0) {
+    $modeStats = is_array($stats['modes'] ?? null) ? $stats['modes'] : [];
+    $genreStats = is_array($stats['genres'] ?? null) ? $stats['genres'] : [];
+    $unlocked = [];
+
+    $totalWins = 0;
+    $totalPlayed = 0;
+    $bestAnyTime = null;
+    $bestAnyClicks = null;
+
+    foreach ($modeStats as $m) {
+        $wins = (int)($m['gamesWon'] ?? 0);
+        $played = (int)($m['gamesPlayed'] ?? 0);
+        $bestTime = $m['bestTime'] ?? null;
+        $bestClicks = $m['bestClicks'] ?? null;
+        $currentStreak = (int)($m['currentStreak'] ?? 0);
+
+        $totalWins += $wins;
+        $totalPlayed += $played;
+
+        if ($bestTime !== null) {
+            $bestTimeInt = (int)$bestTime;
+            if ($bestAnyTime === null || $bestTimeInt < $bestAnyTime) $bestAnyTime = $bestTimeInt;
+        }
+        if ($bestClicks !== null) {
+            $bestClicksInt = (int)$bestClicks;
+            if ($bestAnyClicks === null || $bestClicksInt < $bestAnyClicks) $bestAnyClicks = $bestClicksInt;
+        }
+
+        if ($currentStreak >= 3) $unlocked['streak_3'] = true;
+        if ($currentStreak >= 10) $unlocked['streak_10'] = true;
+    }
+
+    $genresWon = 0;
+    foreach ($genreStats as $g) {
+        if ((int)($g['gamesWon'] ?? 0) > 0) $genresWon++;
+    }
+
+    if ($totalWins >= 1) $unlocked['first_blood'] = true;
+    if ($totalWins >= 10) $unlocked['ten_wins'] = true;
+    if ($totalWins >= 50) $unlocked['fifty_wins'] = true;
+    if ($totalWins >= 100) $unlocked['century'] = true;
+    if ($totalPlayed >= 50) $unlocked['wiki_wanderer'] = true;
+
+    if ($bestAnyTime !== null && $bestAnyTime <= 15) $unlocked['lightning'] = true;
+    else if ($bestAnyTime !== null && $bestAnyTime <= 30) $unlocked['speed_demon'] = true;
+
+    if ($bestAnyClicks !== null && $bestAnyClicks <= 2) $unlocked['minimalist'] = true;
+    else if ($bestAnyClicks !== null && $bestAnyClicks <= 3) $unlocked['straight_line'] = true;
+    else if ($bestAnyClicks !== null && $bestAnyClicks <= 5) $unlocked['pathfinder'] = true;
+
+    if ($genresWon >= 5) $unlocked['globe_trotter'] = true;
+    if ((int)($modeStats['sprint']['gamesWon'] ?? 0) >= 10) $unlocked['sprinter'] = true;
+    if ((int)($modeStats['challenge']['gamesWon'] ?? 0) >= 10) $unlocked['sharpshooter'] = true;
+    if ((int)($modeStats['trending']['gamesWon'] ?? 0) >= 5) $unlocked['trendsetter'] = true;
+    if ($streak >= 3) $unlocked['streak_3'] = true;
+    if ($streak >= 10) $unlocked['streak_10'] = true;
+    if ($dailyCompletions >= 7) $unlocked['daily_devotee'] = true;
+    if ($dailyCompletions >= 30) $unlocked['ironman'] = true;
+
+    // Requires per-round modifier telemetry and cannot be inferred from aggregates.
+    // $unlocked['modifier_master']
+    // $unlocked['no_hints']
+    // $unlocked['close_call']
+
+    return array_values(array_keys($unlocked));
 }
 
 function getFriendshipStatus($userId, $targetUserId) {

@@ -1142,13 +1142,12 @@
 .hint-dropdown {
   min-width: 220px;
   border-radius: 12px;
-  background: rgba(13,14,21,0.97);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,191,0,0.2);
+  background: #0f1119;
+  border: 1px solid rgba(255,191,0,0.3);
   box-shadow:
     0 12px 40px rgba(0,0,0,0.7),
-    0 0 20px rgba(255,191,0,0.04),
-    inset 0 1px 0 rgba(255,191,0,0.06);
+    0 0 20px rgba(255,191,0,0.08),
+    inset 0 1px 0 rgba(255,191,0,0.1);
   overflow: hidden;
 }
 .hint-dropdown-header {
@@ -1170,8 +1169,8 @@
   border: 1px solid transparent;
 }
 .hint-option:hover {
-  background: rgba(255,255,255,0.03);
-  border-color: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
 }
 .hint-option-icon {
   display: flex;
@@ -1212,12 +1211,12 @@
   border: 1px solid;
 }
 .hint-banner--category {
-  border-color: rgba(0,229,255,0.2);
-  background: rgba(0,229,255,0.04);
+  border-color: rgba(0,229,255,0.32);
+  background: #111722;
 }
 .hint-banner--hotcold {
-  border-color: rgba(255,191,0,0.2);
-  background: rgba(255,191,0,0.04);
+  border-color: rgba(255,191,0,0.32);
+  background: #1a1510;
 }
 .hint-banner-glow {
   position: absolute;

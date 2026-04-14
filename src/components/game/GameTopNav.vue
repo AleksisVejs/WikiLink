@@ -1,7 +1,7 @@
 <template>
   <nav class="sticky top-0 z-[40] glass-header" style="border-bottom: 1px solid rgba(37,39,56,0.5);">
     <div class="max-w-6xl mx-auto px-2 sm:px-4">
-      <div class="relative flex items-center justify-between h-11 sm:h-12">
+      <div class="relative flex items-center justify-between h-12 sm:h-12">
         <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <button @click="$emit('quit')" class="nav-action-btn nav-action-btn--red" title="Exit game (Esc)">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,6 +69,25 @@
         </div>
 
         <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div
+            v-if="multiplayerOpponent"
+            class="hidden sm:flex items-center gap-1.5 max-w-[220px] px-2 py-1 rounded-md border border-crt-cyan/30 bg-crt-cyan/[0.06]"
+            title="Current multiplayer opponent"
+          >
+            <span class="font-mono text-[10px] text-crt-cyan truncate">{{ multiplayerOpponent.label }}</span>
+            <div class="w-5 h-5 rounded-md border flex items-center justify-center shrink-0" :style="opponentAccentStyle">
+              <svg
+                v-if="opponentIcon"
+                class="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                v-html="opponentIcon.svgPath"
+              ></svg>
+              <span v-else class="font-mono text-[9px] text-crt-cyan">{{ opponentInitial }}</span>
+            </div>
+          </div>
+
           <GameHintControls
             v-if="hasTarget && isPlaying"
             :hints="hints"
@@ -82,7 +101,7 @@
               <svg class="w-3 h-3 text-retro-muted/40 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
               </svg>
-              <span class="font-terminal text-base sm:text-lg font-bold leading-none" :class="clickLimitClass">
+              <span class="font-terminal text-sm sm:text-lg font-bold leading-none" :class="clickLimitClass">
                 {{ clicks }}<span v-if="effectiveClickLimit" class="text-retro-muted text-[10px] sm:text-xs">/{{ effectiveClickLimit }}</span>
               </span>
             </div>
@@ -91,12 +110,12 @@
               <svg class="w-3 h-3 text-retro-muted/40 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span v-if="formattedRemaining !== null" class="font-terminal text-base sm:text-lg font-bold leading-none" :class="timerClass">{{ formattedRemaining }}</span>
-              <span v-else class="font-terminal text-base sm:text-lg font-bold leading-none text-crt-white">{{ formattedTime }}</span>
+              <span v-if="formattedRemaining !== null" class="font-terminal text-sm sm:text-lg font-bold leading-none" :class="timerClass">{{ formattedRemaining }}</span>
+              <span v-else class="font-terminal text-sm sm:text-lg font-bold leading-none text-crt-white">{{ formattedTime }}</span>
             </div>
           </div>
 
-          <button @click="$emit('toggle-mute')" class="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg transition-all hover:bg-retro-surface/50" :title="muted ? 'Unmute' : 'Mute'">
+          <button @click="$emit('toggle-mute')" class="flex items-center justify-center w-8 h-8 rounded-lg transition-all hover:bg-retro-surface/50" :title="muted ? 'Unmute' : 'Mute'">
             <svg v-if="!muted" class="w-3.5 h-3.5 text-retro-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M12 6l-4 4H4v4h4l4 4V6z" />
             </svg>
@@ -143,7 +162,7 @@
         </div>
       </div>
 
-      <div v-if="displayPath.length > 1 && !initialLoading" class="nav-breadcrumb">
+      <div v-if="displayPath.length > 1 && !initialLoading" class="hidden sm:flex nav-breadcrumb">
         <template v-for="(article, idx) in displayPath" :key="idx">
           <span v-if="idx > 0" class="text-retro-border/30 shrink-0 text-[8px] sm:text-[10px] select-none">&rsaquo;</span>
           <span v-if="article.type === 'collapsed'" class="shrink-0 px-1.5 py-0.5 rounded text-retro-muted/40 font-mono text-[9px] sm:text-[10px] whitespace-nowrap">
@@ -159,14 +178,36 @@
           </span>
         </template>
       </div>
+
+      <div
+        v-if="multiplayerOpponent"
+        class="sm:hidden flex items-center justify-center pb-1 -mt-0.5"
+      >
+        <div class="px-2 py-0.5 rounded-md border border-crt-cyan/30 bg-crt-cyan/[0.06] max-w-[90vw] flex items-center gap-1.5">
+          <span class="block font-mono text-[10px] text-crt-cyan truncate text-center">{{ multiplayerOpponent.label }}</span>
+          <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0" :style="opponentAccentStyle">
+            <svg
+              v-if="opponentIcon"
+              class="w-2.5 h-2.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              v-html="opponentIcon.svgPath"
+            ></svg>
+            <span v-else class="font-mono text-[8px] text-crt-cyan">{{ opponentInitial }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </nav>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import GameHintControls from './GameHintControls.vue'
+import { getProfileIconById, getProfileAccentById } from '../../constants/profileIcons'
 
-defineProps({
+const props = defineProps({
   pathLength: { type: Number, required: true },
   isPlaying: { type: Boolean, required: true },
   isWon: { type: Boolean, required: true },
@@ -191,6 +232,30 @@ defineProps({
   gameModifiers: { type: Object, required: true },
   modifierSvgPath: { type: Function, required: true },
   displayPath: { type: Array, required: true },
+  multiplayerOpponent: { type: Object, default: null },
+})
+
+const opponentIcon = computed(() => {
+  if (!props.multiplayerOpponent) return null
+  return getProfileIconById(props.multiplayerOpponent.profile_icon)
+})
+
+const opponentAccentStyle = computed(() => {
+  if (!props.multiplayerOpponent) return null
+  const accent = getProfileAccentById(props.multiplayerOpponent.profile_accent)
+  if (!accent?.color) return null
+  return {
+    color: accent.color,
+    borderColor: `${accent.color}66`,
+    background: `${accent.color}14`,
+  }
+})
+
+const opponentInitial = computed(() => {
+  const label = String(props.multiplayerOpponent?.label || '').trim()
+  if (!label) return '?'
+  const clean = label.replace(/^vs\s+/i, '')
+  return (clean.charAt(0) || '?').toUpperCase()
 })
 
 defineEmits([

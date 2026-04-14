@@ -27,6 +27,7 @@
       :game-modifiers="game.MODIFIERS"
       :modifier-svg-path="modifierSvgPath"
       :display-path="displayPath"
+      :multiplayer-opponent="multiplayerOpponent"
       @quit="confirmQuit"
       @go-back="handleGoBack"
       @reroll="rerollPair"
@@ -318,6 +319,47 @@ const activeModifiers = computed(() => {
 
 const currentMode = computed(() => game.currentMode.value)
 const isMultiplayerGame = computed(() => !!matchCode.value || !!lobbyCode.value)
+const multiplayerOpponent = computed(() => {
+  if (!isMultiplayerGame.value) return null
+
+  if (matchCode.value) {
+    const opponent = matchResult.value?.opponent || null
+    const name = (matchResult.value?.opponent?.username || '').trim()
+    return {
+      label: name ? `vs ${name}` : 'vs Opponent',
+      profile_icon: opponent?.profile_icon || 'rookie',
+      profile_accent: opponent?.profile_accent || 'rank',
+    }
+  }
+
+  if (lobbyCode.value) {
+    const players = Array.isArray(lobbyResult.value?.players) ? lobbyResult.value.players : []
+    const uid = auth.user.value?.id
+    const others = players.filter(p => p?.user_id != null && p.user_id !== uid)
+    if (others.length === 0) {
+      return {
+        label: 'Lobby',
+        profile_icon: 'rookie',
+        profile_accent: 'rank',
+      }
+    }
+    if (others.length === 1) {
+      const name = (others[0]?.username || '').trim()
+      return {
+        label: name ? `vs ${name}` : 'vs 1 player',
+        profile_icon: others[0]?.profile_icon || 'rookie',
+        profile_accent: others[0]?.profile_accent || 'rank',
+      }
+    }
+    return {
+      label: `vs ${others.length} players`,
+      profile_icon: 'rookie',
+      profile_accent: 'rank',
+    }
+  }
+
+  return null
+})
 const sessionRouteQuery = computed(() => {
   const out = {}
   for (const [key, value] of Object.entries(route.query || {})) {
@@ -507,6 +549,20 @@ function processPostGame(won) {
 
   if (newUnlocks.length > 0) {
     const unlocked = achievements.consumeRecentUnlocks()
+    const achievementXp = unlocked.reduce((sum, a) => sum + (Number(a?.xp) || 0), 0)
+    if (achievementXp > 0) {
+      const bonusResult = progression.awardBonusXp(achievementXp, 'Achievement XP')
+      xpRewardData.value = {
+        ...xpRewardData.value,
+        rewards: [...(xpRewardData.value?.rewards || []), ...bonusResult.rewards],
+        totalReward: (xpRewardData.value?.totalReward || 0) + bonusResult.totalReward,
+      }
+      if (bonusResult.leveledUp) {
+        showLevelUp.value = true
+        sound.playLevelUp()
+        setTimeout(() => showLevelUp.value = false, 2500)
+      }
+    }
     unlocked.forEach((a, i) => {
       setTimeout(() => {
         sound.playAchievement()
@@ -1117,6 +1173,7 @@ async function pollMatchPresence() {
   if (!matchCode.value || !auth.isLoggedIn() || game.isGameOver.value || showOpponentQuitModal.value) return
   try {
     const result = await api.get(`/match/${matchCode.value}`)
+    matchResult.value = result
     const hasFreshChange = !!result?.opponent?.quit
     presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, hasFreshChange)
     if (result?.opponent?.quit) {
@@ -1133,6 +1190,40 @@ async function pollMatchPresence() {
   }
   if (!showOpponentQuitModal.value) {
     matchPresencePollTimerId = setTimeout(pollMatchPresence, presencePollDelayMs.value)
+  }
+}
+
+async function syncMultiplayerIdentityAndPolling() {
+  const uid = auth.user.value?.id
+  if (!uid || !isMultiplayerGame.value) return
+
+  if (matchCode.value) {
+    if (!matchResult.value?.opponent?.username) {
+      try {
+        matchResult.value = await api.get(`/match/${matchCode.value}`)
+      } catch {
+        // ignore transient fetch failures
+      }
+    }
+    if (!game.isGameOver.value && !showOpponentQuitModal.value && !matchPresencePollTimerId) {
+      presencePollDelayMs.value = POLL_MIN_MS
+      pollMatchPresence()
+    }
+  }
+
+  if (lobbyCode.value) {
+    if (!lobbyResult.value?.players?.length) {
+      try {
+        lobbyResult.value = await api.get(`/lobby/${lobbyCode.value}`)
+      } catch {
+        // ignore transient fetch failures
+      }
+    }
+    if (!lobbyPolling.value) {
+      lobbyPolling.value = true
+      lobbyPollDelayMs.value = POLL_MIN_MS
+      pollLobbyResult()
+    }
   }
 }
 
@@ -1386,15 +1477,7 @@ onMounted(() => {
   window.addEventListener('keydown', onMeaningfulActivity)
   window.addEventListener('focus', onVisibilityOrFocus)
   document.addEventListener('visibilitychange', onVisibilityOrFocus)
-  if (matchCode.value && auth.isLoggedIn()) {
-    presencePollDelayMs.value = POLL_MIN_MS
-    pollMatchPresence()
-  }
-  if (lobbyCode.value && auth.isLoggedIn()) {
-    lobbyPolling.value = true
-    lobbyPollDelayMs.value = POLL_MIN_MS
-    pollLobbyResult()
-  }
+  syncMultiplayerIdentityAndPolling()
   if (!multiplayerPersistTimerId) {
     multiplayerPersistTimerId = setInterval(() => {
       persistMultiplayerSession()
@@ -1443,4 +1526,8 @@ watch(
     persistMultiplayerSession()
   }
 )
+
+watch(() => auth.user.value?.id, () => {
+  syncMultiplayerIdentityAndPolling()
+})
 </script>

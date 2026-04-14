@@ -110,10 +110,18 @@
 
             <div v-if="dailyMode && dailyLeaderboard.length" class="rounded-lg px-3 py-2" style="background: #12131c; border: 1px solid #252738;">
               <div class="font-pixel text-[6px] text-crt-amber tracking-[0.15em] mb-1.5">DAILY LEADERBOARD</div>
-              <div class="space-y-0.5 font-mono text-[11px]">
-                <div v-for="entry in dailyLeaderboard.slice(0, 3)" :key="entry.rank" class="flex items-center gap-2">
+              <div class="space-y-1 font-mono text-[11px]">
+                <div
+                  v-for="entry in dailyLeaderboard.slice(0, 3)"
+                  :key="entry.rank"
+                  class="flex items-center gap-2 rounded px-1.5 py-1"
+                  :style="leaderboardNameplateStyle(entry.profile_nameplate_border)"
+                >
                   <span class="text-retro-muted w-3 text-right shrink-0">#{{ entry.rank }}</span>
-                  <span class="text-crt-white flex-1 truncate">{{ entry.username }}</span>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-crt-white truncate">{{ entry.username }}</div>
+                    <div class="font-pixel text-[6px] tracking-wider text-retro-muted truncate">{{ formatProfileTitle(entry.profile_title) }}</div>
+                  </div>
                   <span class="text-crt-green shrink-0">{{ entry.clicks }}</span>
                   <span class="text-retro-muted shrink-0">{{ formatLeaderboardTime(entry.time) }}</span>
                 </div>
@@ -163,8 +171,14 @@
                     <span class="shrink-0 tabular-nums w-12 text-right">Time</span>
                   </div>
                 </div>
-                <div class="space-y-0.5 font-mono text-[11px] max-h-[220px] overflow-y-auto">
-                  <div v-for="row in lobbyResult.leaderboard" :key="row.user_id" class="flex items-center gap-2 py-1 rounded px-1" :class="{ 'bg-crt-green/[0.04] border-l-2 border-l-crt-green': currentUserId != null && row.user_id === currentUserId }">
+                <div class="space-y-1 font-mono text-[11px] max-h-[220px] overflow-y-auto">
+                  <div
+                    v-for="row in lobbyResult.leaderboard"
+                    :key="row.user_id"
+                    class="flex items-center gap-2 py-1.5 rounded px-1.5"
+                    :style="leaderboardNameplateStyle(row.profile_nameplate_border)"
+                    :class="{ 'bg-crt-green/[0.04] border-l-2 border-l-crt-green': currentUserId != null && row.user_id === currentUserId }"
+                  >
                     <span class="text-retro-muted w-7 text-right shrink-0 flex items-center justify-end">
                       <template v-if="!row.reached_target">
                         <span class="font-pixel text-[7px] text-crt-red/85">DNF</span>
@@ -186,7 +200,18 @@
                       </template>
                       <span v-else class="font-terminal text-sm text-retro-muted">#{{ row.rank }}</span>
                     </span>
-                    <span class="flex-1 truncate" :class="currentUserId != null && row.user_id === currentUserId ? 'text-crt-green' : 'text-crt-white'">{{ row.username }}</span>
+                    <div class="flex-1 min-w-0">
+                      <div class="truncate" :class="currentUserId != null && row.user_id === currentUserId ? 'text-crt-green' : 'text-crt-white'">{{ row.username }}</div>
+                      <div class="flex items-center gap-2 mt-0.5">
+                        <span class="font-pixel text-[6px] tracking-wider text-retro-muted truncate">{{ formatProfileTitle(row.profile_title) }}</span>
+                        <span v-if="row.profile_pinned_badge" class="inline-flex items-center gap-1 text-arcade-gold min-w-0">
+                          <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                          </svg>
+                          <span class="truncate">{{ formatPinnedBadge(row.profile_pinned_badge) }}</span>
+                        </span>
+                      </div>
+                    </div>
                     <span class="text-crt-green shrink-0 tabular-nums">{{ row.clicks }}</span>
                     <span class="text-retro-muted shrink-0 tabular-nums w-12 text-right">{{ formatLeaderboardTime(row.time) }}</span>
                   </div>
@@ -233,6 +258,28 @@
 </template>
 
 <script setup>
+const NAMEPLATE_BORDER_STYLE = {
+  default: 'border: 1px solid rgba(255,255,255,0.1); background: #10121b;',
+  dashed: 'border: 1px dashed rgba(255,255,255,0.28); background: #10121b;',
+  double: 'border: 3px double rgba(255,255,255,0.28); background: #10121b;',
+  glow: 'border: 1px solid rgba(57,255,20,0.45); background: #10121b; box-shadow: 0 0 10px rgba(57,255,20,0.2);',
+}
+
+function leaderboardNameplateStyle(borderId) {
+  return NAMEPLATE_BORDER_STYLE[borderId] || NAMEPLATE_BORDER_STYLE.default
+}
+
+function formatProfileTitle(value) {
+  const raw = String(value || 'newcomer')
+  return raw.replace(/_/g, ' ').toUpperCase()
+}
+
+function formatPinnedBadge(value) {
+  const raw = String(value || '')
+  if (!raw) return ''
+  return raw.replace(/_/g, ' ').toUpperCase()
+}
+
 defineProps({
   showEndModal: { type: Boolean, required: true },
   endModalStyle: { type: String, required: true },

@@ -39,13 +39,19 @@ const MODE_XP = {
 }
 
 const DIFFICULTY_XP = {
-  easy:   1.25,
-  normal: 1.5,
-  hard:   2.0,
-  custom: 1.25,
+  easy:   2.0,
+  normal: 2.5,
+  hard:   3.0,
+  custom: 1.0,
+}
+
+function modifierMultiplier(modifierCount) {
+  const count = Math.max(0, Number(modifierCount) || 0)
+  return Math.pow(1.25, count)
 }
 
 const totalXp = ref(loadProgression().totalXp)
+let xpCheatRegistered = false
 
 export function useProgression() {
   const levelInfo = computed(() => levelFromXp(totalXp.value))
@@ -60,9 +66,10 @@ export function useProgression() {
     const modeXp = MODE_XP[mode] || MODE_XP.classic
     const hasDifficulty = mode === 'sprint' || mode === 'challenge'
     const diffMult = hasDifficulty ? (DIFFICULTY_XP[difficulty] || 1.0) : 1.0
-    const modMult = modifiers.length > 0 ? (1 + 0.25 * modifiers.length) : 1.0
+    const modeMult = (hasDifficulty && difficulty === 'custom') ? 1.0 : modeXp.multiplier
+    const modMult = modifierMultiplier(modifiers.length)
 
-    if (modeXp.multiplier === 0 || !won) return []
+    if (modeMult === 0 || !won) return []
 
     rewards.push({ label: 'Victory', xp: 100 })
 
@@ -88,14 +95,14 @@ export function useProgression() {
       rewards.push({ label: 'No hints', xp: 25 })
     }
 
-    const totalMult = modeXp.multiplier * diffMult * modMult
+    const totalMult = modeMult * diffMult * modMult
     if (totalMult !== 1.0) {
       const baseTotal = rewards.reduce((sum, r) => sum + r.xp, 0)
       const bonus = Math.round(baseTotal * (totalMult - 1))
       const parts = []
-      if (modeXp.multiplier !== 1.0) {
+      if (modeMult !== 1.0) {
         const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1)
-        parts.push(`${modeLabel} ${modeXp.multiplier}x`)
+        parts.push(`${modeLabel} ${modeMult}x`)
       }
       if (diffMult !== 1.0) {
         const diffLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1)
@@ -125,17 +132,43 @@ export function useProgression() {
     return { rewards, totalReward, leveledUp, newLevel }
   }
 
+  function awardBonusXp(amount, label = 'Bonus XP') {
+    const parsed = Math.max(0, Math.round(Number(amount) || 0))
+    if (parsed === 0) {
+      return { rewards: [], totalReward: 0, leveledUp: false, newLevel: level.value }
+    }
+
+    const previousLevel = level.value
+    totalXp.value += parsed
+    saveProgression({ totalXp: totalXp.value })
+
+    const newLevel = level.value
+    const leveledUp = newLevel > previousLevel
+    return {
+      rewards: [{ label, xp: parsed }],
+      totalReward: parsed,
+      leveledUp,
+      newLevel,
+    }
+  }
+
   function estimateXp(mode, difficulty = 'normal', modifierCount = 0) {
     const modeXp = MODE_XP[mode]
     if (!modeXp || modeXp.multiplier === 0) return { base: 0, total: 0, multiplier: 0 }
     const hasDifficulty = mode === 'sprint' || mode === 'challenge'
     const diffMult = hasDifficulty ? (DIFFICULTY_XP[difficulty] || 1.0) : 1.0
-    const combinedMult = modeXp.multiplier * diffMult
-    const modMult = 1 + 0.25 * modifierCount
+    const modeMult = (hasDifficulty && difficulty === 'custom') ? 1.0 : modeXp.multiplier
+    const combinedMult = modeMult * diffMult
+    const modMult = modifierMultiplier(modifierCount)
     const finalMult = combinedMult * modMult
     const base = 100
     const total = Math.round(base * finalMult)
     return { base, total, multiplier: Math.round(finalMult * 100) / 100 }
+  }
+
+  if (!xpCheatRegistered && typeof window !== 'undefined') {
+    window.__wikilinkAddXp = (amount = 1000, label = 'Cheat XP') => awardBonusXp(amount, label)
+    xpCheatRegistered = true
   }
 
   return {
@@ -145,6 +178,7 @@ export function useProgression() {
     nextLevelXp,
     progress,
     awardXp,
+    awardBonusXp,
     estimateXp,
     MODE_XP,
     DIFFICULTY_XP,

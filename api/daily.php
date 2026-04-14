@@ -59,7 +59,7 @@ function submitDailyScore($userId, $date, $clicks, $time, $path) {
 function getDailyLeaderboard($date, $limit = 50) {
     $db = getDb();
     $stmt = $db->prepare('
-        SELECT u.username, ds.clicks, ds.time_seconds, ds.path
+        SELECT u.username, u.profile_title, u.profile_nameplate_border, u.profile_accent, u.profile_pinned_badge, ds.clicks, ds.time_seconds, ds.path
         FROM daily_scores ds
         JOIN users u ON u.id = ds.user_id
         WHERE ds.date = ?
@@ -73,6 +73,10 @@ function getDailyLeaderboard($date, $limit = 50) {
         return [
             'rank'     => $idx + 1,
             'username' => $row['username'],
+            'profile_title' => !empty($row['profile_title']) ? $row['profile_title'] : 'newcomer',
+            'profile_nameplate_border' => !empty($row['profile_nameplate_border']) ? $row['profile_nameplate_border'] : 'default',
+            'profile_accent' => !empty($row['profile_accent']) ? $row['profile_accent'] : 'rank',
+            'profile_pinned_badge' => isset($row['profile_pinned_badge']) ? (string)$row['profile_pinned_badge'] : '',
             'clicks'   => (int)$row['clicks'],
             'time'     => (int)$row['time_seconds'],
             'path'     => json_decode($row['path'], true),
