@@ -289,6 +289,36 @@
           </button>
         </div>
 
+        <div v-if="resumeMultiplayerSession" class="mb-3 sm:mb-4 animate-slide-up">
+          <button @click="resumeMultiplayer"
+                  class="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-300 group touch-manipulation relative overflow-hidden"
+                  style="background: linear-gradient(135deg, rgba(0,229,255,0.06), rgba(57,255,20,0.04)); border: 1.5px solid rgba(0,229,255,0.22);">
+            <div class="absolute top-0 left-0 right-0 h-[1px]" style="background: linear-gradient(90deg, transparent, rgba(0,229,255,0.3), transparent);"></div>
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                   style="background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.18);">
+                <svg class="w-5 h-5 text-crt-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div class="text-left min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="font-pixel text-[8px] text-crt-cyan tracking-[0.15em]">RESUME MULTIPLAYER</span>
+                  <span class="font-mono text-[9px] px-1.5 py-0.5 rounded" style="color: #39ff14; background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.2);">
+                    {{ resumeMultiplayerSession.type === 'lobby' ? 'GROUP' : 'DUEL' }}
+                  </span>
+                </div>
+                <p class="font-mono text-[10px] sm:text-[11px] text-retro-muted truncate mt-0.5">
+                  Code: {{ resumeMultiplayerSession.code }}
+                </p>
+              </div>
+            </div>
+            <svg class="w-5 h-5 text-crt-cyan/30 group-hover:text-crt-cyan group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+
         <!-- Display frame (game config) -->
         <div class="relative rounded-xl sm:rounded-2xl overflow-hidden animate-slide-up"
              style="background: linear-gradient(180deg, #0d0e15, #0a0b11); border: 1.5px solid rgba(37,39,56,0.7); box-shadow: 0 1px 0 0 rgba(0,229,255,0.04), inset 0 0 60px rgba(0,0,0,0.4), 0 12px 40px rgba(0,0,0,0.5);">
@@ -738,15 +768,21 @@
               <div class="text-center py-4">
                 <div class="font-pixel text-[8px] mb-3 tracking-wider"
                      :class="matchStatus === 'ready' ? 'text-crt-green' : 'text-crt-amber'">
-                  {{ matchStatus === 'ready' ? 'OPPONENT JOINED!' : 'WAITING FOR OPPONENT' }}
+                  {{ matchStatus === 'joined_waiting' ? 'WAITING FOR HOST' : (matchStatus === 'ready' ? 'OPPONENT JOINED!' : 'WAITING FOR OPPONENT') }}
                 </div>
-                <div class="font-terminal text-4xl text-arcade-purple mb-3 tracking-[0.3em]">{{ matchCode }}</div>
-                <p class="font-mono text-xs text-retro-muted mb-2">Share this code with your opponent</p>
+                <div class="font-terminal text-4xl text-arcade-purple mb-3 tracking-[0.3em]">{{ matchCode || joinedMatchCode }}</div>
+                <p class="font-mono text-xs text-retro-muted mb-2">
+                  {{ matchStatus === 'joined_waiting' ? 'Host will start the match for both players' : 'Share this code with your opponent' }}
+                </p>
 
                 <!-- Waiting indicator -->
-                <div v-if="matchStatus !== 'ready'" class="flex items-center justify-center gap-2 mb-4 py-2">
+                <div v-if="matchStatus !== 'ready' && matchStatus !== 'joined_waiting'" class="flex items-center justify-center gap-2 mb-4 py-2">
                   <span class="w-2 h-2 rounded-full bg-crt-amber animate-blink"></span>
                   <span class="font-mono text-[11px] text-crt-amber/70 animate-blink-slow">Scanning for opponent...</span>
+                </div>
+                <div v-if="matchStatus === 'joined_waiting'" class="flex items-center justify-center gap-2 mb-4 py-2">
+                  <span class="w-2 h-2 rounded-full bg-crt-cyan animate-blink"></span>
+                  <span class="font-mono text-[11px] text-crt-cyan/80 animate-blink-slow">Waiting for host to press Start...</span>
                 </div>
 
                 <!-- Ready indicator -->
@@ -762,11 +798,15 @@
                   <button @click="copyMatchCode" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-2 text-[10px]">
                     COPY CODE
                   </button>
-                  <button @click="startCreatedMatch"
+                  <button v-if="matchStatus !== 'joined_waiting'" @click="startCreatedMatch"
                           :disabled="matchStatus !== 'ready'"
                           class="flex-1 !py-2 !px-4 !text-[9px]"
                           :class="matchStatus === 'ready' ? 'btn-retro-primary' : 'btn-retro-ghost opacity-40 cursor-not-allowed'">
                     {{ matchStatus === 'ready' ? 'START' : 'WAITING...' }}
+                  </button>
+                  <button v-else type="button"
+                          class="flex-1 !py-2 !px-4 !text-[9px] btn-retro-ghost opacity-60 cursor-not-allowed">
+                    HOST STARTS
                   </button>
                 </div>
               </div>
@@ -803,22 +843,6 @@
                         class="btn-retro-primary w-full !py-3 font-pixel text-[8px] tracking-[0.15em]">
                   {{ matchLoading ? 'CREATING...' : 'CREATE ROOM' }}
                 </button>
-                <div class="relative py-0.5">
-                  <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-retro-border/20"></div>
-                  <div class="relative flex justify-center">
-                    <span class="font-pixel text-[6px] tracking-[0.2em] text-retro-muted/80 px-2" style="background: #0d0e15;">HAVE A CODE</span>
-                  </div>
-                </div>
-                <div class="flex gap-2">
-                  <input v-model="joinRoomCode" type="text" placeholder="CODE" maxlength="6" autocomplete="off"
-                         class="min-w-0 flex-1 px-3 py-2.5 rounded-lg font-terminal text-lg text-center tracking-[0.28em] bg-[#12131c] border border-retro-border text-crt-white focus:border-arcade-purple focus:outline-none uppercase" />
-                  <button type="button" @click="joinMatch" :disabled="matchLoading"
-                          class="shrink-0 px-4 py-2.5 rounded-lg font-pixel text-[8px] tracking-[0.15em] transition-all touch-manipulation disabled:opacity-40"
-                          style="background: rgba(0,229,255,0.08); border: 1.5px solid rgba(0,229,255,0.35); color: #00e5ff;">
-                    {{ matchLoading ? '...' : 'JOIN' }}
-                  </button>
-                </div>
-                <p v-if="matchError" class="font-mono text-[10px] text-crt-red">{{ matchError }}</p>
               </div>
 
               <div v-if="matchTab === 'group' && groupView === 'menu'" class="space-y-4">
@@ -836,23 +860,24 @@
                         class="btn-retro-primary w-full !py-3 font-pixel text-[8px] tracking-[0.15em]" style="border-color: rgba(57,255,20,0.45);">
                   {{ groupLoading ? 'CREATING...' : 'CREATE LOBBY' }}
                 </button>
-                <div class="relative py-0.5">
-                  <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-retro-border/20"></div>
-                  <div class="relative flex justify-center">
-                    <span class="font-pixel text-[6px] tracking-[0.2em] text-retro-muted/80 px-2" style="background: #0d0e15;">HAVE A CODE</span>
-                  </div>
-                </div>
-                <div class="flex gap-2">
-                  <input v-model="joinRoomCode" type="text" placeholder="CODE" maxlength="6" autocomplete="off"
-                         class="min-w-0 flex-1 px-3 py-2.5 rounded-lg font-terminal text-lg text-center tracking-[0.28em] bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-green focus:outline-none uppercase" />
-                  <button type="button" @click="joinGroupLobby" :disabled="groupLoading"
-                          class="shrink-0 px-4 py-2.5 rounded-lg font-pixel text-[8px] tracking-[0.15em] transition-all touch-manipulation disabled:opacity-40"
-                          style="background: rgba(57,255,20,0.08); border: 1.5px solid rgba(57,255,20,0.4); color: #39ff14;">
-                    {{ groupLoading ? '...' : 'JOIN' }}
-                  </button>
-                </div>
-                <p v-if="groupError" class="font-mono text-[10px] text-crt-red">{{ groupError }}</p>
               </div>
+
+              <div class="relative py-0.5 mt-4">
+                <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-retro-border/20"></div>
+                <div class="relative flex justify-center">
+                  <span class="font-pixel text-[6px] tracking-[0.2em] text-retro-muted/80 px-2" style="background: #0d0e15;">ENTER CODE</span>
+                </div>
+              </div>
+              <div class="flex gap-2 mt-3">
+                <input v-model="joinRoomCode" type="text" placeholder="ROOM CODE" maxlength="6" autocomplete="off"
+                       class="min-w-0 flex-1 px-3 py-2.5 rounded-lg font-terminal text-lg text-center tracking-[0.28em] bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none uppercase" />
+                <button type="button" @click="joinByCode(matchTab === 'group' ? 'lobby' : 'match')" :disabled="joinBusy"
+                        class="shrink-0 px-4 py-2.5 rounded-lg font-pixel text-[8px] tracking-[0.15em] transition-all touch-manipulation disabled:opacity-40"
+                        style="background: rgba(0,229,255,0.08); border: 1.5px solid rgba(0,229,255,0.35); color: #00e5ff;">
+                  {{ joinBusy ? '...' : 'JOIN' }}
+                </button>
+              </div>
+              <p v-if="unifiedJoinError" class="font-mono text-[10px] text-crt-red mt-2">{{ unifiedJoinError }}</p>
             </template>
           </div>
         </div>
@@ -930,6 +955,7 @@ import { useAchievements } from '../composables/useAchievements'
 import { useWikipedia } from '../composables/useWikipedia'
 import WikiTitleInput from '../components/WikiTitleInput.vue'
 import { APP_VERSION } from '../version.js'
+import { loadMultiplayerSession, buildSessionRoute, clearMultiplayerSession } from '../utils/multiplayerSession'
 
 const router = useRouter()
 const toast = useToast()
@@ -956,6 +982,7 @@ const showConfirmPassword = ref(false)
 const globalStats = ref(null)
 const dailyLeaderboard = ref([])
 const showDailyLeaderboard = ref(false)
+const resumeMultiplayerSession = ref(null)
 
 const selectedGenreId = ref('random')
 const selectedModeId = ref('classic')
@@ -973,6 +1000,7 @@ const matchLoading = ref(false)
 const matchError = ref('')
 const matchStatus = ref(null)
 const matchOpponentUsername = ref('')
+const joinedMatchCode = ref('')
 let matchPollTimer = null
 
 const groupView = ref('menu')
@@ -1058,6 +1086,8 @@ const xpEstimate = computed(() => {
   const diff = showDifficulty.value ? selectedDifficulty.value : 'normal'
   return progression.estimateXp(selectedModeId.value, diff, activeModifiers.value.length)
 })
+const joinBusy = computed(() => matchLoading.value || groupLoading.value)
+const unifiedJoinError = computed(() => matchError.value || groupError.value || '')
 
 function toggleModifier(id) {
   const idx = activeModifiers.value.indexOf(id)
@@ -1156,6 +1186,36 @@ function startGame() {
 
 function startDaily() { sound.playStart(); router.push({ name: 'game', params: { mode: 'daily' } }) }
 
+function refreshResumeSession() {
+  const saved = loadMultiplayerSession()
+  if (!saved || !saved.route || !saved.code) {
+    resumeMultiplayerSession.value = null
+    return
+  }
+  const hasMultiplayerQuery = !!(saved.route?.query?.match || saved.route?.query?.lobby)
+  if (!hasMultiplayerQuery) {
+    clearMultiplayerSession()
+    resumeMultiplayerSession.value = null
+    return
+  }
+  if (saved.userId !== (auth.user.value?.id || null)) {
+    resumeMultiplayerSession.value = null
+    return
+  }
+  resumeMultiplayerSession.value = saved
+}
+
+function resumeMultiplayer() {
+  const routeToGame = buildSessionRoute(resumeMultiplayerSession.value)
+  if (!routeToGame) {
+    clearMultiplayerSession()
+    refreshResumeSession()
+    return
+  }
+  sound.playStart()
+  router.push(routeToGame)
+}
+
 async function createMatch() {
   if (!auth.user.value) { toast.warn('Login required for 1v1 matches'); showAuthModal.value = true; return }
   matchLoading.value = true
@@ -1166,6 +1226,7 @@ async function createMatch() {
     const result = await api.post('/match/create', { startTitle: pair.start.title, endTitle: pair.end.title })
     if (result.error) { matchError.value = result.error; return }
     matchCode.value = result.code
+    joinedMatchCode.value = ''
     matchOpponentUsername.value = ''
     matchStatus.value = 'waiting'
     matchTab.value = 'waiting'
@@ -1181,16 +1242,20 @@ async function createMatch() {
 function startMatchPolling() {
   stopMatchPolling()
   matchPollTimer = setInterval(async () => {
-    if (!matchCode.value) { stopMatchPolling(); return }
+    const code = matchCode.value || joinedMatchCode.value
+    if (!code) { stopMatchPolling(); return }
     try {
-      const result = await api.get(`/match/${matchCode.value}`)
+      const result = await api.get(`/match/${code}`)
       if (result.opponent?.username) matchOpponentUsername.value = result.opponent.username
       if (result.status === 'active' || result.status === 'finished') {
-        matchStatus.value = 'ready'
         stopMatchPolling()
         sound.playStart()
-        const name = result.opponent?.username
-        toast.success(name ? `${name} joined! Ready to start.` : 'Opponent joined! Ready to start.')
+        showMatchModal.value = false
+        router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, match: code } })
+        return
+      }
+      if (matchCode.value) {
+        matchStatus.value = result.opponent?.username ? 'ready' : 'waiting'
       }
     } catch { /* ignore */ }
   }, 3000)
@@ -1271,34 +1336,6 @@ async function createGroupLobby() {
   }
 }
 
-async function joinGroupLobby() {
-  if (!auth.user.value) { toast.warn('Login required'); showAuthModal.value = true; return }
-  const code = joinRoomCode.value.trim().toUpperCase()
-  if (!code || code.length < 4) { groupError.value = 'Enter a valid lobby code'; return }
-  groupLoading.value = true
-  groupError.value = ''
-  try {
-    const result = await api.post(`/lobby/join/${code}`)
-    if (result.error) { groupError.value = result.error; return }
-    groupLobbyCode.value = result.code
-    groupLobbyData.value = result
-    matchTab.value = 'group'
-    if (result.status === 'active') {
-      sound.playStart()
-      showMatchModal.value = false
-      router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, lobby: result.code } })
-      return
-    }
-    groupView.value = 'waiting'
-    toast.success('Joined lobby')
-    startGroupLobbyPolling()
-  } catch (e) {
-    groupError.value = e.message || 'Failed to join lobby'
-  } finally {
-    groupLoading.value = false
-  }
-}
-
 async function postStartGroupLobby() {
   if (!groupLobbyCode.value || !groupLobbyData.value?.is_host) return
   groupStartLoading.value = true
@@ -1322,37 +1359,93 @@ function copyGroupLobbyCode() {
   navigator.clipboard.writeText(groupLobbyCode.value).then(() => toast.success('Code copied!')).catch(() => toast.warn('Could not copy'))
 }
 
-async function joinMatch() {
-  if (!auth.user.value) { toast.warn('Login required for 1v1 matches'); showAuthModal.value = true; return }
+async function joinByCode(prefer = 'match') {
+  if (!auth.user.value) { toast.warn('Login required for multiplayer'); showAuthModal.value = true; return }
   const code = joinRoomCode.value.trim().toUpperCase()
-  if (!code || code.length < 4) { matchError.value = 'Enter a valid match code'; return }
+  if (!code || code.length < 4) {
+    matchError.value = 'Enter a valid room code'
+    groupError.value = 'Enter a valid room code'
+    return
+  }
+
   matchLoading.value = true
+  groupLoading.value = true
   matchError.value = ''
+  groupError.value = ''
+
+  const order = prefer === 'lobby' ? ['lobby', 'match'] : ['match', 'lobby']
+  const errors = {}
+
   try {
-    const result = await api.post(`/match/join/${code}`)
-    if (result.error) { matchError.value = result.error; return }
-    sound.playStart()
-    showMatchModal.value = false
-    router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, match: code } })
-  } catch (e) {
-    matchError.value = e.message || 'Failed to join match'
+    for (const type of order) {
+      try {
+        if (type === 'match') {
+          const result = await api.post(`/match/join/${code}`)
+          if (result.error) {
+            errors.match = result.error
+          } else {
+            if (result.status === 'active' || result.status === 'finished') {
+              sound.playStart()
+              showMatchModal.value = false
+              router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, match: result.code } })
+              return
+            }
+            joinedMatchCode.value = result.code
+            matchCode.value = ''
+            matchStatus.value = 'joined_waiting'
+            matchOpponentUsername.value = ''
+            matchTab.value = 'waiting'
+            toast.success('Joined match. Waiting for host to start...')
+            startMatchPolling()
+            return
+          }
+        } else {
+          const result = await api.post(`/lobby/join/${code}`)
+          if (result.error) {
+            errors.lobby = result.error
+          } else {
+            groupLobbyCode.value = result.code
+            groupLobbyData.value = result
+            matchTab.value = 'group'
+            if (result.status === 'active') {
+              sound.playStart()
+              showMatchModal.value = false
+              router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, lobby: result.code } })
+              return
+            }
+            groupView.value = 'waiting'
+            toast.success('Joined lobby')
+            startGroupLobbyPolling()
+            return
+          }
+        }
+      } catch (e) {
+        errors[type] = e?.message || 'Join failed'
+      }
+    }
+
+    const message = errors.match || errors.lobby || 'Code not found'
+    matchError.value = message
+    groupError.value = message
   } finally {
     matchLoading.value = false
+    groupLoading.value = false
   }
 }
 
 function startCreatedMatch() {
   if (!matchCode.value || matchStatus.value !== 'ready') return
-  sound.playStart()
-  showMatchModal.value = false
-  api.get(`/match/${matchCode.value}`).then(match => {
+  api.post(`/match/start/${matchCode.value}`).then(match => {
+    sound.playStart()
+    showMatchModal.value = false
     router.push({ name: 'game', params: { mode: 'custom' }, query: { from: match.start_title, to: match.end_title, match: matchCode.value } })
-  }).catch(() => toast.error('Failed to start match'))
+  }).catch((e) => toast.error(e?.message || 'Failed to start match'))
 }
 
 function copyMatchCode() {
-  if (!matchCode.value) return
-  navigator.clipboard.writeText(matchCode.value).then(() => toast.success('Code copied!')).catch(() => toast.warn('Could not copy to clipboard'))
+  const code = matchCode.value || joinedMatchCode.value
+  if (!code) return
+  navigator.clipboard.writeText(code).then(() => toast.success('Code copied!')).catch(() => toast.warn('Could not copy to clipboard'))
 }
 
 function formatTime(seconds) {
@@ -1384,6 +1477,7 @@ watch(showMatchModal, (val) => {
     stopGroupLobbyPolling()
     if (matchStatus.value !== 'ready') {
       matchCode.value = ''
+      joinedMatchCode.value = ''
       matchStatus.value = null
       matchOpponentUsername.value = ''
       matchTab.value = 'duel'
@@ -1393,12 +1487,16 @@ watch(showMatchModal, (val) => {
   }
 })
 watch(authMode, () => { authError.value = ''; authConfirmPassword.value = ''; showPassword.value = false; showConfirmPassword.value = false })
+watch(() => auth.user.value?.id, () => {
+  refreshResumeSession()
+})
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
   api.get('/stats').then(d => globalStats.value = d).catch(() => {})
   api.get('/daily/leaderboard').then(d => dailyLeaderboard.value = d.scores || []).catch(() => {})
   trending.fetchTrending()
+  refreshResumeSession()
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)

@@ -694,6 +694,32 @@
         </div>
       </transition>
     </Teleport>
+
+    <Teleport to="body">
+      <transition name="fade">
+        <div v-if="showOpponentQuitModal" class="fixed inset-0 z-[65] flex items-center justify-center p-3 sm:p-4">
+          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm"></div>
+          <div class="relative rounded-2xl p-6 max-w-sm w-full animate-scale-in text-center"
+               style="background: #0d0e15; border: 1.5px solid rgba(255,68,68,0.25); box-shadow: 0 0 40px rgba(255,68,68,0.08), 0 12px 40px rgba(0,0,0,0.6);">
+            <div class="inline-flex items-center gap-2 mb-3 px-3 py-1.5 rounded-lg" style="background: rgba(255,68,68,0.06); border: 1px solid rgba(255,68,68,0.12);">
+              <svg class="w-4 h-4 text-crt-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-12.728 12.728M5.636 5.636l12.728 12.728" />
+              </svg>
+              <span class="font-pixel text-[8px] text-crt-red tracking-[0.2em]">PLAYER LEFT</span>
+            </div>
+            <p class="font-mono text-sm text-retro-light mb-6">
+              {{ opponentQuitName || 'The other player' }} quit the match.<br>
+              <span class="text-retro-muted text-xs mt-1 inline-block">Continue as solo or quit?</span>
+            </p>
+            <div class="flex gap-3 pb-[env(safe-area-inset-bottom)]">
+              <button @click="quitAfterOpponentLeft" class="btn-secondary flex-1 touch-manipulation">QUIT</button>
+              <button @click="resumeSoloAfterOpponentQuit(opponentQuitName || 'Opponent')" class="btn-primary flex-1 touch-manipulation">CONTINUE SOLO</button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -709,6 +735,7 @@ import { useApi } from '../composables/useApi'
 import { useTrending } from '../composables/useTrending'
 import { useProgression } from '../composables/useProgression'
 import { useAchievements } from '../composables/useAchievements'
+import { saveMultiplayerSession, loadMultiplayerSession, clearMultiplayerSession } from '../utils/multiplayerSession'
 
 const props = defineProps({
   mode: { type: String, required: true }
@@ -763,9 +790,15 @@ const lobbyCode = computed(() => route.query.lobby || null)
 const matchResult = ref(null)
 const matchPolling = ref(false)
 let matchPollTimerId = null
+let matchPresencePollTimerId = null
+const showOpponentQuitModal = ref(false)
+const opponentQuitName = ref('')
+const resumedSoloAfterQuit = ref(false)
+const OPPONENT_QUIT_ACK_KEY = 'wikilink_opponent_quit_ack_v1'
 const lobbyResult = ref(null)
 const lobbyPolling = ref(false)
 let lobbyPollTimerId = null
+let multiplayerPersistTimerId = null
 
 const lobbyYourRank = computed(() => {
   const lb = lobbyResult.value?.leaderboard
@@ -794,6 +827,46 @@ const activeModifiers = computed(() => {
 })
 
 const currentMode = computed(() => game.currentMode.value)
+const isMultiplayerGame = computed(() => !!matchCode.value || !!lobbyCode.value)
+const sessionRouteQuery = computed(() => {
+  const out = {}
+  for (const [key, value] of Object.entries(route.query || {})) {
+    if (typeof value === 'string' && value.length) out[key] = value
+  }
+  return out
+})
+
+function loadOpponentQuitAckMap() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(OPPONENT_QUIT_ACK_KEY) || '{}')
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveOpponentQuitAckMap(map) {
+  try {
+    localStorage.setItem(OPPONENT_QUIT_ACK_KEY, JSON.stringify(map))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function isOpponentQuitAcked(code) {
+  const uid = auth.user.value?.id
+  if (!code || uid == null) return false
+  const map = loadOpponentQuitAckMap()
+  return !!map[`${uid}:${code}`]
+}
+
+function markOpponentQuitAcked(code) {
+  const uid = auth.user.value?.id
+  if (!code || uid == null) return
+  const map = loadOpponentQuitAckMap()
+  map[`${uid}:${code}`] = Date.now()
+  saveOpponentQuitAckMap(map)
+}
 
 const MODIFIER_SVG_PATHS = {
   fog: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />',
@@ -1027,6 +1100,10 @@ async function initializeGame() {
   setTimeout(() => bootStep.value = 3, 1300)
 
   try {
+    if (await tryRestoreMultiplayerGame()) {
+      return
+    }
+
     if (props.mode === 'daily') {
       let pair = null
       try {
@@ -1093,9 +1170,55 @@ async function initializeGame() {
     }
 
     sound.playStart()
+    persistMultiplayerSession()
   } finally {
     initialLoading.value = false
   }
+}
+
+function activeMultiplayerCode() {
+  return matchCode.value || lobbyCode.value || null
+}
+
+function persistMultiplayerSession() {
+  if (!isMultiplayerGame.value) return
+  const code = activeMultiplayerCode()
+  if (!code) return
+  const snapshot = game.exportSnapshot()
+  if (!snapshot) return
+  saveMultiplayerSession({
+    type: matchCode.value ? 'match' : 'lobby',
+    code,
+    userId: auth.user.value?.id || null,
+    route: {
+      mode: props.mode,
+      query: sessionRouteQuery.value,
+    },
+    snapshot,
+  })
+}
+
+async function tryRestoreMultiplayerGame() {
+  if (!isMultiplayerGame.value) return false
+  const saved = loadMultiplayerSession()
+  if (!saved || !saved.snapshot || !saved.route) return false
+  if (saved.userId !== (auth.user.value?.id || null)) return false
+  if (saved.route.mode !== props.mode) return false
+  const code = activeMultiplayerCode()
+  if (!code || saved.code !== code) return false
+  const routeFrom = sessionRouteQuery.value.from || ''
+  const routeTo = sessionRouteQuery.value.to || ''
+  const savedFrom = saved.route.query?.from || ''
+  const savedTo = saved.route.query?.to || ''
+  if (savedFrom !== routeFrom || savedTo !== routeTo) return false
+
+  const restored = game.restoreSnapshot(saved.snapshot)
+  if (!restored) return false
+  await loadArticle(saved.snapshot.currentArticle)
+  if (saved.snapshot.status === 'playing') {
+    toast.info('Restored multiplayer session')
+  }
+  return true
 }
 
 async function loadArticle(title) {
@@ -1361,7 +1484,7 @@ function formatLeaderboardTime(seconds) {
 }
 
 async function submitMatchResult() {
-  if (!matchCode.value || !auth.isLoggedIn()) return
+  if (!matchCode.value || !auth.isLoggedIn() || resumedSoloAfterQuit.value) return
   try {
     const result = await api.post(`/match/submit/${matchCode.value}`, {
       clicks: game.state.clicks,
@@ -1387,6 +1510,54 @@ async function pollMatchResult() {
     }
   } catch { /* ignore */ }
   matchPollTimerId = setTimeout(pollMatchResult, 3000)
+}
+
+async function notifyMatchQuit() {
+  if (!matchCode.value || !auth.isLoggedIn() || resumedSoloAfterQuit.value) return
+  try {
+    await api.post(`/match/quit/${matchCode.value}`)
+  } catch {
+    // ignore network/API issues when quitting
+  }
+}
+
+async function pollMatchPresence() {
+  if (!matchCode.value || !auth.isLoggedIn() || game.isGameOver.value || showOpponentQuitModal.value) return
+  try {
+    const result = await api.get(`/match/${matchCode.value}`)
+    if (result?.opponent?.quit) {
+      if (isOpponentQuitAcked(matchCode.value)) {
+        return
+      }
+      opponentQuitName.value = result.opponent?.username || 'Opponent'
+      showOpponentQuitModal.value = true
+      if (matchPresencePollTimerId) { clearInterval(matchPresencePollTimerId); matchPresencePollTimerId = null }
+    }
+  } catch {
+    // ignore transient polling failures
+  }
+}
+
+async function resumeSoloAfterOpponentQuit(opponentName = 'Opponent') {
+  if (matchCode.value) markOpponentQuitAcked(matchCode.value)
+  clearMultiplayerSession()
+  resumedSoloAfterQuit.value = true
+  showOpponentQuitModal.value = false
+  opponentQuitName.value = ''
+  matchPolling.value = false
+  if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
+  if (matchPresencePollTimerId) { clearInterval(matchPresencePollTimerId); matchPresencePollTimerId = null }
+  const q = { ...route.query }
+  delete q.match
+  await router.replace({ name: 'game', params: { mode: props.mode }, query: q })
+  toast.warn(`${opponentName} quit. Switched to solo mode.`)
+}
+
+function quitAfterOpponentLeft() {
+  if (matchCode.value) markOpponentQuitAcked(matchCode.value)
+  showOpponentQuitModal.value = false
+  opponentQuitName.value = ''
+  goHome()
 }
 
 async function submitLobbyResult() {
@@ -1463,21 +1634,29 @@ function confirmQuit() {
 }
 
 function goHome() {
+  notifyMatchQuit()
   matchPolling.value = false
   if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
+  if (matchPresencePollTimerId) { clearInterval(matchPresencePollTimerId); matchPresencePollTimerId = null }
   lobbyPolling.value = false
   if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
+  clearMultiplayerSession()
   game.resetGame()
   router.push({ name: 'home' })
 }
 
 async function playAgain() {
+  clearMultiplayerSession()
+  resumedSoloAfterQuit.value = false
+  showOpponentQuitModal.value = false
+  opponentQuitName.value = ''
   game.resetGame()
   freeplayFinished.value = false
   articleData.value = null
   matchResult.value = null
   matchPolling.value = false
   if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
+  if (matchPresencePollTimerId) { clearInterval(matchPresencePollTimerId); matchPresencePollTimerId = null }
   lobbyResult.value = null
   lobbyPolling.value = false
   if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
@@ -1511,6 +1690,14 @@ onMounted(() => {
     return
   }
   window.addEventListener('keydown', handleKeydown)
+  if (matchCode.value && auth.isLoggedIn()) {
+    matchPresencePollTimerId = setInterval(pollMatchPresence, 3000)
+  }
+  if (!multiplayerPersistTimerId) {
+    multiplayerPersistTimerId = setInterval(() => {
+      persistMultiplayerSession()
+    }, 5000)
+  }
   initializeGame()
 })
 
@@ -1519,8 +1706,25 @@ onUnmounted(() => {
   clearTimeout(hoverTimer)
   matchPolling.value = false
   if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
+  if (matchPresencePollTimerId) { clearInterval(matchPresencePollTimerId); matchPresencePollTimerId = null }
   lobbyPolling.value = false
   if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
+  if (multiplayerPersistTimerId) { clearInterval(multiplayerPersistTimerId); multiplayerPersistTimerId = null }
+  persistMultiplayerSession()
   game.resetGame()
 })
+
+watch(
+  () => [
+    game.state.currentArticle,
+    game.state.status,
+    game.state.clicks,
+    game.state.path.length,
+    game.state.hints,
+    game.state.hintsUsed,
+  ],
+  () => {
+    persistMultiplayerSession()
+  }
+)
 </script>

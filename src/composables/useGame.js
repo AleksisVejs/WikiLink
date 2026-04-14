@@ -406,6 +406,67 @@ export function useGame() {
     state.lastClickTime = null
   }
 
+  function exportSnapshot() {
+    if (!state.mode || !state.startArticle || !state.currentArticle) return null
+    return {
+      mode: state.mode,
+      genre: state.genre,
+      difficulty: state.difficulty,
+      status: state.status,
+      startArticle: state.startArticle,
+      targetArticle: state.targetArticle,
+      currentArticle: state.currentArticle,
+      path: [...state.path],
+      clicks: state.clicks,
+      elapsed: state.elapsed,
+      timeRemaining: state.timeRemaining,
+      effectiveTimeLimit: state.effectiveTimeLimit,
+      effectiveClickLimit: state.effectiveClickLimit,
+      speedDecayPenalty: state.speedDecayPenalty,
+      modifiers: [...state.modifiers],
+      hints: state.hints,
+      hintsUsed: state.hintsUsed,
+      combo: state.combo,
+      lastClickTime: state.lastClickTime,
+      savedAt: Date.now(),
+    }
+  }
+
+  function restoreSnapshot(snapshot) {
+    if (!snapshot || !snapshot.startArticle || !snapshot.currentArticle) return false
+    stopTimer()
+
+    state.mode = snapshot.mode || null
+    state.genre = snapshot.genre || null
+    state.difficulty = snapshot.difficulty || 'normal'
+    state.status = snapshot.status || 'idle'
+    state.startArticle = snapshot.startArticle || null
+    state.targetArticle = snapshot.targetArticle || null
+    state.currentArticle = snapshot.currentArticle || null
+    state.path = Array.isArray(snapshot.path) && snapshot.path.length
+      ? [...snapshot.path]
+      : (snapshot.currentArticle ? [snapshot.currentArticle] : [])
+    state.clicks = Number.isFinite(snapshot.clicks) ? snapshot.clicks : 0
+    state.elapsed = Number.isFinite(snapshot.elapsed) ? snapshot.elapsed : 0
+    state.effectiveTimeLimit = Number.isFinite(snapshot.effectiveTimeLimit) ? snapshot.effectiveTimeLimit : null
+    state.effectiveClickLimit = Number.isFinite(snapshot.effectiveClickLimit) ? snapshot.effectiveClickLimit : null
+    state.timeRemaining = Number.isFinite(snapshot.timeRemaining) ? snapshot.timeRemaining : state.effectiveTimeLimit
+    state.speedDecayPenalty = Number.isFinite(snapshot.speedDecayPenalty) ? snapshot.speedDecayPenalty : 0
+    state.modifiers = Array.isArray(snapshot.modifiers) ? [...snapshot.modifiers] : []
+    state.hints = Number.isFinite(snapshot.hints) ? snapshot.hints : 3
+    state.hintsUsed = Number.isFinite(snapshot.hintsUsed) ? snapshot.hintsUsed : 0
+    state.combo = Number.isFinite(snapshot.combo) ? snapshot.combo : 0
+    state.lastClickTime = Number.isFinite(snapshot.lastClickTime) ? snapshot.lastClickTime : null
+
+    if (state.status === 'playing') {
+      state.startTime = Date.now() - (state.elapsed * 1000)
+      startTimer()
+    } else {
+      state.startTime = Date.now() - (state.elapsed * 1000)
+    }
+    return true
+  }
+
   return {
     state,
     GAME_MODES,
@@ -431,5 +492,7 @@ export function useGame() {
     getDailyStatus,
     getEffectiveLimits,
     LIMIT_BOUNDS,
+    exportSnapshot,
+    restoreSnapshot,
   }
 }

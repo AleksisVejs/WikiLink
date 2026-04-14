@@ -59,6 +59,24 @@ function requireRateLimit($action, $max = 10, $window = 300) {
     }
 }
 
+function ensureNotBusyInAnotherRoom($userId, $targetType, $targetCode = null) {
+    $openMatch = getOpenMatchForUser($userId);
+    if ($openMatch) {
+        $same = ($targetType === 'match' && $targetCode && strtoupper($openMatch['code']) === strtoupper($targetCode));
+        if (!$same) {
+            jsonResponse(['error' => 'You are already in another 1v1 match. Leave it before creating or joining a new room.'], 400);
+        }
+    }
+
+    $openLobby = getOpenLobbyForUser($userId);
+    if ($openLobby) {
+        $same = ($targetType === 'lobby' && $targetCode && strtoupper($openLobby['code']) === strtoupper($targetCode));
+        if (!$same) {
+            jsonResponse(['error' => 'You are already in another group lobby. Leave it before creating or joining a new room.'], 400);
+        }
+    }
+}
+
 // --- Routing ---
 
 // POST /register
@@ -258,6 +276,7 @@ if ($method === 'GET' && $uri === '/trending') {
 // POST /match/create
 if ($method === 'POST' && $uri === '/match/create') {
     $user = requireAuth();
+    ensureNotBusyInAnotherRoom($user['id'], 'match');
     requireRateLimit('match_create', 10, 60);
     $body = jsonInput();
     $result = createMatch(
@@ -271,6 +290,7 @@ if ($method === 'POST' && $uri === '/match/create') {
 // POST /match/join/:code
 if ($method === 'POST' && preg_match('#^/match/join/([A-Za-z0-9]+)$#', $uri, $m)) {
     $user = requireAuth();
+    ensureNotBusyInAnotherRoom($user['id'], 'match', $m[1]);
     jsonResponse(joinMatch($m[1], $user['id']));
 }
 
@@ -288,6 +308,20 @@ if ($method === 'POST' && preg_match('#^/match/submit/([A-Za-z0-9]+)$#', $uri, $
     jsonResponse($result, isset($result['error']) ? 400 : 200);
 }
 
+// POST /match/start/:code
+if ($method === 'POST' && preg_match('#^/match/start/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = startMatch($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /match/quit/:code
+if ($method === 'POST' && preg_match('#^/match/quit/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = quitMatch($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
 // GET /match/:code
 if ($method === 'GET' && preg_match('#^/match/([A-Za-z0-9]+)$#', $uri, $m)) {
     $user = requireAuth();
@@ -298,6 +332,7 @@ if ($method === 'GET' && preg_match('#^/match/([A-Za-z0-9]+)$#', $uri, $m)) {
 // POST /lobby/create
 if ($method === 'POST' && $uri === '/lobby/create') {
     $user = requireAuth();
+    ensureNotBusyInAnotherRoom($user['id'], 'lobby');
     requireRateLimit('lobby_create', 10, 60);
     $body = jsonInput();
     $max = isset($body['maxPlayers']) ? $body['maxPlayers'] : 8;
@@ -313,6 +348,7 @@ if ($method === 'POST' && $uri === '/lobby/create') {
 // POST /lobby/join/:code
 if ($method === 'POST' && preg_match('#^/lobby/join/([A-Za-z0-9]+)$#', $uri, $m)) {
     $user = requireAuth();
+    ensureNotBusyInAnotherRoom($user['id'], 'lobby', $m[1]);
     $result = joinLobby($m[1], $user['id']);
     jsonResponse($result, isset($result['error']) ? 400 : 200);
 }

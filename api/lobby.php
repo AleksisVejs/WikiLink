@@ -26,6 +26,27 @@ function ensureLobbyTables() {
     $db->exec('CREATE INDEX IF NOT EXISTS idx_lobby_players_lobby ON lobby_players(lobby_id)');
 }
 
+function cleanupStaleLobbies() {
+    ensureLobbyTables();
+    $db = getDb();
+
+    // Waiting lobbies that never started.
+    $db->exec("DELETE FROM lobbies
+        WHERE status = 'waiting'
+          AND created_at < datetime('now', '-2 hours')");
+
+    // Active lobbies with no recent completion should not block forever.
+    $db->exec("UPDATE lobbies
+        SET status = 'finished'
+        WHERE status = 'active'
+          AND created_at < datetime('now', '-12 hours')");
+
+    // Remove old completed lobbies.
+    $db->exec("DELETE FROM lobbies
+        WHERE status = 'finished'
+          AND created_at < datetime('now', '-14 days')");
+}
+
 function lobbyFetchByCode($db, $code) {
     $stmt = $db->prepare('SELECT * FROM lobbies WHERE code = ?');
     $stmt->execute([$code]);
@@ -114,6 +135,7 @@ function formatLobbyResponse($lobby, $userId) {
 }
 
 function createLobby($startTitle, $endTitle, $hostId, $maxPlayers = 8) {
+    cleanupStaleLobbies();
     $startTitle = trim($startTitle);
     $endTitle = trim($endTitle);
     if (empty($startTitle) || empty($endTitle)) {
@@ -148,6 +170,7 @@ function createLobby($startTitle, $endTitle, $hostId, $maxPlayers = 8) {
 }
 
 function joinLobby($code, $userId) {
+    cleanupStaleLobbies();
     $code = strtoupper(trim($code));
     ensureLobbyTables();
     $db = getDb();
@@ -183,6 +206,7 @@ function joinLobby($code, $userId) {
 }
 
 function startLobby($code, $userId) {
+    cleanupStaleLobbies();
     $code = strtoupper(trim($code));
     ensureLobbyTables();
     $db = getDb();
@@ -212,6 +236,7 @@ function startLobby($code, $userId) {
 }
 
 function submitLobbyResult($code, $userId, $clicks, $time, $path) {
+    cleanupStaleLobbies();
     $code = strtoupper(trim($code));
     ensureLobbyTables();
     $db = getDb();
@@ -253,6 +278,7 @@ function submitLobbyResult($code, $userId, $clicks, $time, $path) {
 }
 
 function getLobbyStatus($code, $userId) {
+    cleanupStaleLobbies();
     $code = strtoupper(trim($code));
     ensureLobbyTables();
     $db = getDb();
@@ -265,4 +291,22 @@ function getLobbyStatus($code, $userId) {
     }
 
     return formatLobbyResponse($lobby, $userId);
+}
+
+function getOpenLobbyForUser($userId) {
+    cleanupStaleLobbies();
+    ensureLobbyTables();
+    $db = getDb();
+    $stmt = $db->prepare("
+        SELECT l.*
+        FROM lobbies l
+        JOIN lobby_players lp ON lp.lobby_id = l.id
+        WHERE lp.user_id = ?
+          AND l.status != 'finished'
+        ORDER BY l.id DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$userId]);
+    $row = $stmt->fetch();
+    return $row ?: null;
 }
