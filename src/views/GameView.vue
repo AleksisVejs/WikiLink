@@ -769,6 +769,24 @@ async function tryRestoreMultiplayerGame() {
   if (saved.route.mode !== props.mode) return false
   const code = activeMultiplayerCode()
   if (!code || saved.code !== code) return false
+  const titleValue = (value) => {
+    if (value && typeof value === 'object') {
+      if (typeof value.title === 'string') return value.title
+      return ''
+    }
+    return typeof value === 'string' ? value : ''
+  }
+  const normalizeTitle = (value) => titleValue(value).trim().replace(/_/g, ' ').toLowerCase()
+  const routeFrom = normalizeTitle(route.query.from)
+  const routeTo = normalizeTitle(route.query.to)
+  const savedFrom = normalizeTitle(saved.route?.query?.from)
+  const savedTo = normalizeTitle(saved.route?.query?.to)
+  const snapshotFrom = normalizeTitle(saved.snapshot.startArticle)
+  const snapshotTo = normalizeTitle(saved.snapshot.targetArticle)
+  if (routeFrom && snapshotFrom && routeFrom !== snapshotFrom) return false
+  if (routeTo && snapshotTo && routeTo !== snapshotTo) return false
+  if (routeFrom && savedFrom && routeFrom !== savedFrom) return false
+  if (routeTo && savedTo && routeTo !== savedTo) return false
 
   const restored = game.restoreSnapshot(saved.snapshot)
   if (!restored) return false
@@ -1093,12 +1111,6 @@ async function notifyMultiplayerLeave() {
       // ignore transient leave failures
     }
   }
-}
-
-function onBeforeUnloadLeave() {
-  // Treat refresh/tab close as a transient disconnect, not an explicit quit.
-  // Presence/heartbeat grace window handles cleanup without forcing "player quit".
-  return
 }
 
 async function pollMatchPresence() {

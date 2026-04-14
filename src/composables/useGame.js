@@ -464,12 +464,12 @@ export function useGame() {
     state.elapsed = baseElapsed + ageSeconds
     state.effectiveTimeLimit = Number.isFinite(snapshot.effectiveTimeLimit) ? snapshot.effectiveTimeLimit : null
     state.effectiveClickLimit = Number.isFinite(snapshot.effectiveClickLimit) ? snapshot.effectiveClickLimit : null
+    state.speedDecayPenalty = Number.isFinite(snapshot.speedDecayPenalty) ? snapshot.speedDecayPenalty : 0
     if (state.effectiveTimeLimit) {
       state.timeRemaining = Math.max(0, state.effectiveTimeLimit - state.elapsed - state.speedDecayPenalty)
     } else {
       state.timeRemaining = null
     }
-    state.speedDecayPenalty = Number.isFinite(snapshot.speedDecayPenalty) ? snapshot.speedDecayPenalty : 0
     state.modifiers = Array.isArray(snapshot.modifiers) ? [...snapshot.modifiers] : []
     state.hints = Number.isFinite(snapshot.hints) ? snapshot.hints : 3
     state.hintsUsed = Number.isFinite(snapshot.hintsUsed) ? snapshot.hintsUsed : 0
