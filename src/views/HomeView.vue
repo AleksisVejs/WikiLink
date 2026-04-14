@@ -745,6 +745,7 @@ let roomSettingsAutosaveTimer = null
 const roomSettingsAutosaveRetry = ref(false)
 const multiplayerInviteLoading = ref(false)
 const multiplayerInviteError = ref('')
+const suppressModalFriendInvites = ref(false)
 
 const genres = Object.values(GENRES)
 const modifierList = Object.values(MODIFIERS)
@@ -876,7 +877,11 @@ const canEditRoomSettings = computed(() => {
   const isStillWaiting = matchStatus.value === 'waiting' || matchStatus.value === 'ready'
   return isHostRoom && isStillWaiting
 })
-const canInviteFriends = computed(() => !!auth.user.value && friendsComposable.friends.value.length > 0)
+const canInviteFriends = computed(() =>
+  !suppressModalFriendInvites.value &&
+  !!auth.user.value &&
+  friendsComposable.friends.value.length > 0
+)
 
 function toggleModifier(id) {
   const idx = activeModifiers.value.indexOf(id)
@@ -1133,6 +1138,7 @@ function resumeMultiplayer() {
 
 async function createMatch() {
   if (!auth.user.value) { toast.warn('Login required for 1v1 matches'); showAuthModal.value = true; return }
+  suppressModalFriendInvites.value = false
   replayMatchWaitingMode.value = false
   replayLobbyWaitingMode.value = false
   matchLoading.value = true
@@ -1363,6 +1369,7 @@ function copyGroupLobbyCode() {
 
 async function joinByCode(prefer = 'match') {
   if (!auth.user.value) { toast.warn('Login required for multiplayer'); showAuthModal.value = true; return }
+  suppressModalFriendInvites.value = false
   replayMatchWaitingMode.value = false
   replayLobbyWaitingMode.value = false
   const code = joinRoomCode.value.trim().toUpperCase()
@@ -1587,6 +1594,7 @@ async function openHostedMatchFromRoute() {
   }
 
   showMatchModal.value = true
+  suppressModalFriendInvites.value = true
   matchTab.value = 'waiting'
   matchCode.value = hostCode
   joinedMatchCode.value = ''
@@ -1617,6 +1625,7 @@ async function openReplayRoomFromRoute() {
   }
 
   showMatchModal.value = true
+  suppressModalFriendInvites.value = false
   matchError.value = ''
   groupError.value = ''
   try {
@@ -1761,6 +1770,7 @@ async function closeMatchModal() {
     }
   }
   showMatchModal.value = false
+  suppressModalFriendInvites.value = false
   replayMatchWaitingMode.value = false
   replayLobbyWaitingMode.value = false
   multiplayerInviteError.value = ''
@@ -1887,6 +1897,7 @@ watch(showMatchModal, (val) => {
     replayMatchWaitingMode.value = false
     replayLobbyWaitingMode.value = false
     multiplayerInviteError.value = ''
+    suppressModalFriendInvites.value = false
     resetGroupLobbyUi()
   }
 })

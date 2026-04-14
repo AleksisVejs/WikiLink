@@ -219,6 +219,21 @@ function createRoomInvite($senderUserId, $receiverUsername, $roomType, $roomCode
         $room = getMatchStatus($roomCode, (int)$senderUserId);
         if (isset($room['error'])) return ['error' => 'Match not found.'];
         if (($room['status'] ?? '') !== 'waiting') return ['error' => 'Match is no longer joinable.'];
+        if (!empty($room['opponent']['username'])) return ['error' => 'Match already has an opponent.'];
+
+        $pendingInviteStmt = $db->prepare("
+            SELECT id
+            FROM game_invites
+            WHERE sender_user_id = ?
+              AND COALESCE(invite_type, 'match') = 'match'
+              AND COALESCE(room_code, match_code) = ?
+              AND status = 'pending'
+            LIMIT 1
+        ");
+        $pendingInviteStmt->execute([(int)$senderUserId, $roomCode]);
+        if ($pendingInviteStmt->fetch()) {
+            return ['error' => 'You already sent a pending invite for this room.'];
+        }
     } else {
         $room = getLobbyStatus($roomCode, (int)$senderUserId);
         if (isset($room['error'])) return ['error' => 'Lobby not found.'];
@@ -345,6 +360,21 @@ function respondToGameInvite($inviteId, $receiverUserId, $action) {
     if ($action === 'deny') {
         $db->prepare("UPDATE game_invites SET status = 'declined', responded_at = datetime('now') WHERE id = ?")
             ->execute([(int)$inviteId]);
+
+        // If a direct 1v1 invite is denied, close that waiting room so the host can invite someone else.
+        if ($inviteType === 'match' && $roomCode !== '') {
+            ensureMatchTable();
+            $closeStmt = $db->prepare("
+                UPDATE matches
+                SET status = 'finished',
+                    p1_quit = 1
+                WHERE code = ?
+                  AND player1_id = ?
+                  AND status = 'waiting'
+            ");
+            $closeStmt->execute([$roomCode, (int)$invite['sender_user_id']]);
+        }
+
         return ['ok' => true, 'status' => 'declined'];
     }
 

@@ -297,16 +297,19 @@
           </div>
 
           <div v-if="activeTab === 'friends'" class="space-y-3 animate-fade-in">
-            <div v-if="isOwnProfile" class="rounded-xl p-4 sm:p-5" style="background:#10121b;border:1.5px solid #252738;">
+            <div v-if="isOwnProfile" class="rounded-2xl p-4 sm:p-5" style="background:linear-gradient(180deg,#10121b,#0d0f17);border:1.5px solid #252738;box-shadow:0 10px 24px rgba(0,0,0,0.25);">
               <div class="flex items-center gap-2 mb-3">
                 <div class="w-1 h-4 rounded-full bg-crt-cyan"></div>
                 <span class="font-pixel text-[8px] text-crt-cyan tracking-[0.2em]">ADD FRIEND</span>
               </div>
               <div class="flex flex-col sm:flex-row gap-2">
                 <div class="flex-1 relative">
+                  <svg class="w-4 h-4 text-retro-muted/50 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z" />
+                  </svg>
                   <input v-model="friendSearchQuery" type="text" placeholder="Search by username..."
                          @input="debouncedSearch" @focus="showSearchResults = true"
-                         class="w-full px-3 py-2 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
+                         class="w-full pl-9 pr-3 py-2 rounded-lg font-mono text-sm bg-[#12131c] border border-retro-border text-crt-white focus:border-crt-cyan focus:outline-none" />
                   <div v-if="showSearchResults && searchResults.length > 0"
                        class="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-hidden z-30"
                        style="background: #12131c; border: 1.5px solid #252738; box-shadow: 0 8px 24px rgba(0,0,0,0.6);">
@@ -336,7 +339,7 @@
             </div>
 
             <div v-if="isOwnProfile && friendsComposable.incomingRequests.value.length > 0"
-                 class="rounded-xl overflow-hidden" style="background:#10121b;border:1.5px solid rgba(255,191,0,0.25);">
+                 class="rounded-2xl overflow-hidden" style="background:linear-gradient(180deg,#10121b,#0d0f17);border:1.5px solid rgba(255,191,0,0.25);box-shadow:0 10px 24px rgba(0,0,0,0.22);">
               <div class="px-4 py-3 border-b border-retro-border/20 flex items-center gap-2">
                 <div class="w-1 h-4 rounded-full bg-crt-amber"></div>
                 <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">PENDING REQUESTS</span>
@@ -344,7 +347,7 @@
               </div>
               <div class="divide-y divide-retro-border/10">
                 <div v-for="req in friendsComposable.incomingRequests.value" :key="req.request_id"
-                     class="px-4 py-3 flex items-center justify-between gap-2">
+                     class="px-4 py-3.5 flex items-center justify-between gap-2 hover:bg-retro-surface/10 transition-colors">
                   <router-link :to="`/profile/${req.username}`" class="font-mono text-[11px] text-crt-white hover:text-crt-cyan transition-colors truncate">{{ req.username }}</router-link>
                   <div class="flex items-center gap-1.5">
                     <button @click="handleAcceptRequest(req.request_id)"
@@ -358,32 +361,37 @@
               </div>
             </div>
 
-            <div class="rounded-xl overflow-hidden" style="background:#10121b;border:1.5px solid #252738;">
+            <div class="rounded-2xl overflow-hidden" style="background:linear-gradient(180deg,#10121b,#0d0f17);border:1.5px solid #252738;box-shadow:0 12px 28px rgba(0,0,0,0.24);">
               <div class="px-4 py-3 border-b border-retro-border/20 flex items-center gap-2">
                 <div class="w-1 h-4 rounded-full bg-crt-green"></div>
                 <span class="font-pixel text-[8px] text-crt-green tracking-[0.2em]">FRIENDS</span>
                 <span class="font-mono text-[9px] text-retro-muted">{{ visibleFriends.length }}</span>
+                <span class="ml-auto font-mono text-[9px] text-retro-muted/70">{{ isOwnProfile ? 'Manage your squad' : 'Player connections' }}</span>
               </div>
-              <div v-if="visibleFriends.length > 0" class="divide-y divide-retro-border/10">
+              <div v-if="visibleFriends.length > 0" class="p-2 sm:p-3 space-y-2">
                 <div v-for="friend in visibleFriends" :key="friend.friendship_id"
-                     class="px-4 py-3 flex items-center justify-between gap-2 hover:bg-retro-surface/10 transition-colors">
+                     class="px-3 py-2.5 rounded-xl flex items-center justify-between gap-2 hover:bg-retro-surface/10 transition-colors border border-retro-border/20">
                   <router-link :to="`/profile/${friend.username}`" class="min-w-0 flex items-center gap-2.5 flex-1">
-                    <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                         style="background:#0d0e15;border:1px solid rgba(57,255,20,0.2);">
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                         style="background:#0d0e15;border:1px solid rgba(57,255,20,0.2);box-shadow:inset 0 0 12px rgba(0,0,0,0.35);">
                       <svg class="w-4.5 h-4.5 text-crt-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24" v-html="friendProfileIcon(friend).svgPath"></svg>
                     </div>
                     <div class="min-w-0">
                       <div class="font-mono text-[11px] text-crt-white truncate hover:text-crt-cyan transition-colors">{{ friend.username }}</div>
-                      <div class="font-mono text-[9px] text-retro-muted">{{ friend.total_wins }}W / {{ friend.total_games }}G</div>
+                      <div class="flex items-center gap-1.5 mt-0.5">
+                        <span class="font-mono text-[9px] px-1.5 py-0.5 rounded text-crt-green" style="background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.2);">{{ friend.total_wins }}W</span>
+                        <span class="font-mono text-[9px] px-1.5 py-0.5 rounded text-retro-muted" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">{{ friend.total_games }}G</span>
+                      </div>
                     </div>
                   </router-link>
                   <div class="flex items-center gap-1.5 shrink-0">
                     <button v-if="isOwnProfile" @click="inviteFriendTo1v1(friend.username)" title="Invite to 1v1"
-                            class="p-1.5 rounded-lg transition-all"
+                            class="px-2 py-1.5 rounded-lg transition-all flex items-center gap-1"
                             style="border: 1px solid rgba(180,76,255,0.3); background: rgba(180,76,255,0.06);">
                       <svg class="w-3.5 h-3.5 text-arcade-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
+                      <span class="hidden sm:inline font-pixel text-[7px] tracking-wider text-arcade-purple">1V1</span>
                     </button>
                     <button v-if="isOwnProfile" @click="handleRemoveFriendById(friend.friendship_id)" title="Remove friend"
                             class="p-1.5 rounded-lg transition-all"
@@ -396,8 +404,13 @@
                 </div>
               </div>
               <div v-else class="px-4 py-8 text-center">
-                <div class="font-pixel text-[8px] text-retro-muted/50 mb-2">NO FRIENDS YET</div>
-                <p class="font-mono text-xs text-retro-muted/30">{{ isOwnProfile ? 'Search for players above to add friends' : 'This player has not added any friends yet' }}</p>
+                <div class="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style="background: rgba(57,255,20,0.05); border: 1px solid rgba(57,255,20,0.2);">
+                  <svg class="w-6 h-6 text-crt-green/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2a5 5 0 0110 0v2M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <div class="font-pixel text-[8px] text-retro-muted/70 mb-2 tracking-wider">NO FRIENDS YET</div>
+                <p class="font-mono text-xs text-retro-muted/40">{{ isOwnProfile ? 'Search for players above to add friends' : 'This player has not added any friends yet' }}</p>
               </div>
             </div>
           </div>

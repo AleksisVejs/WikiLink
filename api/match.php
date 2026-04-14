@@ -627,13 +627,9 @@ function getOpenMatchForUser($userId) {
             player1_id = ?
             AND COALESCE(p1_quit, 0) = 0
             AND (
-              (
-                status = 'active'
-                AND player2_id IS NOT NULL
-                AND COALESCE(p2_quit, 0) = 0
-              )
+              status = 'waiting'
               OR (
-                status = 'waiting'
+                status = 'active'
                 AND player2_id IS NOT NULL
                 AND COALESCE(p2_quit, 0) = 0
               )
@@ -643,16 +639,10 @@ function getOpenMatchForUser($userId) {
           (
             player2_id = ?
             AND COALESCE(p2_quit, 0) = 0
+            AND COALESCE(p1_quit, 0) = 0
             AND (
-              (
-                status = 'active'
-                AND player1_id IS NOT NULL
-                AND COALESCE(p1_quit, 0) = 0
-              )
-              OR (
-                status = 'waiting'
-                AND COALESCE(p1_quit, 0) = 0
-              )
+              status = 'waiting'
+              OR status = 'active'
             )
           )
         ORDER BY id DESC
