@@ -1,42 +1,67 @@
 # WikiLink
 
-Vue 3 + Vite + Tailwind Wikipedia navigation game (WikiRace-style). Uses the [Wikipedia REST and Action APIs](https://www.mediawiki.org/wiki/API:Main_page) from the browser; no backend is required.
+WikiLink is a Wikipedia navigation game (WikiRace-style) built with Vue 3, Vite, and Tailwind CSS, with a PHP API for multiplayer, lobby, match flow, auth, and related game services.
 
-## Local development
+## Live Website
+
+Production is hosted at [https://wikilink.fraksis.com/](https://wikilink.fraksis.com/).
+
+## Tech Stack
+
+- Frontend: Vue 3 + Vue Router + Vite + Tailwind CSS
+- Backend/API: PHP endpoints in `api/`
+- Data: SQLite (for API-side persistence)
+- Hosting: Apache/cPanel
+
+## Project Structure
+
+- `src/` - Vue application (views, composables, router, components)
+- `api/` - PHP API endpoints and backend logic
+- `public/` - static files and Apache rewrite config for SPA routing
+- `dist/` - production build output (generated)
+
+## Local Development
+
+### 1) Install frontend dependencies
 
 ```bash
 npm install
+```
+
+### 2) Run frontend (Vite)
+
+```bash
 npm run dev
 ```
 
-## Production build
+### 3) Run API locally (optional, for multiplayer/backend features)
+
+From the `api/` folder:
+
+```bash
+php -S localhost:8080 router.php
+```
+
+This uses `api/router.php` as the local front controller.
+
+## Build for Production
 
 ```bash
 npm run build
 ```
 
-Output is in `dist/`. Upload **all** files from `dist/` to your hosting document root (or a subdirectory). The `public/.htaccess` file is copied into `dist/` for Apache (cPanel) so client-side routes like `/play/daily` resolve to `index.html`.
+Build output is generated in `dist/`.
 
-### cPanel / Apache
+## Deployment (cPanel / Apache)
 
 1. Run `npm run build`.
-2. Upload the contents of `dist/` via File Manager or FTP.
-3. Ensure `mod_rewrite` is enabled (standard on cPanel).
-4. If the site lives in a **subfolder** (e.g. `public_html/wikilink/`), set `base` in `vite.config.js` to that path (e.g. `base: '/wikilink/'`) and rebuild so asset URLs resolve correctly.
+2. Upload all contents of `dist/` to the target web root (or subdirectory).
+3. Ensure Apache `mod_rewrite` is enabled.
+4. If deploying in a subfolder, set the correct Vite `base` in `vite.config.js` (for example `'/wikilink/'`) and rebuild.
+5. Deploy the `api/` folder to a PHP-enabled path on the same host.
 
-### Daily challenge
+## Notes
 
-The daily puzzle uses a **UTC calendar date** (`YYYY-MM-DD`) and a deterministic seed so everyone gets the same start/target pair for that UTC day. Pairs are chosen from Wikipedia search results; if rankings change during the day, titles can theoretically shift slightly, but selection is no longer random per visitor.
-
-## GitHub
-
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/AleksisVejs/WikiLink.git
-git push -u origin main
-```
-
-Use a [personal access token](https://github.com/settings/tokens) or SSH when Git prompts for credentials.
+- The app includes both single-player and backend-powered multiplayer/game services.
+- Daily challenge behavior is deterministic by UTC day.
+- If API routes are moved, update frontend API base references accordingly.

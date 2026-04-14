@@ -591,6 +591,9 @@
                 <div v-else class="text-center py-1">
                   <span class="font-mono text-[11px] text-retro-muted animate-blink">Waiting for other players...</span>
                   <span class="font-terminal text-sm text-crt-cyan ml-2">{{ lobbyResult.code }}</span>
+                  <div v-if="lobbyDisconnectedCount > 0" class="mt-1 font-mono text-[10px] text-crt-amber/80">
+                    {{ lobbyDisconnectedCount }} player{{ lobbyDisconnectedCount === 1 ? '' : 's' }} reconnecting...
+                  </div>
                 </div>
               </div>
             </div>
@@ -720,6 +723,31 @@
       </transition>
     </Teleport>
 
+    <Teleport to="body">
+      <transition name="fade">
+        <div v-if="showLobbyPlayerLeftModal" class="fixed inset-0 z-[65] flex items-center justify-center p-3 sm:p-4">
+          <div class="absolute inset-0 bg-black/85 backdrop-blur-sm"></div>
+          <div class="relative rounded-2xl p-6 max-w-sm w-full animate-scale-in text-center"
+               style="background: #0d0e15; border: 1.5px solid rgba(255,68,68,0.25); box-shadow: 0 0 40px rgba(255,68,68,0.08), 0 12px 40px rgba(0,0,0,0.6);">
+            <div class="inline-flex items-center gap-2 mb-3 px-3 py-1.5 rounded-lg" style="background: rgba(255,68,68,0.06); border: 1px solid rgba(255,68,68,0.12);">
+              <svg class="w-4 h-4 text-crt-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-12.728 12.728M5.636 5.636l12.728 12.728" />
+              </svg>
+              <span class="font-pixel text-[8px] text-crt-red tracking-[0.2em]">PLAYER LEFT</span>
+            </div>
+            <p class="font-mono text-sm text-retro-light mb-6">
+              {{ lobbyLeftPlayersLabel }} left the lobby.<br>
+              <span class="text-retro-muted text-xs mt-1 inline-block">Continue solo or quit?</span>
+            </p>
+            <div class="flex gap-3 pb-[env(safe-area-inset-bottom)]">
+              <button @click="quitAfterLobbyPlayerLeft" class="btn-secondary flex-1 touch-manipulation">QUIT</button>
+              <button @click="resumeSoloAfterLobbyPlayerLeft(lobbyLeftPlayersLabel)" class="btn-primary flex-1 touch-manipulation">CONTINUE SOLO</button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -791,6 +819,12 @@ const matchResult = ref(null)
 const matchPolling = ref(false)
 let matchPollTimerId = null
 let matchPresencePollTimerId = null
+const POLL_MIN_MS = 1000
+const POLL_MAX_MS = 5000
+const POLL_STEP_MS = 500
+const matchPollDelayMs = ref(POLL_MIN_MS)
+const lobbyPollDelayMs = ref(POLL_MIN_MS)
+const presencePollDelayMs = ref(POLL_MIN_MS)
 const showOpponentQuitModal = ref(false)
 const opponentQuitName = ref('')
 const resumedSoloAfterQuit = ref(false)
@@ -799,6 +833,24 @@ const lobbyResult = ref(null)
 const lobbyPolling = ref(false)
 let lobbyPollTimerId = null
 let multiplayerPersistTimerId = null
+let multiplayerHeartbeatTimerId = null
+let activityHeartbeatTimerId = null
+const showLobbyPlayerLeftModal = ref(false)
+const lobbyLeftPlayerNames = ref([])
+const lobbyLeftPlayersLabel = computed(() => {
+  const names = lobbyLeftPlayerNames.value.filter(Boolean)
+  if (names.length === 0) return 'A player'
+  if (names.length === 1) return names[0]
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names[0]}, ${names[1]} and ${names.length - 2} others`
+})
+let lastActivityHeartbeatAt = 0
+const ACTIVITY_HEARTBEAT_MIN_GAP_MS = 10000
+
+function nextPollDelay(currentDelay, hasFreshChange) {
+  if (hasFreshChange) return POLL_MIN_MS
+  return Math.min(currentDelay + POLL_STEP_MS, POLL_MAX_MS)
+}
 
 const lobbyYourRank = computed(() => {
   const lb = lobbyResult.value?.leaderboard
@@ -806,6 +858,10 @@ const lobbyYourRank = computed(() => {
   if (!lb || uid == null) return null
   const row = lb.find(r => r.user_id === uid)
   return row ? row.rank : null
+})
+const lobbyDisconnectedCount = computed(() => {
+  const players = Array.isArray(lobbyResult.value?.players) ? lobbyResult.value.players : []
+  return players.filter(p => p?.presence?.is_in_reconnect_grace).length
 })
 const showScreenShake = ref(false)
 const showRedVignette = ref(false)
@@ -1198,6 +1254,48 @@ function persistMultiplayerSession() {
   })
 }
 
+async function sendMultiplayerHeartbeat() {
+  if (!auth.isLoggedIn() || !isMultiplayerGame.value) return
+  if (matchCode.value) {
+    await api.post(`/match/ping/${matchCode.value}`).catch(() => {})
+    return
+  }
+  if (lobbyCode.value) {
+    await api.post(`/lobby/ping/${lobbyCode.value}`).catch(() => {})
+  }
+}
+
+function scheduleActivityHeartbeat() {
+  if (!auth.isLoggedIn() || !isMultiplayerGame.value) return
+  const now = Date.now()
+  const delta = now - lastActivityHeartbeatAt
+
+  if (delta >= ACTIVITY_HEARTBEAT_MIN_GAP_MS) {
+    lastActivityHeartbeatAt = now
+    sendMultiplayerHeartbeat()
+    return
+  }
+
+  const waitMs = ACTIVITY_HEARTBEAT_MIN_GAP_MS - delta
+  if (activityHeartbeatTimerId) return
+  activityHeartbeatTimerId = setTimeout(() => {
+    activityHeartbeatTimerId = null
+    if (!auth.isLoggedIn() || !isMultiplayerGame.value) return
+    lastActivityHeartbeatAt = Date.now()
+    sendMultiplayerHeartbeat()
+  }, waitMs)
+}
+
+function onMeaningfulActivity() {
+  scheduleActivityHeartbeat()
+}
+
+function onVisibilityOrFocus() {
+  if (document.visibilityState === 'visible') {
+    scheduleActivityHeartbeat()
+  }
+}
+
 async function tryRestoreMultiplayerGame() {
   if (!isMultiplayerGame.value) return false
   const saved = loadMultiplayerSession()
@@ -1494,6 +1592,7 @@ async function submitMatchResult() {
     matchResult.value = result
     if (result.status !== 'finished') {
       matchPolling.value = true
+      matchPollDelayMs.value = POLL_MIN_MS
       pollMatchResult()
     }
   } catch { /* ignore */ }
@@ -1502,51 +1601,84 @@ async function submitMatchResult() {
 async function pollMatchResult() {
   if (!matchCode.value || !matchPolling.value) return
   try {
+    const prevStatus = matchResult.value?.status || null
+    const prevOpponentSubmitted = !!matchResult.value?.opponent?.submitted
     const result = await api.get(`/match/${matchCode.value}`)
     matchResult.value = result
+    const hasFreshChange = prevStatus !== result.status
+      || prevOpponentSubmitted !== !!result?.opponent?.submitted
+    matchPollDelayMs.value = nextPollDelay(matchPollDelayMs.value, hasFreshChange)
     if (result.status === 'finished') {
       matchPolling.value = false
       return
     }
-  } catch { /* ignore */ }
-  matchPollTimerId = setTimeout(pollMatchResult, 3000)
+  } catch {
+    matchPollDelayMs.value = nextPollDelay(matchPollDelayMs.value, false)
+  }
+  matchPollTimerId = setTimeout(pollMatchResult, matchPollDelayMs.value)
 }
 
-async function notifyMatchQuit() {
-  if (!matchCode.value || !auth.isLoggedIn() || resumedSoloAfterQuit.value) return
+async function notifyMultiplayerLeave() {
+  if (!auth.isLoggedIn() || !isMultiplayerGame.value) return
   try {
-    await api.post(`/match/quit/${matchCode.value}`)
+    await api.post('/multiplayer/leave-current')
   } catch {
-    // ignore network/API issues when quitting
+    // Fallback: keepalive request with auth header for fast-navigation/browser-close cases.
+    try {
+      const token = localStorage.getItem('wikilink_token')
+      const headers = {}
+      if (token) headers.Authorization = `Bearer ${token}`
+      await fetch('/api/multiplayer/leave-current', { method: 'POST', headers, keepalive: true })
+    } catch {
+      // ignore transient leave failures
+    }
   }
+}
+
+function onBeforeUnloadLeave() {
+  if (!auth.isLoggedIn() || !isMultiplayerGame.value) return
+  const token = localStorage.getItem('wikilink_token')
+  if (!token) return
+  fetch('/api/multiplayer/leave-current', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    keepalive: true,
+  }).catch(() => {})
 }
 
 async function pollMatchPresence() {
   if (!matchCode.value || !auth.isLoggedIn() || game.isGameOver.value || showOpponentQuitModal.value) return
   try {
     const result = await api.get(`/match/${matchCode.value}`)
+    const hasFreshChange = !!result?.opponent?.quit
+    presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, hasFreshChange)
     if (result?.opponent?.quit) {
       if (isOpponentQuitAcked(matchCode.value)) {
+        matchPresencePollTimerId = setTimeout(pollMatchPresence, presencePollDelayMs.value)
         return
       }
       opponentQuitName.value = result.opponent?.username || 'Opponent'
       showOpponentQuitModal.value = true
-      if (matchPresencePollTimerId) { clearInterval(matchPresencePollTimerId); matchPresencePollTimerId = null }
+      if (matchPresencePollTimerId) { clearTimeout(matchPresencePollTimerId); matchPresencePollTimerId = null }
     }
   } catch {
-    // ignore transient polling failures
+    presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, false)
+  }
+  if (!showOpponentQuitModal.value) {
+    matchPresencePollTimerId = setTimeout(pollMatchPresence, presencePollDelayMs.value)
   }
 }
 
 async function resumeSoloAfterOpponentQuit(opponentName = 'Opponent') {
   if (matchCode.value) markOpponentQuitAcked(matchCode.value)
+  await notifyMultiplayerLeave()
   clearMultiplayerSession()
   resumedSoloAfterQuit.value = true
   showOpponentQuitModal.value = false
   opponentQuitName.value = ''
   matchPolling.value = false
   if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
-  if (matchPresencePollTimerId) { clearInterval(matchPresencePollTimerId); matchPresencePollTimerId = null }
+  if (matchPresencePollTimerId) { clearTimeout(matchPresencePollTimerId); matchPresencePollTimerId = null }
   const q = { ...route.query }
   delete q.match
   await router.replace({ name: 'game', params: { mode: props.mode }, query: q })
@@ -1570,8 +1702,11 @@ async function submitLobbyResult() {
     })
     lobbyResult.value = result
     if (result.status !== 'finished') {
-      lobbyPolling.value = true
-      pollLobbyResult()
+      if (!lobbyPolling.value) {
+        lobbyPolling.value = true
+        lobbyPollDelayMs.value = POLL_MIN_MS
+        pollLobbyResult()
+      }
     }
   } catch { /* ignore */ }
 }
@@ -1579,14 +1714,63 @@ async function submitLobbyResult() {
 async function pollLobbyResult() {
   if (!lobbyCode.value || !lobbyPolling.value) return
   try {
+    const prevStatus = lobbyResult.value?.status || null
+    const prevPlayers = Array.isArray(lobbyResult.value?.players) ? lobbyResult.value.players : []
+    const prevSubmitted = Array.isArray(lobbyResult.value?.players)
+      ? lobbyResult.value.players.filter(p => p.submitted).length
+      : 0
     const result = await api.get(`/lobby/${lobbyCode.value}`)
     lobbyResult.value = result
+    const nextPlayers = Array.isArray(result?.players) ? result.players : []
+    const nextIds = new Set(nextPlayers.map(p => p.user_id))
+    const uid = auth.user.value?.id
+    const removed = prevPlayers.filter(p => p.user_id !== uid && !nextIds.has(p.user_id))
+    if (removed.length > 0 && !showLobbyPlayerLeftModal.value) {
+      const leftName = removed[0]?.username || 'A player'
+      const activeRemaining = nextPlayers.length
+      if (activeRemaining >= 2) {
+        const extraCount = removed.length - 1
+        const suffix = extraCount > 0 ? ` (+${extraCount} more)` : ''
+        toast.warn(`${leftName} left the lobby${suffix}.`)
+      } else {
+        lobbyLeftPlayerNames.value = removed.map(p => p?.username || 'A player')
+        showLobbyPlayerLeftModal.value = true
+        if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
+      }
+    }
+    const nextSubmitted = Array.isArray(result?.players)
+      ? result.players.filter(p => p.submitted).length
+      : 0
+    const hasFreshChange = prevStatus !== result.status || prevSubmitted !== nextSubmitted
+    lobbyPollDelayMs.value = nextPollDelay(lobbyPollDelayMs.value, hasFreshChange)
+    if (showLobbyPlayerLeftModal.value) return
     if (result.status === 'finished') {
       lobbyPolling.value = false
       return
     }
-  } catch { /* ignore */ }
-  lobbyPollTimerId = setTimeout(pollLobbyResult, 3000)
+  } catch {
+    lobbyPollDelayMs.value = nextPollDelay(lobbyPollDelayMs.value, false)
+  }
+  lobbyPollTimerId = setTimeout(pollLobbyResult, lobbyPollDelayMs.value)
+}
+
+async function resumeSoloAfterLobbyPlayerLeft(playerName = 'Player') {
+  await notifyMultiplayerLeave()
+  clearMultiplayerSession()
+  showLobbyPlayerLeftModal.value = false
+  lobbyLeftPlayerNames.value = []
+  lobbyPolling.value = false
+  if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
+  const q = { ...route.query }
+  delete q.lobby
+  await router.replace({ name: 'game', params: { mode: props.mode }, query: q })
+  toast.warn(`${playerName} left. Switched to solo mode.`)
+}
+
+function quitAfterLobbyPlayerLeft() {
+  showLobbyPlayerLeftModal.value = false
+  lobbyLeftPlayerNames.value = []
+  goHome()
 }
 
 async function submitDailyScore() {
@@ -1633,13 +1817,17 @@ function confirmQuit() {
   }
 }
 
-function goHome() {
-  notifyMatchQuit()
+async function goHome() {
+  await notifyMultiplayerLeave()
   matchPolling.value = false
   if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
-  if (matchPresencePollTimerId) { clearInterval(matchPresencePollTimerId); matchPresencePollTimerId = null }
+  if (matchPresencePollTimerId) { clearTimeout(matchPresencePollTimerId); matchPresencePollTimerId = null }
   lobbyPolling.value = false
   if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
+  if (multiplayerHeartbeatTimerId) { clearInterval(multiplayerHeartbeatTimerId); multiplayerHeartbeatTimerId = null }
+  if (activityHeartbeatTimerId) { clearTimeout(activityHeartbeatTimerId); activityHeartbeatTimerId = null }
+  showLobbyPlayerLeftModal.value = false
+  lobbyLeftPlayerNames.value = []
   clearMultiplayerSession()
   game.resetGame()
   router.push({ name: 'home' })
@@ -1650,13 +1838,15 @@ async function playAgain() {
   resumedSoloAfterQuit.value = false
   showOpponentQuitModal.value = false
   opponentQuitName.value = ''
+  showLobbyPlayerLeftModal.value = false
+  lobbyLeftPlayerNames.value = []
   game.resetGame()
   freeplayFinished.value = false
   articleData.value = null
   matchResult.value = null
   matchPolling.value = false
   if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
-  if (matchPresencePollTimerId) { clearInterval(matchPresencePollTimerId); matchPresencePollTimerId = null }
+  if (matchPresencePollTimerId) { clearTimeout(matchPresencePollTimerId); matchPresencePollTimerId = null }
   lobbyResult.value = null
   lobbyPolling.value = false
   if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
@@ -1690,26 +1880,55 @@ onMounted(() => {
     return
   }
   window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('scroll', onMeaningfulActivity, { passive: true })
+  window.addEventListener('mousemove', onMeaningfulActivity, { passive: true })
+  window.addEventListener('touchstart', onMeaningfulActivity, { passive: true })
+  window.addEventListener('click', onMeaningfulActivity, { passive: true })
+  window.addEventListener('keydown', onMeaningfulActivity)
+  window.addEventListener('focus', onVisibilityOrFocus)
+  document.addEventListener('visibilitychange', onVisibilityOrFocus)
   if (matchCode.value && auth.isLoggedIn()) {
-    matchPresencePollTimerId = setInterval(pollMatchPresence, 3000)
+    presencePollDelayMs.value = POLL_MIN_MS
+    pollMatchPresence()
+  }
+  if (lobbyCode.value && auth.isLoggedIn()) {
+    lobbyPolling.value = true
+    lobbyPollDelayMs.value = POLL_MIN_MS
+    pollLobbyResult()
   }
   if (!multiplayerPersistTimerId) {
     multiplayerPersistTimerId = setInterval(() => {
       persistMultiplayerSession()
     }, 5000)
   }
+  if (isMultiplayerGame.value && auth.isLoggedIn() && !multiplayerHeartbeatTimerId) {
+    sendMultiplayerHeartbeat()
+    lastActivityHeartbeatAt = Date.now()
+    multiplayerHeartbeatTimerId = setInterval(sendMultiplayerHeartbeat, 15000)
+  }
+  window.addEventListener('beforeunload', onBeforeUnloadLeave)
   initializeGame()
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('scroll', onMeaningfulActivity)
+  window.removeEventListener('mousemove', onMeaningfulActivity)
+  window.removeEventListener('touchstart', onMeaningfulActivity)
+  window.removeEventListener('click', onMeaningfulActivity)
+  window.removeEventListener('keydown', onMeaningfulActivity)
+  window.removeEventListener('focus', onVisibilityOrFocus)
+  window.removeEventListener('beforeunload', onBeforeUnloadLeave)
+  document.removeEventListener('visibilitychange', onVisibilityOrFocus)
   clearTimeout(hoverTimer)
   matchPolling.value = false
   if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
-  if (matchPresencePollTimerId) { clearInterval(matchPresencePollTimerId); matchPresencePollTimerId = null }
+  if (matchPresencePollTimerId) { clearTimeout(matchPresencePollTimerId); matchPresencePollTimerId = null }
   lobbyPolling.value = false
   if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
   if (multiplayerPersistTimerId) { clearInterval(multiplayerPersistTimerId); multiplayerPersistTimerId = null }
+  if (multiplayerHeartbeatTimerId) { clearInterval(multiplayerHeartbeatTimerId); multiplayerHeartbeatTimerId = null }
+  if (activityHeartbeatTimerId) { clearTimeout(activityHeartbeatTimerId); activityHeartbeatTimerId = null }
   persistMultiplayerSession()
   game.resetGame()
 })

@@ -59,6 +59,23 @@ function requireRateLimit($action, $max = 10, $window = 300) {
     }
 }
 
+function getCleanupKey() {
+    $key = getenv('WIKILINK_CLEANUP_KEY');
+    if ($key && trim($key) !== '') return trim($key);
+    if (!empty($_SERVER['WIKILINK_CLEANUP_KEY'])) return trim($_SERVER['WIKILINK_CLEANUP_KEY']);
+    return null;
+}
+
+function requireCleanupAuth() {
+    $configured = getCleanupKey();
+    if (!$configured) {
+        return true;
+    }
+    $provided = isset($_GET['key']) ? (string)$_GET['key'] : '';
+    if ($provided === $configured) return true;
+    jsonResponse(['error' => 'Forbidden.'], 403);
+}
+
 function ensureNotBusyInAnotherRoom($userId, $targetType, $targetCode = null) {
     $openMatch = getOpenMatchForUser($userId);
     if ($openMatch) {
@@ -329,6 +346,13 @@ if ($method === 'GET' && preg_match('#^/match/([A-Za-z0-9]+)$#', $uri, $m)) {
     jsonResponse($result, isset($result['error']) ? 404 : 200);
 }
 
+// POST /match/ping/:code
+if ($method === 'POST' && preg_match('#^/match/ping/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    touchMatchPresence($m[1], $user['id']);
+    jsonResponse(['ok' => true]);
+}
+
 // POST /multiplayer/leave-current
 if ($method === 'POST' && $uri === '/multiplayer/leave-current') {
     $user = requireAuth();
@@ -338,6 +362,19 @@ if ($method === 'POST' && $uri === '/multiplayer/leave-current') {
         'ok' => true,
         'matches_left' => $matchesLeft,
         'lobbies_left' => $lobbiesLeft,
+    ]);
+}
+
+// GET|POST /multiplayer/cleanup (for cron jobs)
+if (($method === 'GET' || $method === 'POST') && $uri === '/multiplayer/cleanup') {
+    requireCleanupAuth();
+    $matchStats = cleanupStaleMatches();
+    $lobbyStats = cleanupStaleLobbies();
+    jsonResponse([
+        'ok' => true,
+        'matches' => $matchStats,
+        'lobbies' => $lobbyStats,
+        'ran_at' => gmdate('c'),
     ]);
 }
 
@@ -391,6 +428,13 @@ if ($method === 'GET' && preg_match('#^/lobby/([A-Za-z0-9]+)$#', $uri, $m)) {
     $user = requireAuth();
     $result = getLobbyStatus($m[1], $user['id']);
     jsonResponse($result, isset($result['error']) ? 404 : 200);
+}
+
+// POST /lobby/ping/:code
+if ($method === 'POST' && preg_match('#^/lobby/ping/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    touchLobbyPresence($m[1], $user['id']);
+    jsonResponse(['ok' => true]);
 }
 
 // GET /user/search?q=...

@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__ . '/db.php';
 
+const MATCH_HEARTBEAT_INTERVAL_SECONDS = 15;
+const MATCH_MISSED_HEARTBEAT_LIMIT = 3;
+const MATCH_RECONNECT_GRACE_SECONDS = 45;
+
 function ensureMatchTable() {
     $db = getDb();
     $db->exec("CREATE TABLE IF NOT EXISTS matches (
@@ -18,11 +22,23 @@ function ensureMatchTable() {
         p2_path     TEXT,
         p1_quit     INTEGER NOT NULL DEFAULT 0,
         p2_quit     INTEGER NOT NULL DEFAULT 0,
+        p1_last_seen_at TEXT,
+        p2_last_seen_at TEXT,
+        p1_missed_heartbeats INTEGER NOT NULL DEFAULT 0,
+        p2_missed_heartbeats INTEGER NOT NULL DEFAULT 0,
+        p1_disconnected_at TEXT,
+        p2_disconnected_at TEXT,
         status      TEXT    NOT NULL DEFAULT 'waiting',
         created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     )");
     ensureMatchColumn($db, 'p1_quit', "ALTER TABLE matches ADD COLUMN p1_quit INTEGER NOT NULL DEFAULT 0");
     ensureMatchColumn($db, 'p2_quit', "ALTER TABLE matches ADD COLUMN p2_quit INTEGER NOT NULL DEFAULT 0");
+    ensureMatchColumn($db, 'p1_last_seen_at', "ALTER TABLE matches ADD COLUMN p1_last_seen_at TEXT");
+    ensureMatchColumn($db, 'p2_last_seen_at', "ALTER TABLE matches ADD COLUMN p2_last_seen_at TEXT");
+    ensureMatchColumn($db, 'p1_missed_heartbeats', "ALTER TABLE matches ADD COLUMN p1_missed_heartbeats INTEGER NOT NULL DEFAULT 0");
+    ensureMatchColumn($db, 'p2_missed_heartbeats', "ALTER TABLE matches ADD COLUMN p2_missed_heartbeats INTEGER NOT NULL DEFAULT 0");
+    ensureMatchColumn($db, 'p1_disconnected_at', "ALTER TABLE matches ADD COLUMN p1_disconnected_at TEXT");
+    ensureMatchColumn($db, 'p2_disconnected_at', "ALTER TABLE matches ADD COLUMN p2_disconnected_at TEXT");
 }
 
 function ensureMatchColumn($db, $columnName, $alterSql) {
@@ -32,6 +48,87 @@ function ensureMatchColumn($db, $columnName, $alterSql) {
         if (isset($col['name']) && $col['name'] === $columnName) return;
     }
     $db->exec($alterSql);
+}
+
+function secondsSinceTimestamp($timestamp) {
+    if (!$timestamp) return null;
+    $ts = strtotime($timestamp . ' UTC');
+    if ($ts === false) return null;
+    return max(0, time() - $ts);
+}
+
+function applyMatchPresenceRules($db, $match) {
+    $id = (int)$match['id'];
+    $updates = [];
+    $stats = ['disconnect_marked' => 0, 'reconnected' => 0, 'timed_out' => 0, 'finished' => 0];
+
+    $players = [
+        [
+            'id_col' => 'player1_id',
+            'quit_col' => 'p1_quit',
+            'seen_col' => 'p1_last_seen_at',
+            'missed_col' => 'p1_missed_heartbeats',
+            'disc_col' => 'p1_disconnected_at',
+        ],
+        [
+            'id_col' => 'player2_id',
+            'quit_col' => 'p2_quit',
+            'seen_col' => 'p2_last_seen_at',
+            'missed_col' => 'p2_missed_heartbeats',
+            'disc_col' => 'p2_disconnected_at',
+        ],
+    ];
+
+    foreach ($players as $p) {
+        if (empty($match[$p['id_col']]) || (int)$match[$p['quit_col']] === 1) continue;
+
+        $inactiveFor = secondsSinceTimestamp($match[$p['seen_col']]);
+        $missed = $inactiveFor === null
+            ? MATCH_MISSED_HEARTBEAT_LIMIT
+            : (int)floor($inactiveFor / MATCH_HEARTBEAT_INTERVAL_SECONDS);
+        if ($missed < 0) $missed = 0;
+
+        $updates[$p['missed_col']] = $missed;
+
+        if ($missed >= MATCH_MISSED_HEARTBEAT_LIMIT) {
+            if (empty($match[$p['disc_col']])) {
+                $updates[$p['disc_col']] = gmdate('Y-m-d H:i:s');
+                $stats['disconnect_marked']++;
+            } else {
+                $discFor = secondsSinceTimestamp($match[$p['disc_col']]);
+                if ($discFor !== null && $discFor >= MATCH_RECONNECT_GRACE_SECONDS) {
+                    $updates[$p['quit_col']] = 1;
+                    $stats['timed_out']++;
+                }
+            }
+        } else {
+            if (!empty($match[$p['disc_col']])) $stats['reconnected']++;
+            $updates[$p['disc_col']] = null;
+        }
+    }
+
+    if (!empty($updates)) {
+        $setSql = [];
+        $params = [];
+        foreach ($updates as $col => $value) {
+            $setSql[] = "$col = ?";
+            $params[] = $value;
+        }
+        $params[] = $id;
+        $stmt = $db->prepare('UPDATE matches SET ' . implode(', ', $setSql) . ' WHERE id = ?');
+        $stmt->execute($params);
+    }
+
+    $shouldFinish = (isset($updates['p1_quit']) && (int)$updates['p1_quit'] === 1)
+        || (isset($updates['p2_quit']) && (int)$updates['p2_quit'] === 1)
+        || (int)$match['p1_quit'] === 1
+        || (int)$match['p2_quit'] === 1;
+    if ($shouldFinish && $match['status'] !== 'finished') {
+        $db->prepare("UPDATE matches SET status = 'finished' WHERE id = ?")->execute([$id]);
+        $stats['finished']++;
+    }
+
+    return $stats;
 }
 
 function cleanupStaleMatches() {
@@ -57,6 +154,17 @@ function cleanupStaleMatches() {
           AND (COALESCE(p1_quit, 0) = 1 OR COALESCE(p2_quit, 0) = 1)
           AND created_at < datetime('now', '-15 minutes')");
 
+    $stats = ['disconnect_marked' => 0, 'reconnected' => 0, 'timed_out' => 0, 'finished' => 0];
+    $rowsStmt = $db->query("SELECT * FROM matches WHERE status != 'finished'");
+    $rows = $rowsStmt ? $rowsStmt->fetchAll() : [];
+    foreach ($rows as $row) {
+        $s = applyMatchPresenceRules($db, $row);
+        $stats['disconnect_marked'] += (int)$s['disconnect_marked'];
+        $stats['reconnected'] += (int)$s['reconnected'];
+        $stats['timed_out'] += (int)$s['timed_out'];
+        $stats['finished'] += (int)$s['finished'];
+    }
+
     // Safety net: very old active matches should not block new rooms forever.
     $db->exec("UPDATE matches
         SET status = 'finished'
@@ -67,6 +175,7 @@ function cleanupStaleMatches() {
     $db->exec("DELETE FROM matches
         WHERE status = 'finished'
           AND created_at < datetime('now', '-14 days')");
+    return $stats;
 }
 
 function createMatch($startTitle, $endTitle, $userId) {
@@ -86,7 +195,7 @@ function createMatch($startTitle, $endTitle, $userId) {
     for ($attempt = 0; $attempt < 10; $attempt++) {
         $code = generateUniqueCode();
         try {
-            $stmt = $db->prepare('INSERT INTO matches (code, start_title, end_title, player1_id) VALUES (?, ?, ?, ?)');
+            $stmt = $db->prepare('INSERT INTO matches (code, start_title, end_title, player1_id, p1_last_seen_at) VALUES (?, ?, ?, ?, datetime(\'now\'))');
             $stmt->execute([$code, $startTitle, $endTitle, $userId]);
             return ['code' => $code, 'start_title' => $startTitle, 'end_title' => $endTitle];
         } catch (PDOException $e) {
@@ -111,6 +220,7 @@ function joinMatch($code, $userId) {
     if ($match['status'] === 'finished') return ['error' => 'Match is closed.'];
 
     if ($match['player1_id'] == $userId) {
+        touchMatchPresence($code, $userId);
         return [
             'code' => $match['code'],
             'start_title' => $match['start_title'],
@@ -125,10 +235,26 @@ function joinMatch($code, $userId) {
     }
 
     if ($match['status'] === 'waiting' && !$match['player2_id']) {
-        $stmt = $db->prepare('UPDATE matches SET player2_id = ? WHERE code = ? AND player2_id IS NULL');
-        $stmt->execute([$userId, $code]);
-        if ($stmt->rowCount() === 0) {
-            return ['error' => 'Match is full.'];
+        try {
+            $db->beginTransaction();
+            $freshStmt = $db->prepare('SELECT status, player2_id FROM matches WHERE code = ?');
+            $freshStmt->execute([$code]);
+            $fresh = $freshStmt->fetch();
+            if (!$fresh || $fresh['status'] !== 'waiting' || $fresh['player2_id']) {
+                if ($db->inTransaction()) $db->rollBack();
+                return ['error' => 'Match is full.'];
+            }
+
+            $stmt = $db->prepare('UPDATE matches SET player2_id = ?, p2_last_seen_at = datetime(\'now\') WHERE code = ? AND player2_id IS NULL');
+            $stmt->execute([$userId, $code]);
+            if ($stmt->rowCount() === 0) {
+                if ($db->inTransaction()) $db->rollBack();
+                return ['error' => 'Match is full.'];
+            }
+            $db->commit();
+        } catch (PDOException $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            throw $e;
         }
     }
 
@@ -166,14 +292,38 @@ function startMatch($code, $userId) {
     }
 
     if ($match['status'] !== 'active') {
-        $stmt = $db->prepare("UPDATE matches SET status = 'active' WHERE code = ? AND status = 'waiting'");
-        $stmt->execute([$code]);
+        try {
+            $db->beginTransaction();
+            $freshStmt = $db->prepare('SELECT status, player2_id FROM matches WHERE code = ?');
+            $freshStmt->execute([$code]);
+            $fresh = $freshStmt->fetch();
+            if (!$fresh) {
+                if ($db->inTransaction()) $db->rollBack();
+                return ['error' => 'Match not found.'];
+            }
+            if ($fresh['status'] === 'finished') {
+                if ($db->inTransaction()) $db->rollBack();
+                return ['error' => 'Match is already finished.'];
+            }
+            if (!$fresh['player2_id']) {
+                if ($db->inTransaction()) $db->rollBack();
+                return ['error' => 'Cannot start until opponent joins.'];
+            }
+
+            $stmt = $db->prepare("UPDATE matches SET status = 'active' WHERE code = ? AND status = 'waiting'");
+            $stmt->execute([$code]);
+            $db->commit();
+        } catch (PDOException $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            throw $e;
+        }
     }
 
     $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
     $stmt->execute([$code]);
     $updated = $stmt->fetch();
 
+    touchMatchPresence($code, $userId);
     return formatMatchResult($updated, $userId);
 }
 
@@ -192,27 +342,55 @@ function submitMatchResult($code, $userId, $clicks, $time, $path) {
     if ($match['status'] === 'waiting') return ['error' => 'Match has not started yet.'];
 
     $pathJson = json_encode(is_array($path) ? $path : []);
+    $safeClicks = max(0, (int)$clicks);
+    $safeTime = max(0, (int)$time);
 
-    if ($match['player1_id'] == $userId) {
-        $stmt = $db->prepare('UPDATE matches SET p1_clicks = ?, p1_time = ?, p1_path = ? WHERE code = ?');
-        $stmt->execute([$clicks, $time, $pathJson, $code]);
-    } elseif ($match['player2_id'] == $userId) {
-        $stmt = $db->prepare('UPDATE matches SET p2_clicks = ?, p2_time = ?, p2_path = ? WHERE code = ?');
-        $stmt->execute([$clicks, $time, $pathJson, $code]);
-    } else {
-        return ['error' => 'You are not in this match.'];
-    }
+    try {
+        $db->beginTransaction();
+        if ($match['player1_id'] == $userId) {
+            $stmt = $db->prepare("UPDATE matches SET p1_clicks = ?, p1_time = ?, p1_path = ?, p1_last_seen_at = datetime('now') WHERE code = ?");
+            $stmt->execute([$safeClicks, $safeTime, $pathJson, $code]);
+        } elseif ($match['player2_id'] == $userId) {
+            $stmt = $db->prepare("UPDATE matches SET p2_clicks = ?, p2_time = ?, p2_path = ?, p2_last_seen_at = datetime('now') WHERE code = ?");
+            $stmt->execute([$safeClicks, $safeTime, $pathJson, $code]);
+        } else {
+            if ($db->inTransaction()) $db->rollBack();
+            return ['error' => 'You are not in this match.'];
+        }
 
-    $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
-    $stmt->execute([$code]);
-    $updated = $stmt->fetch();
+        $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+        $stmt->execute([$code]);
+        $updated = $stmt->fetch();
 
-    if ($updated['p1_clicks'] !== null && $updated['p2_clicks'] !== null) {
-        $db->prepare('UPDATE matches SET status = \'finished\' WHERE code = ?')->execute([$code]);
-        $updated['status'] = 'finished';
+        if ($updated['p1_clicks'] !== null && $updated['p2_clicks'] !== null) {
+            $db->prepare('UPDATE matches SET status = \'finished\' WHERE code = ?')->execute([$code]);
+            $updated['status'] = 'finished';
+        }
+        $db->commit();
+    } catch (PDOException $e) {
+        if ($db->inTransaction()) $db->rollBack();
+        throw $e;
     }
 
     return formatMatchResult($updated, $userId);
+}
+
+function touchMatchPresence($code, $userId) {
+    ensureMatchTable();
+    $db = getDb();
+    $code = strtoupper(trim($code));
+    if (!$code) return;
+
+    $stmt = $db->prepare('SELECT player1_id, player2_id FROM matches WHERE code = ?');
+    $stmt->execute([$code]);
+    $match = $stmt->fetch();
+    if (!$match) return;
+
+    if ((int)$match['player1_id'] === (int)$userId) {
+        $db->prepare("UPDATE matches SET p1_last_seen_at = datetime('now'), p1_missed_heartbeats = 0, p1_disconnected_at = NULL WHERE code = ?")->execute([$code]);
+    } elseif ((int)$match['player2_id'] === (int)$userId) {
+        $db->prepare("UPDATE matches SET p2_last_seen_at = datetime('now'), p2_missed_heartbeats = 0, p2_disconnected_at = NULL WHERE code = ?")->execute([$code]);
+    }
 }
 
 function quitMatch($code, $userId) {
@@ -269,6 +447,7 @@ function getMatchStatus($code, $userId) {
         return ['error' => 'You are not in this match.'];
     }
 
+    touchMatchPresence($code, $userId);
     return formatMatchResult($match, $userId);
 }
 
@@ -373,6 +552,15 @@ function formatMatchResult($match, $userId) {
     ];
 
     $uid = (int)$userId;
+    $youMissed = $isP1 ? (int)$match['p1_missed_heartbeats'] : (int)$match['p2_missed_heartbeats'];
+    $oppMissed = $isP1 ? (int)$match['p2_missed_heartbeats'] : (int)$match['p1_missed_heartbeats'];
+    $youDisc = $isP1 ? $match['p1_disconnected_at'] : $match['p2_disconnected_at'];
+    $oppDisc = $isP1 ? $match['p2_disconnected_at'] : $match['p1_disconnected_at'];
+    $youGraceLeft = null;
+    $oppGraceLeft = null;
+    if ($youDisc) $youGraceLeft = max(0, MATCH_RECONNECT_GRACE_SECONDS - (secondsSinceTimestamp($youDisc) ?? MATCH_RECONNECT_GRACE_SECONDS));
+    if ($oppDisc) $oppGraceLeft = max(0, MATCH_RECONNECT_GRACE_SECONDS - (secondsSinceTimestamp($oppDisc) ?? MATCH_RECONNECT_GRACE_SECONDS));
+
     $result['you'] = [
         'username' => isset($names[$uid]) ? $names[$uid] : null,
         'clicks' => $isP1 ? $match['p1_clicks'] : $match['p2_clicks'],
@@ -380,6 +568,11 @@ function formatMatchResult($match, $userId) {
         'path' => json_decode($isP1 ? ($match['p1_path'] ?: '[]') : ($match['p2_path'] ?: '[]'), true),
         'submitted' => ($isP1 ? $match['p1_clicks'] : $match['p2_clicks']) !== null,
         'quit' => (bool)($isP1 ? $match['p1_quit'] : $match['p2_quit']),
+        'presence' => [
+            'missed_heartbeats' => $youMissed,
+            'is_in_reconnect_grace' => $youDisc !== null,
+            'grace_seconds_left' => $youGraceLeft,
+        ],
     ];
 
     $result['opponent'] = [
@@ -388,6 +581,17 @@ function formatMatchResult($match, $userId) {
         'time' => $isP1 ? $match['p2_time'] : $match['p1_time'],
         'submitted' => ($isP1 ? $match['p2_clicks'] : $match['p1_clicks']) !== null,
         'quit' => (bool)($isP1 ? $match['p2_quit'] : $match['p1_quit']),
+        'presence' => [
+            'missed_heartbeats' => $oppMissed,
+            'is_in_reconnect_grace' => $oppDisc !== null,
+            'grace_seconds_left' => $oppGraceLeft,
+        ],
+    ];
+
+    $result['presence_config'] = [
+        'heartbeat_interval_seconds' => MATCH_HEARTBEAT_INTERVAL_SECONDS,
+        'missed_heartbeat_limit' => MATCH_MISSED_HEARTBEAT_LIMIT,
+        'reconnect_grace_seconds' => MATCH_RECONNECT_GRACE_SECONDS,
     ];
 
     if ($match['status'] === 'finished') {
