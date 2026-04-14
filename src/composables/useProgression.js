@@ -166,7 +166,7 @@ export function useProgression() {
     return { base, total, multiplier: Math.round(finalMult * 100) / 100 }
   }
 
-  if (!xpCheatRegistered && typeof window !== 'undefined') {
+  if (!xpCheatRegistered && typeof window !== 'undefined' && import.meta.env.DEV) {
     window.__wikilinkAddXp = (amount = 1000, label = 'Cheat XP') => awardBonusXp(amount, label)
     xpCheatRegistered = true
   }

@@ -83,6 +83,14 @@ function updateProfileCustomization($userId, $iconId = null, $accentId = null, $
     $allowedTitles = ['newcomer', 'pathfinder', 'specialist', 'veteran', 'expert', 'master', 'grandmaster', 'legend'];
     $allowedBanners = ['default', 'matrix', 'sunset', 'royal'];
     $allowedNameplateBorders = ['default', 'dashed', 'double', 'glow'];
+    $iconMinLevel = ['rookie' => 1, 'compass' => 5, 'spark' => 10, 'crown' => 15, 'star' => 20];
+    $accentMinLevel = ['rank' => 1, 'neon' => 1, 'cyan' => 5, 'amber' => 10, 'purple' => 15];
+    $titleMinLevel = ['newcomer' => 1, 'pathfinder' => 5, 'specialist' => 10, 'veteran' => 15, 'expert' => 20, 'master' => 30, 'grandmaster' => 40, 'legend' => 50];
+    $bannerMinLevel = ['default' => 1, 'matrix' => 8, 'sunset' => 12, 'royal' => 18];
+    $nameplateMinLevel = ['default' => 1, 'dashed' => 10, 'double' => 18, 'glow' => 25];
+
+    $db = getDb();
+    $cosmeticLevel = getUserCosmeticLevel($db, (int)$userId);
 
     $sets = [];
     $values = [];
@@ -91,6 +99,9 @@ function updateProfileCustomization($userId, $iconId = null, $accentId = null, $
         $iconId = strtolower(trim((string)$iconId));
         if (!in_array($iconId, $allowedIcons, true)) {
             return ['error' => 'Invalid profile icon.'];
+        }
+        if ($cosmeticLevel < ($iconMinLevel[$iconId] ?? 1)) {
+            return ['error' => 'This profile icon is not unlocked yet.'];
         }
         $sets[] = 'profile_icon = ?';
         $values[] = $iconId;
@@ -101,6 +112,9 @@ function updateProfileCustomization($userId, $iconId = null, $accentId = null, $
         if (!in_array($accentId, $allowedAccents, true)) {
             return ['error' => 'Invalid profile accent.'];
         }
+        if ($cosmeticLevel < ($accentMinLevel[$accentId] ?? 1)) {
+            return ['error' => 'This profile accent is not unlocked yet.'];
+        }
         $sets[] = 'profile_accent = ?';
         $values[] = $accentId;
     }
@@ -108,6 +122,9 @@ function updateProfileCustomization($userId, $iconId = null, $accentId = null, $
         $titleId = strtolower(trim((string)$titleId));
         if (!in_array($titleId, $allowedTitles, true)) {
             return ['error' => 'Invalid profile title.'];
+        }
+        if ($cosmeticLevel < ($titleMinLevel[$titleId] ?? 1)) {
+            return ['error' => 'This profile title is not unlocked yet.'];
         }
         $sets[] = 'profile_title = ?';
         $values[] = $titleId;
@@ -117,6 +134,9 @@ function updateProfileCustomization($userId, $iconId = null, $accentId = null, $
         if (!in_array($bannerId, $allowedBanners, true)) {
             return ['error' => 'Invalid profile banner.'];
         }
+        if ($cosmeticLevel < ($bannerMinLevel[$bannerId] ?? 1)) {
+            return ['error' => 'This profile banner is not unlocked yet.'];
+        }
         $sets[] = 'profile_banner = ?';
         $values[] = $bannerId;
     }
@@ -124,6 +144,9 @@ function updateProfileCustomization($userId, $iconId = null, $accentId = null, $
         $nameplateBorderId = strtolower(trim((string)$nameplateBorderId));
         if (!in_array($nameplateBorderId, $allowedNameplateBorders, true)) {
             return ['error' => 'Invalid profile nameplate border.'];
+        }
+        if ($cosmeticLevel < ($nameplateMinLevel[$nameplateBorderId] ?? 1)) {
+            return ['error' => 'This profile nameplate border is not unlocked yet.'];
         }
         $sets[] = 'profile_nameplate_border = ?';
         $values[] = $nameplateBorderId;
@@ -133,6 +156,22 @@ function updateProfileCustomization($userId, $iconId = null, $accentId = null, $
         if (strlen($pinnedBadgeId) > 64) {
             return ['error' => 'Pinned badge id is too long.'];
         }
+        if ($pinnedBadgeId !== '') {
+            $statsStmt = $db->prepare('SELECT stats_json FROM user_stats WHERE user_id = ?');
+            $statsStmt->execute([(int)$userId]);
+            $statsRow = $statsStmt->fetch();
+            $stats = $statsRow ? (json_decode($statsRow['stats_json'], true) ?: ['modes' => [], 'genres' => []]) : ['modes' => [], 'genres' => []];
+            $dailyStmt = $db->prepare('SELECT COUNT(*) as total FROM daily_scores WHERE user_id = ?');
+            $dailyStmt->execute([(int)$userId]);
+            $dailyCompletions = (int)($dailyStmt->fetch()['total'] ?? 0);
+            $streak = function_exists('getUserDailyStreak') ? (int)getUserDailyStreak((int)$userId) : 0;
+            $unlockedIds = function_exists('getPublicAchievementIds')
+                ? getPublicAchievementIds($stats, $streak, $dailyCompletions)
+                : [];
+            if (!in_array($pinnedBadgeId, $unlockedIds, true)) {
+                return ['error' => 'Pinned badge is not unlocked.'];
+            }
+        }
         $sets[] = 'profile_pinned_badge = ?';
         $values[] = $pinnedBadgeId;
     }
@@ -141,7 +180,6 @@ function updateProfileCustomization($userId, $iconId = null, $accentId = null, $
         return ['error' => 'No customization changes provided.'];
     }
 
-    $db = getDb();
     $values[] = (int)$userId;
     $sql = 'UPDATE users SET ' . implode(', ', $sets) . ' WHERE id = ?';
     $db->prepare($sql)->execute($values);
@@ -158,6 +196,22 @@ function updateProfileCustomization($userId, $iconId = null, $accentId = null, $
         'profile_nameplate_border' => ($row['profile_nameplate_border'] ?? 'default') ?: 'default',
         'profile_pinned_badge' => isset($row['profile_pinned_badge']) ? $row['profile_pinned_badge'] : '',
     ];
+}
+
+function getUserCosmeticLevel($db, $userId) {
+    $statsStmt = $db->prepare('SELECT stats_json FROM user_stats WHERE user_id = ?');
+    $statsStmt->execute([(int)$userId]);
+    $statsRow = $statsStmt->fetch();
+    $stats = $statsRow ? (json_decode($statsRow['stats_json'], true) ?: ['modes' => []]) : ['modes' => []];
+    $totalWins = 0;
+    foreach (($stats['modes'] ?? []) as $m) {
+        $totalWins += (int)($m['gamesWon'] ?? 0);
+    }
+    $dailyStmt = $db->prepare('SELECT COUNT(*) as total FROM daily_scores WHERE user_id = ?');
+    $dailyStmt->execute([(int)$userId]);
+    $dailyCompletions = (int)($dailyStmt->fetch()['total'] ?? 0);
+    $estimatedLevel = 1 + (int)floor($totalWins / 2) + (int)floor($dailyCompletions / 5);
+    return max(1, min(50, $estimatedLevel));
 }
 
 function changePassword($userId, $sessionId, $currentPassword, $newPassword) {

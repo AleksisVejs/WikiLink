@@ -513,7 +513,7 @@ export function useGame() {
     return true
   }
 
-  if (!dailyCheatRegistered && typeof window !== 'undefined') {
+  if (!dailyCheatRegistered && typeof window !== 'undefined' && import.meta.env.DEV) {
     window.__wikilinkDailyWin = (clicks = 3, time = 30, submitToServer = true) =>
       cheatDailyResult(clicks, time, submitToServer)
     dailyCheatRegistered = true
