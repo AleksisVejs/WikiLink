@@ -583,6 +583,20 @@ if ($method === 'POST' && $uri === '/friends/game-invite') {
     jsonResponse($result, isset($result['error']) ? 400 : 200);
 }
 
+// POST /friends/room-invite
+if ($method === 'POST' && $uri === '/friends/room-invite') {
+    $user = requireAuth();
+    requireRateLimit('friend_game_invite', 20, 300);
+    $body = jsonInput();
+    $result = createRoomInvite(
+        $user['id'],
+        isset($body['username']) ? $body['username'] : '',
+        isset($body['roomType']) ? $body['roomType'] : 'match',
+        isset($body['roomCode']) ? $body['roomCode'] : ''
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
 // GET /friends/game-invites
 if ($method === 'GET' && $uri === '/friends/game-invites') {
     $user = requireAuth();

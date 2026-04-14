@@ -130,6 +130,25 @@
                 </div>
                 <div v-else class="font-mono text-[10px] text-crt-amber/80 animate-blink-slow">Waiting for host to start...</div>
               </div>
+              <div v-if="canInviteFriends && groupLobbyData?.is_host" class="mt-3 rounded-lg px-3 py-2.5 text-left" style="background: #12131c; border: 1px solid #252738;">
+                <div class="font-pixel text-[6px] text-retro-muted tracking-wider mb-2">INVITE FRIEND TO LOBBY</div>
+                <div class="flex items-center gap-2">
+                  <select v-model="selectedGroupInviteFriend" class="min-w-0 flex-1 px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white">
+                    <option value="">Select friend</option>
+                    <option v-for="f in friends" :key="`group-friend-${f.friend_user_id}`" :value="f.username">{{ f.username }}</option>
+                  </select>
+                  <button
+                    type="button"
+                    @click="$emit('invite-friend-to-group', selectedGroupInviteFriend)"
+                    :disabled="inviteBusy || !selectedGroupInviteFriend"
+                    class="px-3 py-1.5 rounded-lg font-pixel text-[8px] tracking-[0.12em] transition-all disabled:opacity-40"
+                    style="background: rgba(0,229,255,0.08); border: 1.5px solid rgba(0,229,255,0.35); color: #00e5ff;"
+                  >
+                    {{ inviteBusy ? '...' : 'INVITE' }}
+                  </button>
+                </div>
+                <p v-if="inviteError" class="font-mono text-[10px] text-crt-red mt-1.5">{{ inviteError }}</p>
+              </div>
               <div v-if="groupError" class="font-mono text-[11px] text-crt-red mt-2">{{ groupError }}</div>
             </div>
           </template>
@@ -264,6 +283,25 @@
                   HOST STARTS
                 </button>
               </div>
+              <div v-if="canInviteFriends && matchCode" class="mt-3 rounded-lg px-3 py-2.5 text-left" style="background: #12131c; border: 1px solid #252738;">
+                <div class="font-pixel text-[6px] text-retro-muted tracking-wider mb-2">INVITE FRIEND TO 1v1</div>
+                <div class="flex items-center gap-2">
+                  <select v-model="selectedMatchInviteFriend" class="min-w-0 flex-1 px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white">
+                    <option value="">Select friend</option>
+                    <option v-for="f in friends" :key="`match-friend-${f.friend_user_id}`" :value="f.username">{{ f.username }}</option>
+                  </select>
+                  <button
+                    type="button"
+                    @click="$emit('invite-friend-to-match', selectedMatchInviteFriend)"
+                    :disabled="inviteBusy || !selectedMatchInviteFriend"
+                    class="px-3 py-1.5 rounded-lg font-pixel text-[8px] tracking-[0.12em] transition-all disabled:opacity-40"
+                    style="background: rgba(180,76,255,0.08); border: 1.5px solid rgba(180,76,255,0.35); color: #b44cff;"
+                  >
+                    {{ inviteBusy ? '...' : 'INVITE' }}
+                  </button>
+                </div>
+                <p v-if="inviteError" class="font-mono text-[10px] text-crt-red mt-1.5">{{ inviteError }}</p>
+              </div>
             </div>
           </template>
 
@@ -321,6 +359,11 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
+
+const selectedMatchInviteFriend = ref('')
+const selectedGroupInviteFriend = ref('')
+
 defineProps({
   open: { type: Boolean, required: true },
   matchTab: { type: String, required: true },
@@ -347,6 +390,10 @@ defineProps({
   roomGenres: { type: Array, default: () => [] },
   roomModes: { type: Array, default: () => [] },
   roomModifiers: { type: Array, default: () => [] },
+  friends: { type: Array, default: () => [] },
+  inviteBusy: { type: Boolean, default: false },
+  inviteError: { type: String, default: '' },
+  canInviteFriends: { type: Boolean, default: false },
 })
 
 defineEmits([
@@ -365,5 +412,7 @@ defineEmits([
   'update-room-settings',
   'toggle-room-modifier',
   'save-room-settings',
+  'invite-friend-to-match',
+  'invite-friend-to-group',
 ])
 </script>

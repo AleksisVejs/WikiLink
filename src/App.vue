@@ -48,7 +48,8 @@
               <h2 class="font-pixel text-[9px] text-crt-cyan tracking-[0.2em]">GAME INVITE</h2>
             </div>
             <p class="font-mono text-xs text-retro-muted mb-4">
-              <span class="text-crt-cyan">{{ incomingInvite.sender_username }}</span> invited you to a 1v1 match.
+              <span class="text-crt-cyan">{{ incomingInvite.sender_username }}</span>
+              invited you to a {{ incomingInvite.invite_type === 'lobby' ? 'group lobby' : '1v1 match' }}.
             </p>
             <div class="flex gap-2">
               <button :disabled="inviteActionLoading" @click="respondToInvite('deny')" class="btn-retro-ghost flex-1 !py-2 !text-[9px]">DENY</button>
@@ -104,12 +105,20 @@ async function respondToInvite(action) {
     })
     const acceptedInvite = incomingInvite.value
     incomingInvite.value = null
-    if (action === 'accept' && result.match) {
-      toast.success(`Joining ${acceptedInvite.sender_username}'s 1v1...`)
-      router.push({
-        name: 'home',
-        query: { inviteMatch: result.match.code },
-      })
+    if (action === 'accept' && (result.match || result.lobby)) {
+      if (result.lobby) {
+        toast.success(`Joining ${acceptedInvite.sender_username}'s lobby...`)
+        router.push({
+          name: 'home',
+          query: { inviteLobby: result.lobby.code },
+        })
+      } else {
+        toast.success(`Joining ${acceptedInvite.sender_username}'s 1v1...`)
+        router.push({
+          name: 'home',
+          query: { inviteMatch: result.match.code },
+        })
+      }
     } else {
       toast.info(`Invite from ${acceptedInvite.sender_username} declined.`)
     }

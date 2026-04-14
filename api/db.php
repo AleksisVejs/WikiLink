@@ -111,6 +111,18 @@ function initSchema($db) {
     foreach ($statements as $sql) {
         $db->exec($sql);
     }
+
+    // Lightweight migration for room-based invites.
+    $inviteColumns = [];
+    foreach ($db->query("PRAGMA table_info(game_invites)") as $col) {
+        $inviteColumns[$col['name']] = true;
+    }
+    if (!isset($inviteColumns['invite_type'])) {
+        $db->exec("ALTER TABLE game_invites ADD COLUMN invite_type TEXT NOT NULL DEFAULT 'match'");
+    }
+    if (!isset($inviteColumns['room_code'])) {
+        $db->exec("ALTER TABLE game_invites ADD COLUMN room_code TEXT");
+    }
 }
 
 function generateUniqueCode($length = 6) {

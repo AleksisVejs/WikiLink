@@ -78,7 +78,9 @@
         <!-- Daily challenge banner -->
         <div v-if="!dailyCompleted" class="mb-3 sm:mb-4 animate-slide-up">
           <button @click="startDaily"
+                  :disabled="hasActiveMultiplayerSession"
                   class="daily-banner w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group touch-manipulation relative overflow-hidden"
+                  :class="{ 'opacity-50 cursor-not-allowed': hasActiveMultiplayerSession }"
                   style="background: linear-gradient(135deg, rgba(255,191,0,0.06), rgba(255,107,43,0.03)); border: 1.5px solid rgba(255,191,0,0.2);">
             <div class="absolute top-0 left-0 right-0 h-[1px]" style="background: linear-gradient(90deg, transparent, rgba(255,191,0,0.3), transparent);"></div>
             <div class="flex items-center gap-3 min-w-0">
@@ -430,8 +432,13 @@
                  style="background: rgba(85,87,112,0.04); border: 1px solid rgba(85,87,112,0.15);">
               <span class="font-mono text-[10px] text-retro-muted/50">No XP in this mode</span>
             </div>
-            <button type="button" @click="startGame" class="btn-retro-primary w-full sm:w-auto sm:min-w-[260px] min-h-[48px] sm:min-h-0 touch-manipulation text-[11px]">
-              START GAME
+            <button
+              type="button"
+              @click="startGame"
+              :disabled="hasActiveMultiplayerSession"
+              class="btn-retro-primary w-full sm:w-auto sm:min-w-[260px] min-h-[48px] sm:min-h-0 touch-manipulation text-[11px] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {{ hasActiveMultiplayerSession ? 'LEAVE MULTIPLAYER TO START' : 'START GAME' }}
             </button>
             <div class="mt-3 flex items-center justify-center gap-2.5">
               <span class="w-1.5 h-1.5 rounded-full bg-crt-green/40 animate-blink"></span>
@@ -530,6 +537,10 @@
       :room-genres="genres.map(g => ({ id: g.id, name: g.shortName }))"
       :room-modes="displayModes.filter(m => ['custom','classic','sprint','challenge'].includes(m.id)).map(m => ({ id: m.id, name: m.name }))"
       :room-modifiers="filteredModifiers.map(m => ({ id: m.id, name: m.name, description: m.description || '' }))"
+      :friends="friendsComposable.friends.value"
+      :invite-busy="multiplayerInviteLoading"
+      :invite-error="multiplayerInviteError"
+      :can-invite-friends="canInviteFriends"
       @close="closeMatchModal"
       @copy-group-code="copyGroupLobbyCode"
       @start-group="postStartGroupLobby"
@@ -545,6 +556,8 @@
       @update-room-settings="updateRoomSettingsDraft"
       @toggle-room-modifier="toggleRoomModifier"
       @save-room-settings="saveRoomSettings"
+      @invite-friend-to-match="inviteFriendToCurrentMatch"
+      @invite-friend-to-group="inviteFriendToCurrentLobby"
     />
 
     <HomeHowToModal :open="showHowTo" @close="showHowTo = false" />
@@ -563,6 +576,7 @@ import { useTrending } from '../composables/useTrending'
 import { useProgression } from '../composables/useProgression'
 import { useAchievements } from '../composables/useAchievements'
 import { useWikipedia } from '../composables/useWikipedia'
+import { useFriends } from '../composables/useFriends'
 import WikiTitleInput from '../components/WikiTitleInput.vue'
 import SiteTopNav from '../components/layout/SiteTopNav.vue'
 import HomeAuthModal from '../components/home/HomeAuthModal.vue'
@@ -583,6 +597,7 @@ const trending = useTrending()
 const progression = useProgression()
 const achievements = useAchievements()
 const wiki = useWikipedia()
+const friendsComposable = useFriends()
 
 const showStats = ref(false)
 const showAuthModal = ref(false)
@@ -651,6 +666,8 @@ const lastSeenMatchSettingsSignature = ref('')
 const lastSeenLobbySettingsSignature = ref('')
 let roomSettingsAutosaveTimer = null
 const roomSettingsAutosaveRetry = ref(false)
+const multiplayerInviteLoading = ref(false)
+const multiplayerInviteError = ref('')
 
 const genres = Object.values(GENRES)
 const modifierList = Object.values(MODIFIERS)
@@ -731,6 +748,7 @@ const unifiedJoinError = computed(() => matchError.value || groupError.value || 
 const showLeaveCurrentRoomButton = computed(() =>
   unifiedJoinError.value.toLowerCase().includes('already in another')
 )
+const hasActiveMultiplayerSession = computed(() => !!resumeMultiplayerSession.value)
 const resumeSprintRemaining = computed(() => {
   const saved = resumeMultiplayerSession.value
   const snap = saved?.snapshot
@@ -754,6 +772,7 @@ const canEditRoomSettings = computed(() => {
   const isStillWaiting = matchStatus.value === 'waiting' || matchStatus.value === 'ready'
   return isHostRoom && isStillWaiting
 })
+const canInviteFriends = computed(() => !!auth.user.value && friendsComposable.friends.value.length > 0)
 
 function toggleModifier(id) {
   const idx = activeModifiers.value.indexOf(id)
@@ -916,6 +935,10 @@ function shareDailyResult() {
 }
 
 function startGame() {
+  if (hasActiveMultiplayerSession.value) {
+    toast.warn('Leave your multiplayer room before starting a solo game.')
+    return
+  }
   if (selectedModeId.value === 'custom') {
     const a = customStartTitle.value.trim()
     const b = customEndTitle.value.trim()
@@ -937,7 +960,14 @@ function startGame() {
   router.push({ name: 'game', params: { mode: selectedModeId.value }, query })
 }
 
-function startDaily() { sound.playStart(); router.push({ name: 'game', params: { mode: 'daily' } }) }
+function startDaily() {
+  if (hasActiveMultiplayerSession.value) {
+    toast.warn('Leave your multiplayer room before starting a solo game.')
+    return
+  }
+  sound.playStart()
+  router.push({ name: 'game', params: { mode: 'daily' } })
+}
 
 async function refreshResumeSession() {
   const saved = loadMultiplayerSession()
@@ -1383,6 +1413,30 @@ async function joinInvitedMatchFromRoute() {
   }
 }
 
+async function joinInvitedLobbyFromRoute() {
+  const inviteCodeRaw = typeof route.query.inviteLobby === 'string' ? route.query.inviteLobby : ''
+  const inviteCode = inviteCodeRaw.trim().toUpperCase()
+  if (!inviteCode || handlingInviteJoin) return
+  if (!auth.user.value) {
+    showAuthModal.value = true
+    toast.warn('Login required to join the invite')
+    return
+  }
+
+  handlingInviteJoin = true
+  showMatchModal.value = true
+  matchTab.value = 'group'
+  joinRoomCode.value = inviteCode
+  try {
+    await joinByCode('lobby')
+  } finally {
+    const nextQuery = { ...route.query }
+    delete nextQuery.inviteLobby
+    router.replace({ name: 'home', query: nextQuery })
+    handlingInviteJoin = false
+  }
+}
+
 async function openHostedMatchFromRoute() {
   const hostCodeRaw = typeof route.query.hostMatch === 'string' ? route.query.hostMatch : ''
   const hostCode = hostCodeRaw.trim().toUpperCase()
@@ -1396,6 +1450,33 @@ async function openHostedMatchFromRoute() {
   handlingHostMatch = true
   replayMatchWaitingMode.value = false
   replayLobbyWaitingMode.value = false
+  matchLoading.value = true
+  matchError.value = ''
+  groupError.value = ''
+
+  try {
+    const existing = await api.get(`/match/${hostCode}`)
+    if (!existing || existing.error || existing.status === 'finished' || existing.you?.quit) {
+      toast.info('That match is already closed. Create a new one.')
+      const nextQuery = { ...route.query }
+      delete nextQuery.hostMatch
+      delete nextQuery.hostInviteId
+      delete nextQuery.hostInviteUser
+      router.replace({ name: 'home', query: nextQuery })
+      return
+    }
+  } catch {
+    toast.info('That match is no longer available. Create a new one.')
+    const nextQuery = { ...route.query }
+    delete nextQuery.hostMatch
+    delete nextQuery.hostInviteId
+    delete nextQuery.hostInviteUser
+    router.replace({ name: 'home', query: nextQuery })
+    return
+  } finally {
+    matchLoading.value = false
+  }
+
   showMatchModal.value = true
   matchTab.value = 'waiting'
   matchCode.value = hostCode
@@ -1510,6 +1591,52 @@ async function leaveCurrentMultiplayerRoom() {
   }
 }
 
+async function inviteFriendToCurrentMatch(username) {
+  const code = (matchCode.value || joinedMatchCode.value || '').trim().toUpperCase()
+  const targetUsername = (username || '').trim()
+  if (!code || !targetUsername) return
+  multiplayerInviteLoading.value = true
+  multiplayerInviteError.value = ''
+  try {
+    const result = await api.post('/friends/room-invite', {
+      username: targetUsername,
+      roomType: 'match',
+      roomCode: code,
+    })
+    if (result?.error) throw new Error(result.error)
+    toast.success(`Invite sent to ${targetUsername}`)
+  } catch (e) {
+    const message = e?.message || 'Could not send invite'
+    multiplayerInviteError.value = message
+    toast.error(message)
+  } finally {
+    multiplayerInviteLoading.value = false
+  }
+}
+
+async function inviteFriendToCurrentLobby(username) {
+  const code = (groupLobbyCode.value || '').trim().toUpperCase()
+  const targetUsername = (username || '').trim()
+  if (!code || !targetUsername) return
+  multiplayerInviteLoading.value = true
+  multiplayerInviteError.value = ''
+  try {
+    const result = await api.post('/friends/room-invite', {
+      username: targetUsername,
+      roomType: 'lobby',
+      roomCode: code,
+    })
+    if (result?.error) throw new Error(result.error)
+    toast.success(`Invite sent to ${targetUsername}`)
+  } catch (e) {
+    const message = e?.message || 'Could not send invite'
+    multiplayerInviteError.value = message
+    toast.error(message)
+  } finally {
+    multiplayerInviteLoading.value = false
+  }
+}
+
 async function closeMatchModal() {
   const hasOpenRoom = !!(matchCode.value || joinedMatchCode.value || groupLobbyCode.value)
   if (hasOpenRoom && auth.user.value) {
@@ -1527,6 +1654,7 @@ async function closeMatchModal() {
   showMatchModal.value = false
   replayMatchWaitingMode.value = false
   replayLobbyWaitingMode.value = false
+  multiplayerInviteError.value = ''
 }
 
 function startCreatedMatch() {
@@ -1598,12 +1726,14 @@ watch(showMatchModal, (val) => {
     }
     replayMatchWaitingMode.value = false
     replayLobbyWaitingMode.value = false
+    multiplayerInviteError.value = ''
     resetGroupLobbyUi()
   }
 })
 watch(authMode, () => { authError.value = ''; authConfirmPassword.value = ''; showPassword.value = false; showConfirmPassword.value = false })
 watch(() => auth.user.value?.id, () => {
   refreshResumeSession()
+  if (auth.user.value) friendsComposable.fetchFriends()
 })
 
 onMounted(() => {
@@ -1612,9 +1742,11 @@ onMounted(() => {
   api.get('/daily/leaderboard').then(d => dailyLeaderboard.value = d.scores || []).catch(() => {})
   trending.fetchTrending()
   refreshResumeSession()
+  if (auth.user.value) friendsComposable.fetchFriends()
   openReplayRoomFromRoute()
   openHostedMatchFromRoute()
   joinInvitedMatchFromRoute()
+  joinInvitedLobbyFromRoute()
   resumeTicker = setInterval(() => {
     resumeNowMs.value = Date.now()
   }, 1000)
@@ -1643,6 +1775,12 @@ watch(
   () => [route.query.inviteMatch, auth.user.value?.id],
   () => {
     joinInvitedMatchFromRoute()
+  }
+)
+watch(
+  () => [route.query.inviteLobby, auth.user.value?.id],
+  () => {
+    joinInvitedLobbyFromRoute()
   }
 )
 watch(
