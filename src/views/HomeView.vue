@@ -1,83 +1,21 @@
 <template>
   <div class="relative min-h-screen flex flex-col">
 
-    <!-- Top bar -->
-    <header class="relative z-20 glass-header shrink-0">
-      <div class="max-w-6xl mx-auto px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between gap-3">
-
-        <!-- Brand -->
-        <router-link to="/" class="flex items-center gap-2.5 shrink-0 group">
-          <img src="/favicon.svg" alt="WikiLink" class="w-8 h-8 sm:w-9 sm:h-9 drop-shadow-[0_0_8px_rgba(57,255,20,0.3)] group-hover:drop-shadow-[0_0_12px_rgba(57,255,20,0.5)] transition-all" />
-          <span class="font-pixel text-[8px] sm:text-[9px] text-crt-white/80 tracking-wider hidden sm:block">WIKILINK</span>
-        </router-link>
-
-        <!-- Right controls -->
-        <div class="flex items-center gap-1.5 sm:gap-2.5">
-
-          <!-- Utility group: Help, Stats, Sound -->
-          <div class="site-nav-group">
-            <button @click="showHowTo = true" class="site-nav-icon-btn" title="How to play">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.065 2.05-1.822 3.772-1.822 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-            <button @click="showStats = true" class="site-nav-icon-btn" title="Stats">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </button>
-            <button @click="sound.toggleMute()" class="site-nav-icon-btn" :title="sound.muted.value ? 'Unmute' : 'Mute'">
-              <svg v-if="!sound.muted.value" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M12 6l-4 4H4v4h4l4 4V6z" />
-              </svg>
-              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-              </svg>
-            </button>
-          </div>
-
-          <!-- User section -->
-          <template v-if="auth.user.value">
-            <div class="site-nav-user">
-              <div class="flex items-center gap-1.5 px-1 sm:px-1.5" title="Your level">
-                <span class="font-pixel text-[7px] sm:text-[8px] text-crt-green/70">LV</span>
-                <span class="font-terminal text-sm text-crt-green leading-none">{{ progression.level.value }}</span>
-              </div>
-              <div class="w-px h-4 bg-retro-border/30"></div>
-              <router-link to="/profile" class="site-nav-profile-link" title="Profile">
-                <div class="site-nav-avatar">
-                  {{ auth.user.value.username?.charAt(0).toUpperCase() }}
-                </div>
-                <span class="font-mono text-[10px] sm:text-[11px] text-retro-light hidden sm:inline truncate max-w-[100px]">{{ auth.user.value.username }}</span>
-              </router-link>
-              <div class="w-px h-4 bg-retro-border/30 hidden sm:block"></div>
-              <button @click="auth.logout()" class="site-nav-icon-btn site-nav-icon-btn--dim" title="Logout">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
-            </div>
-          </template>
-          <button v-else @click="showAuthModal = true" class="site-nav-login-btn">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <span class="font-mono text-[10px] sm:text-[11px] tracking-wider">SIGN IN</span>
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <!-- XP Progress Bar -->
-    <div class="relative z-20 px-4 sm:px-5 max-w-6xl mx-auto w-full">
-      <div class="xp-bar mt-1">
-        <div class="xp-bar-fill" :style="{ width: (progression.progress.value * 100) + '%' }"></div>
-      </div>
-      <div class="flex items-center justify-between mt-0.5 mb-0">
-        <span class="font-mono text-[8px] text-retro-muted">{{ progression.currentXp.value }} / {{ progression.nextLevelXp.value }} XP</span>
-        <span class="font-mono text-[8px] text-crt-green">Level {{ progression.level.value }}</span>
-      </div>
-    </div>
+    <SiteTopNav
+      :user="auth.user.value"
+      :level="progression.level.value"
+      :current-xp="progression.currentXp.value"
+      :next-level-xp="progression.nextLevelXp.value"
+      :xp-percent="progression.progress.value * 100"
+      :show-xp-bar="true"
+      :show-utility-controls="true"
+      :muted="sound.muted.value"
+      @open-howto="showHowTo = true"
+      @open-stats="showStats = true"
+      @toggle-mute="sound.toggleMute()"
+      @login="showAuthModal = true"
+      @logout="auth.logout()"
+    />
 
     <!-- Main -->
     <main class="flex-1 flex flex-col items-center justify-center min-h-0 px-3 sm:px-4 py-3 sm:py-5 md:py-6 relative z-10">
@@ -310,6 +248,9 @@
                 </div>
                 <p class="font-mono text-[10px] sm:text-[11px] text-retro-muted truncate mt-0.5">
                   Code: {{ resumeMultiplayerSession.code }}
+                </p>
+                <p v-if="resumeSprintRemaining !== null" class="font-mono text-[10px] sm:text-[11px] text-crt-amber mt-0.5">
+                  Sprint left: {{ formatTime(resumeSprintRemaining) }}
                 </p>
               </div>
             </div>
@@ -583,6 +524,12 @@
       :join-busy="joinBusy"
       :unified-join-error="unifiedJoinError"
       :show-leave-current-room-button="showLeaveCurrentRoomButton"
+      :room-settings="editableRoomSettings"
+      :can-edit-room-settings="canEditRoomSettings"
+      :room-settings-saving="roomSettingsSaving"
+      :room-genres="genres.map(g => ({ id: g.id, name: g.shortName }))"
+      :room-modes="displayModes.filter(m => ['custom','classic','sprint','challenge'].includes(m.id)).map(m => ({ id: m.id, name: m.name }))"
+      :room-modifiers="filteredModifiers.map(m => ({ id: m.id, name: m.name, description: m.description || '' }))"
       @close="closeMatchModal"
       @copy-group-code="copyGroupLobbyCode"
       @start-group="postStartGroupLobby"
@@ -595,6 +542,9 @@
       @update:join-room-code="joinRoomCode = $event"
       @join-by-code="joinByCode"
       @leave-current-room="leaveCurrentMultiplayerRoom"
+      @update-room-settings="updateRoomSettingsDraft"
+      @toggle-room-modifier="toggleRoomModifier"
+      @save-room-settings="saveRoomSettings"
     />
 
     <HomeHowToModal :open="showHowTo" @close="showHowTo = false" />
@@ -614,6 +564,7 @@ import { useProgression } from '../composables/useProgression'
 import { useAchievements } from '../composables/useAchievements'
 import { useWikipedia } from '../composables/useWikipedia'
 import WikiTitleInput from '../components/WikiTitleInput.vue'
+import SiteTopNav from '../components/layout/SiteTopNav.vue'
 import HomeAuthModal from '../components/home/HomeAuthModal.vue'
 import HomeHowToModal from '../components/home/HomeHowToModal.vue'
 import HomeStatsModal from '../components/home/HomeStatsModal.vue'
@@ -648,6 +599,8 @@ const globalStats = ref(null)
 const dailyLeaderboard = ref([])
 const showDailyLeaderboard = ref(false)
 const resumeMultiplayerSession = ref(null)
+const resumeNowMs = ref(Date.now())
+let resumeTicker = null
 
 const selectedGenreId = ref('random')
 const selectedModeId = ref('classic')
@@ -665,6 +618,8 @@ const matchLoading = ref(false)
 const matchError = ref('')
 const matchStatus = ref(null)
 const matchOpponentUsername = ref('')
+const replayMatchWaitingMode = ref(false)
+const replayLobbyWaitingMode = ref(false)
 const joinedMatchCode = ref('')
 const matchOpponentLeftNotified = ref(false)
 let matchPollTimer = null
@@ -681,6 +636,21 @@ const groupLoading = ref(false)
 const groupStartLoading = ref(false)
 const groupError = ref('')
 let groupPollTimer = null
+const editableRoomSettings = ref({
+  mode: 'custom',
+  genre: 'random',
+  modifiers: [],
+  timeLimit: 120,
+  clickLimit: 6,
+  customStartTitle: '',
+  customEndTitle: '',
+})
+const roomSettingsSaving = ref(false)
+const roomSettingsDirty = ref(false)
+const lastSeenMatchSettingsSignature = ref('')
+const lastSeenLobbySettingsSignature = ref('')
+let roomSettingsAutosaveTimer = null
+const roomSettingsAutosaveRetry = ref(false)
 
 const genres = Object.values(GENRES)
 const modifierList = Object.values(MODIFIERS)
@@ -761,12 +731,122 @@ const unifiedJoinError = computed(() => matchError.value || groupError.value || 
 const showLeaveCurrentRoomButton = computed(() =>
   unifiedJoinError.value.toLowerCase().includes('already in another')
 )
+const resumeSprintRemaining = computed(() => {
+  const saved = resumeMultiplayerSession.value
+  const snap = saved?.snapshot
+  if (!saved || !snap) return null
+  if (snap.mode !== 'sprint') return null
+  if (!Number.isFinite(snap.effectiveTimeLimit)) return null
+  const baseElapsed = Number.isFinite(snap.elapsed) ? snap.elapsed : 0
+  const savedAt = Number.isFinite(snap.savedAt)
+    ? snap.savedAt
+    : (Number.isFinite(saved.updatedAt) ? saved.updatedAt : null)
+  const ageSec = (snap.status === 'playing' && savedAt != null)
+    ? Math.max(0, Math.floor((resumeNowMs.value - savedAt) / 1000))
+    : 0
+  const speedPenalty = Number.isFinite(snap.speedDecayPenalty) ? snap.speedDecayPenalty : 0
+  const elapsed = baseElapsed + ageSec
+  return Math.max(0, snap.effectiveTimeLimit - elapsed - speedPenalty)
+})
+const canEditRoomSettings = computed(() => {
+  if (matchTab.value === 'group') return !!groupLobbyData.value?.can_edit_settings
+  const isHostRoom = !!matchCode.value
+  const isStillWaiting = matchStatus.value === 'waiting' || matchStatus.value === 'ready'
+  return isHostRoom && isStillWaiting
+})
 
 function toggleModifier(id) {
   const idx = activeModifiers.value.indexOf(id)
   if (idx >= 0) activeModifiers.value.splice(idx, 1)
   else activeModifiers.value.push(id)
   sound.playClick()
+}
+
+function toMultiplayerSettingsPayload() {
+  return {
+    mode: editableRoomSettings.value.mode || selectedModeId.value,
+    genre: editableRoomSettings.value.genre || selectedGenreId.value,
+    modifiers: Array.isArray(editableRoomSettings.value.modifiers)
+      ? [...editableRoomSettings.value.modifiers]
+      : [...activeModifiers.value],
+    timeLimit: Number(editableRoomSettings.value.timeLimit) || 120,
+    clickLimit: Number(editableRoomSettings.value.clickLimit) || 6,
+    customStartTitle: (editableRoomSettings.value.customStartTitle || '').trim(),
+    customEndTitle: (editableRoomSettings.value.customEndTitle || '').trim(),
+  }
+}
+
+function hydrateRoomSettingsFromResult(result) {
+  const raw = result?.settings || {}
+  editableRoomSettings.value = {
+    mode: raw.mode || 'custom',
+    genre: raw.genre || 'random',
+    modifiers: Array.isArray(raw.modifiers) ? [...raw.modifiers] : [],
+    timeLimit: raw.timeLimit ?? 120,
+    clickLimit: raw.clickLimit ?? 6,
+    customStartTitle: raw.customStartTitle || result?.start_title || '',
+    customEndTitle: raw.customEndTitle || result?.end_title || '',
+  }
+  roomSettingsDirty.value = false
+}
+
+function updateRoomSettingsDraft(patch) {
+  editableRoomSettings.value = {
+    ...editableRoomSettings.value,
+    ...patch,
+  }
+  roomSettingsDirty.value = true
+  scheduleRoomSettingsAutosave()
+}
+
+function toggleRoomModifier(modId) {
+  if (!canEditRoomSettings.value) return
+  const current = Array.isArray(editableRoomSettings.value.modifiers) ? [...editableRoomSettings.value.modifiers] : []
+  const idx = current.indexOf(modId)
+  if (idx >= 0) current.splice(idx, 1)
+  else current.push(modId)
+  editableRoomSettings.value = {
+    ...editableRoomSettings.value,
+    modifiers: current,
+  }
+  roomSettingsDirty.value = true
+  scheduleRoomSettingsAutosave()
+}
+
+function buildMultiplayerRoute(result, type, code) {
+  const settings = result?.settings || {}
+  const mode = settings.mode || 'custom'
+  const query = {
+    from: result.start_title,
+    to: result.end_title,
+    [type]: code,
+  }
+  if (settings.genre) query.genre = settings.genre
+  if (Array.isArray(settings.modifiers) && settings.modifiers.length > 0) {
+    query.modifiers = settings.modifiers.join(',')
+  }
+  if (settings.timeLimit != null) {
+    query.timeLimit = String(settings.timeLimit)
+    query.difficulty = 'custom'
+  }
+  if (settings.clickLimit != null) {
+    query.clickLimit = String(settings.clickLimit)
+    query.difficulty = 'custom'
+  }
+  return { name: 'game', params: { mode }, query }
+}
+
+function roomSettingsSignature(settings) {
+  const s = settings || {}
+  return JSON.stringify({
+    mode: s.mode || null,
+    genre: s.genre || null,
+    modifiers: Array.isArray(s.modifiers) ? [...s.modifiers].sort() : [],
+    timeLimit: s.timeLimit ?? null,
+    clickLimit: s.clickLimit ?? null,
+    customStartTitle: s.customStartTitle || null,
+    customEndTitle: s.customEndTitle || null,
+  })
 }
 
 const noBackModes = ['daily', 'challenge']
@@ -914,17 +994,25 @@ function resumeMultiplayer() {
 
 async function createMatch() {
   if (!auth.user.value) { toast.warn('Login required for 1v1 matches'); showAuthModal.value = true; return }
+  replayMatchWaitingMode.value = false
+  replayLobbyWaitingMode.value = false
   matchLoading.value = true
   matchError.value = ''
   try {
     const pair = await wiki.getRandomPairByGenre(genres.find(g => g.id === selectedGenreId.value))
     if (!pair) { matchError.value = 'Could not generate articles'; return }
-    const result = await api.post('/match/create', { startTitle: pair.start.title, endTitle: pair.end.title })
+    const result = await api.post('/match/create', {
+      startTitle: pair.start.title,
+      endTitle: pair.end.title,
+      settings: toMultiplayerSettingsPayload(),
+    })
     if (result.error) { matchError.value = result.error; return }
     matchCode.value = result.code
     joinedMatchCode.value = ''
     matchOpponentUsername.value = ''
     matchStatus.value = 'waiting'
+    hydrateRoomSettingsFromResult(result)
+    lastSeenMatchSettingsSignature.value = roomSettingsSignature(result?.settings)
     matchTab.value = 'waiting'
     toast.success(`Match created! Code: ${result.code}`)
     startMatchPolling()
@@ -942,14 +1030,23 @@ function startMatchPolling() {
     if (!code) { stopMatchPolling(); return }
     try {
       const result = await api.get(`/match/${code}`)
+      const hadOpponentBefore = !!matchOpponentUsername.value
+      const signature = roomSettingsSignature(result?.settings)
+      if (!canEditRoomSettings.value && lastSeenMatchSettingsSignature.value && signature !== lastSeenMatchSettingsSignature.value) {
+        toast.info('Host updated match settings.')
+      }
+      lastSeenMatchSettingsSignature.value = signature
+      if (result?.settings && (!canEditRoomSettings.value || !roomSettingsDirty.value)) hydrateRoomSettingsFromResult(result)
       if (result.opponent?.username) {
         matchOpponentUsername.value = result.opponent.username
+      } else {
+        matchOpponentUsername.value = ''
       }
       if (result.status === 'active') {
         stopMatchPolling()
         sound.playStart()
         showMatchModal.value = false
-        router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, match: code } })
+        router.push(buildMultiplayerRoute(result, 'match', code))
         return
       }
       if (result.status === 'finished') {
@@ -986,7 +1083,13 @@ function startMatchPolling() {
           matchOpponentLeftNotified.value = true
           matchOpponentUsername.value = ''
         }
-        matchStatus.value = hasOpponent ? 'ready' : 'waiting'
+        if (replayMatchWaitingMode.value) {
+          const opponentReplayReady = !!result?.replay?.opponent_ready
+          const opponentRejoinedNow = hasOpponent && !hadOpponentBefore
+          matchStatus.value = hasOpponent && (opponentReplayReady || opponentRejoinedNow) ? 'ready' : 'waiting'
+        } else {
+          matchStatus.value = hasOpponent ? 'ready' : 'waiting'
+        }
       }
     } catch { /* ignore */ }
   }, 3000)
@@ -1031,11 +1134,17 @@ function startGroupLobbyPolling() {
       const r = await api.get(`/lobby/${groupLobbyCode.value}`)
       if (r.error) return
       groupLobbyData.value = r
+      const signature = roomSettingsSignature(r?.settings)
+      if (!canEditRoomSettings.value && lastSeenLobbySettingsSignature.value && signature !== lastSeenLobbySettingsSignature.value) {
+        toast.info('Host updated lobby settings.')
+      }
+      lastSeenLobbySettingsSignature.value = signature
+      if (r?.settings && (!canEditRoomSettings.value || !roomSettingsDirty.value)) hydrateRoomSettingsFromResult(r)
       if (r.status === 'active') {
         stopGroupLobbyPolling()
         sound.playStart()
         showMatchModal.value = false
-        router.push({ name: 'game', params: { mode: 'custom' }, query: { from: r.start_title, to: r.end_title, lobby: r.code } })
+        router.push(buildMultiplayerRoute(r, 'lobby', r.code))
       }
     } catch { /* ignore */ }
   }, 3000)
@@ -1043,6 +1152,7 @@ function startGroupLobbyPolling() {
 
 async function createGroupLobby() {
   if (!auth.user.value) { toast.warn('Login required'); showAuthModal.value = true; return }
+  replayLobbyWaitingMode.value = false
   groupLoading.value = true
   groupError.value = ''
   try {
@@ -1052,10 +1162,13 @@ async function createGroupLobby() {
       startTitle: pair.start.title,
       endTitle: pair.end.title,
       maxPlayers: groupMaxPlayers.value,
+      settings: toMultiplayerSettingsPayload(),
     })
     if (result.error) { groupError.value = result.error; return }
     groupLobbyCode.value = result.code
     groupLobbyData.value = result
+    hydrateRoomSettingsFromResult(result)
+    lastSeenLobbySettingsSignature.value = roomSettingsSignature(result?.settings)
     groupView.value = 'waiting'
     matchTab.value = 'group'
     toast.success(`Lobby created: ${result.code}`)
@@ -1072,12 +1185,31 @@ async function postStartGroupLobby() {
   groupStartLoading.value = true
   groupError.value = ''
   try {
+    if (replayLobbyWaitingMode.value && editableRoomSettings.value.mode !== 'custom') {
+      const genre = genres.find(g => g.id === editableRoomSettings.value.genre) || genres.find(g => g.id === 'random')
+      const pair = await wiki.getRandomPairByGenre(genre)
+      if (!pair) {
+        groupError.value = 'Could not generate a new replay pair'
+        return
+      }
+      const reseeded = await api.post(`/lobby/reseed/${groupLobbyCode.value}`, {
+        startTitle: pair.start.title,
+        endTitle: pair.end.title,
+      })
+      if (reseeded?.error) {
+        groupError.value = reseeded.error
+        return
+      }
+      groupLobbyData.value = reseeded
+      hydrateRoomSettingsFromResult(reseeded)
+      lastSeenLobbySettingsSignature.value = roomSettingsSignature(reseeded?.settings)
+    }
     const r = await api.post(`/lobby/start/${groupLobbyCode.value}`)
     if (r.error) { groupError.value = r.error; return }
     stopGroupLobbyPolling()
     sound.playStart()
     showMatchModal.value = false
-    router.push({ name: 'game', params: { mode: 'custom' }, query: { from: r.start_title, to: r.end_title, lobby: r.code } })
+    router.push(buildMultiplayerRoute(r, 'lobby', r.code))
   } catch (e) {
     groupError.value = e.message || 'Failed to start'
   } finally {
@@ -1092,6 +1224,8 @@ function copyGroupLobbyCode() {
 
 async function joinByCode(prefer = 'match') {
   if (!auth.user.value) { toast.warn('Login required for multiplayer'); showAuthModal.value = true; return }
+  replayMatchWaitingMode.value = false
+  replayLobbyWaitingMode.value = false
   const code = joinRoomCode.value.trim().toUpperCase()
   if (!code || code.length < 4) {
     matchError.value = 'Enter a valid room code'
@@ -1122,7 +1256,7 @@ async function joinByCode(prefer = 'match') {
             if (result.status === 'active') {
               sound.playStart()
               showMatchModal.value = false
-              router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, match: result.code } })
+              router.push(buildMultiplayerRoute(result, 'match', result.code))
               return
             }
             joinedMatchCode.value = result.code
@@ -1130,6 +1264,8 @@ async function joinByCode(prefer = 'match') {
             matchStatus.value = 'joined_waiting'
             matchOpponentUsername.value = ''
             matchOpponentLeftNotified.value = false
+            hydrateRoomSettingsFromResult(result)
+            lastSeenMatchSettingsSignature.value = roomSettingsSignature(result?.settings)
             matchTab.value = 'waiting'
             toast.success('Joined match. Waiting for host to start...')
             startMatchPolling()
@@ -1142,11 +1278,13 @@ async function joinByCode(prefer = 'match') {
           } else {
             groupLobbyCode.value = result.code
             groupLobbyData.value = result
+            hydrateRoomSettingsFromResult(result)
+            lastSeenLobbySettingsSignature.value = roomSettingsSignature(result?.settings)
             matchTab.value = 'group'
             if (result.status === 'active') {
               sound.playStart()
               showMatchModal.value = false
-              router.push({ name: 'game', params: { mode: 'custom' }, query: { from: result.start_title, to: result.end_title, lobby: result.code } })
+              router.push(buildMultiplayerRoute(result, 'lobby', result.code))
               return
             }
             groupView.value = 'waiting'
@@ -1167,6 +1305,58 @@ async function joinByCode(prefer = 'match') {
     matchLoading.value = false
     groupLoading.value = false
   }
+}
+
+async function saveRoomSettings() {
+  if (!canEditRoomSettings.value) return
+  if (roomSettingsSaving.value) {
+    roomSettingsAutosaveRetry.value = true
+    return
+  }
+  roomSettingsSaving.value = true
+  try {
+    if (matchTab.value === 'group' && groupLobbyCode.value) {
+      const updated = await api.post(`/lobby/settings/${groupLobbyCode.value}`, {
+        settings: editableRoomSettings.value,
+      })
+      if (updated.error) throw new Error(updated.error)
+      groupLobbyData.value = updated
+      hydrateRoomSettingsFromResult(updated)
+      roomSettingsDirty.value = false
+      lastSeenLobbySettingsSignature.value = roomSettingsSignature(updated?.settings)
+      toast.success('Lobby settings saved')
+      return
+    }
+    const code = matchCode.value || joinedMatchCode.value
+    if (code) {
+      const updated = await api.post(`/match/settings/${code}`, {
+        settings: editableRoomSettings.value,
+      })
+      if (updated.error) throw new Error(updated.error)
+      hydrateRoomSettingsFromResult(updated)
+      roomSettingsDirty.value = false
+      lastSeenMatchSettingsSignature.value = roomSettingsSignature(updated?.settings)
+      toast.success('Match settings saved')
+    }
+  } catch (e) {
+    toast.error(e?.message || 'Could not save settings')
+  } finally {
+    roomSettingsSaving.value = false
+    if (roomSettingsAutosaveRetry.value) {
+      roomSettingsAutosaveRetry.value = false
+      scheduleRoomSettingsAutosave()
+    }
+  }
+}
+
+function scheduleRoomSettingsAutosave() {
+  if (!canEditRoomSettings.value) return
+  if (roomSettingsAutosaveTimer) clearTimeout(roomSettingsAutosaveTimer)
+  roomSettingsAutosaveTimer = setTimeout(() => {
+    roomSettingsAutosaveTimer = null
+    if (!roomSettingsDirty.value) return
+    saveRoomSettings()
+  }, 500)
 }
 
 async function joinInvitedMatchFromRoute() {
@@ -1204,6 +1394,8 @@ async function openHostedMatchFromRoute() {
   }
 
   handlingHostMatch = true
+  replayMatchWaitingMode.value = false
+  replayLobbyWaitingMode.value = false
   showMatchModal.value = true
   matchTab.value = 'waiting'
   matchCode.value = hostCode
@@ -1222,6 +1414,79 @@ async function openHostedMatchFromRoute() {
   router.replace({ name: 'home', query: nextQuery }).finally(() => {
     handlingHostMatch = false
   })
+}
+
+async function openReplayRoomFromRoute() {
+  const replayType = typeof route.query.replayType === 'string' ? route.query.replayType.trim().toLowerCase() : ''
+  const replayCode = typeof route.query.replayCode === 'string' ? route.query.replayCode.trim().toUpperCase() : ''
+  if (!replayType || !replayCode || handlingHostMatch || handlingInviteJoin) return
+  if (!auth.user.value) {
+    showAuthModal.value = true
+    toast.warn('Login required for multiplayer replay')
+    return
+  }
+
+  showMatchModal.value = true
+  matchError.value = ''
+  groupError.value = ''
+  try {
+    if (replayType === 'match') {
+      const result = await api.get(`/match/${replayCode}`)
+      if (result.error || result.status === 'finished') {
+        toast.warn('Replay room is closed.')
+      } else if (result.status === 'active') {
+        replayMatchWaitingMode.value = false
+        replayLobbyWaitingMode.value = false
+        sound.playStart()
+        showMatchModal.value = false
+        router.push(buildMultiplayerRoute(result, 'match', result.code))
+      } else {
+        replayMatchWaitingMode.value = true
+        replayLobbyWaitingMode.value = false
+        if (result.can_edit_settings) {
+          matchCode.value = result.code
+          joinedMatchCode.value = ''
+          matchStatus.value = result?.replay?.opponent_ready ? 'ready' : 'waiting'
+        } else {
+          matchCode.value = ''
+          joinedMatchCode.value = result.code
+          matchStatus.value = 'joined_waiting'
+        }
+        matchOpponentUsername.value = result.opponent?.username || ''
+        hydrateRoomSettingsFromResult(result)
+        lastSeenMatchSettingsSignature.value = roomSettingsSignature(result?.settings)
+        matchTab.value = 'waiting'
+        startMatchPolling()
+      }
+    } else if (replayType === 'lobby') {
+      const result = await api.get(`/lobby/${replayCode}`)
+      if (result.error || result.status === 'finished') {
+        toast.warn('Replay lobby is closed.')
+      } else if (result.status === 'active') {
+        replayLobbyWaitingMode.value = false
+        sound.playStart()
+        showMatchModal.value = false
+        router.push(buildMultiplayerRoute(result, 'lobby', result.code))
+      } else {
+        replayMatchWaitingMode.value = false
+        replayLobbyWaitingMode.value = true
+        groupLobbyCode.value = result.code
+        groupLobbyData.value = result
+        hydrateRoomSettingsFromResult(result)
+        lastSeenLobbySettingsSignature.value = roomSettingsSignature(result?.settings)
+        matchTab.value = 'group'
+        groupView.value = 'waiting'
+        startGroupLobbyPolling()
+      }
+    }
+  } catch (e) {
+    toast.warn(e?.message || 'Could not open replay room')
+  } finally {
+    const nextQuery = { ...route.query }
+    delete nextQuery.replayType
+    delete nextQuery.replayCode
+    router.replace({ name: 'home', query: nextQuery })
+  }
 }
 
 async function leaveCurrentMultiplayerRoom() {
@@ -1260,14 +1525,33 @@ async function closeMatchModal() {
     }
   }
   showMatchModal.value = false
+  replayMatchWaitingMode.value = false
+  replayLobbyWaitingMode.value = false
 }
 
 function startCreatedMatch() {
   if (!matchCode.value || matchStatus.value !== 'ready') return
-  api.post(`/match/start/${matchCode.value}`).then(match => {
+  const startFlow = async () => {
+    if (replayMatchWaitingMode.value && editableRoomSettings.value.mode !== 'custom') {
+      const genre = genres.find(g => g.id === editableRoomSettings.value.genre) || genres.find(g => g.id === 'random')
+      const pair = await wiki.getRandomPairByGenre(genre)
+      if (!pair) throw new Error('Could not generate a new replay pair')
+      const reseeded = await api.post(`/match/reseed/${matchCode.value}`, {
+        startTitle: pair.start.title,
+        endTitle: pair.end.title,
+      })
+      if (reseeded?.error) throw new Error(reseeded.error)
+      hydrateRoomSettingsFromResult(reseeded)
+      lastSeenMatchSettingsSignature.value = roomSettingsSignature(reseeded?.settings)
+    }
+    return api.post(`/match/start/${matchCode.value}`)
+  }
+  startFlow().then(match => {
+    replayMatchWaitingMode.value = false
+    replayLobbyWaitingMode.value = false
     sound.playStart()
     showMatchModal.value = false
-    router.push({ name: 'game', params: { mode: 'custom' }, query: { from: match.start_title, to: match.end_title, match: matchCode.value } })
+    router.push(buildMultiplayerRoute(match, 'match', matchCode.value))
   }).catch((e) => toast.error(e?.message || 'Failed to start match'))
 }
 
@@ -1312,6 +1596,8 @@ watch(showMatchModal, (val) => {
       matchTab.value = 'duel'
       matchError.value = ''
     }
+    replayMatchWaitingMode.value = false
+    replayLobbyWaitingMode.value = false
     resetGroupLobbyUi()
   }
 })
@@ -1326,15 +1612,33 @@ onMounted(() => {
   api.get('/daily/leaderboard').then(d => dailyLeaderboard.value = d.scores || []).catch(() => {})
   trending.fetchTrending()
   refreshResumeSession()
+  openReplayRoomFromRoute()
   openHostedMatchFromRoute()
   joinInvitedMatchFromRoute()
+  resumeTicker = setInterval(() => {
+    resumeNowMs.value = Date.now()
+  }, 1000)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   stopMatchPolling()
   stopGroupLobbyPolling()
+  if (roomSettingsAutosaveTimer) {
+    clearTimeout(roomSettingsAutosaveTimer)
+    roomSettingsAutosaveTimer = null
+  }
+  if (resumeTicker) {
+    clearInterval(resumeTicker)
+    resumeTicker = null
+  }
 })
 
+watch(
+  () => [route.query.replayType, route.query.replayCode, auth.user.value?.id],
+  () => {
+    openReplayRoomFromRoute()
+  }
+)
 watch(
   () => [route.query.inviteMatch, auth.user.value?.id],
   () => {

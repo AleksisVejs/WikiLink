@@ -30,6 +30,97 @@
                   </li>
                 </ul>
               </div>
+              <div v-if="groupLobbyData" class="rounded-lg px-3 py-2.5 mb-3 text-left" style="background: linear-gradient(180deg, #12131c, #0f1018); border: 1px solid #252738;">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                  <div class="font-pixel text-[6px] text-retro-muted tracking-wider">LOBBY SETTINGS</div>
+                  <span class="font-mono text-[9px] text-crt-cyan/70">{{ canEditRoomSettings ? 'Host controls' : 'View only' }}</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Genre</p>
+                    <select :value="roomSettings.genre" :disabled="!canEditRoomSettings" @change="$emit('update-room-settings', { genre: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
+                      <option v-for="g in roomGenres" :key="g.id" :value="g.id">{{ g.name }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Game mode</p>
+                    <select :value="roomSettings.mode" :disabled="!canEditRoomSettings" @change="$emit('update-room-settings', { mode: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
+                      <option v-for="m in roomModes" :key="m.id" :value="m.id">{{ m.name }}</option>
+                    </select>
+                  </div>
+                </div>
+                <div v-if="roomSettings.mode === 'sprint'" class="mt-2">
+                  <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Sprint time (seconds)</p>
+                  <input
+                    :value="roomSettings.timeLimit"
+                    :disabled="!canEditRoomSettings"
+                    @input="$emit('update-room-settings', { timeLimit: Number($event.target.value) || 120 })"
+                    type="number"
+                    min="10"
+                    max="3600"
+                    class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                  />
+                </div>
+                <div v-else-if="roomSettings.mode === 'challenge'" class="mt-2">
+                  <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Click limit</p>
+                  <input
+                    :value="roomSettings.clickLimit"
+                    :disabled="!canEditRoomSettings"
+                    @input="$emit('update-room-settings', { clickLimit: Number($event.target.value) || 6 })"
+                    type="number"
+                    min="1"
+                    max="200"
+                    class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                  />
+                </div>
+                <div v-else-if="roomSettings.mode === 'custom'" class="mt-2 grid grid-cols-1 gap-2">
+                  <div>
+                    <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Custom start article</p>
+                    <input
+                      :value="roomSettings.customStartTitle"
+                      :disabled="!canEditRoomSettings"
+                      @input="$emit('update-room-settings', { customStartTitle: $event.target.value })"
+                      type="text"
+                      class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Custom target article</p>
+                    <input
+                      :value="roomSettings.customEndTitle"
+                      :disabled="!canEditRoomSettings"
+                      @input="$emit('update-room-settings', { customEndTitle: $event.target.value })"
+                      type="text"
+                      class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                  <button
+                    v-for="mod in roomModifiers"
+                    :key="mod.id"
+                    type="button"
+                    @click="$emit('toggle-room-modifier', mod.id)"
+                    :disabled="!canEditRoomSettings"
+                    class="px-2 py-1 rounded font-mono text-[9px] border transition-all"
+                    :style="roomSettings.modifiers?.includes(mod.id)
+                      ? 'color:#39ff14;border-color:rgba(57,255,20,0.35);background:rgba(57,255,20,0.08);'
+                      : 'color:#9ca3af;border-color:#2a2d3f;background:#0a0b11;'">
+                    {{ mod.name }}
+                  </button>
+                </div>
+                <div class="mt-2 space-y-1.5">
+                  <div v-for="mod in roomModifiers" :key="`desc-lobby-${mod.id}`" class="text-left">
+                    <p class="font-mono text-[9px] leading-snug" :class="roomSettings.modifiers?.includes(mod.id) ? 'text-crt-green/85' : 'text-retro-muted/65'">
+                      <span class="text-crt-cyan/75">{{ mod.name }}:</span> {{ mod.description || 'No description available.' }}
+                    </p>
+                  </div>
+                </div>
+                <p class="font-mono text-[9px] text-retro-muted/60 mt-2">Settings lock when the lobby starts.</p>
+                <p class="font-mono text-[9px] mt-2" :class="canEditRoomSettings ? (roomSettingsSaving ? 'text-crt-cyan/80' : 'text-retro-muted/70') : 'text-retro-muted/50'">
+                  {{ canEditRoomSettings ? (roomSettingsSaving ? 'Auto-saving settings...' : 'Settings auto-save after changes.') : 'Host settings (read-only).' }}
+                </p>
+              </div>
               <div v-if="groupLobbyData?.status === 'waiting'" class="flex flex-col gap-2">
                 <div v-if="groupLobbyData?.is_host" class="flex gap-2">
                   <button type="button" @click="$emit('copy-group-code')" class="btn-retro-ghost flex-1 !py-2 text-[10px]">COPY CODE</button>
@@ -53,21 +144,113 @@
                 {{ matchStatus === 'joined_waiting' ? 'Host will start the match for both players' : 'Share this code with your opponent' }}
               </p>
 
-              <div v-if="matchStatus !== 'ready' && matchStatus !== 'joined_waiting'" class="flex items-center justify-center gap-2 mb-4 py-2">
-                <span class="w-2 h-2 rounded-full bg-crt-amber animate-blink"></span>
-                <span class="font-mono text-[11px] text-crt-amber/70 animate-blink-slow">Scanning for opponent...</span>
-              </div>
-              <div v-if="matchStatus === 'joined_waiting'" class="flex items-center justify-center gap-2 mb-4 py-2">
-                <span class="w-2 h-2 rounded-full bg-crt-cyan animate-blink"></span>
-                <span class="font-mono text-[11px] text-crt-cyan/80 animate-blink-slow">Waiting for host to press Start...</span>
-              </div>
-
-              <div v-else class="flex flex-col items-center justify-center gap-1 mb-4 py-2">
-                <div class="flex items-center justify-center gap-2">
-                  <span class="w-2 h-2 rounded-full bg-crt-green" style="box-shadow: 0 0 6px rgba(57,255,20,0.5);"></span>
-                  <span class="font-mono text-[11px] text-crt-green">Opponent is ready!</span>
+              <div v-if="matchStatus === 'waiting' || matchStatus === 'joined_waiting' || matchStatus === 'ready'" class="mb-4 py-2">
+                <div v-if="matchStatus === 'ready'" class="flex flex-col items-center justify-center gap-1">
+                  <div class="flex items-center justify-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-crt-green" style="box-shadow: 0 0 6px rgba(57,255,20,0.5);"></span>
+                    <span class="font-mono text-[11px] text-crt-green">Opponent is ready!</span>
+                  </div>
+                  <span v-if="matchOpponentUsername" class="font-mono text-[10px] text-arcade-purple/80">{{ matchOpponentUsername }}</span>
                 </div>
-                <span v-if="matchOpponentUsername" class="font-mono text-[10px] text-arcade-purple/80">{{ matchOpponentUsername }}</span>
+                <div v-else-if="matchStatus === 'joined_waiting'" class="flex items-center justify-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-crt-cyan animate-blink"></span>
+                  <span class="font-mono text-[11px] text-crt-cyan/80 animate-blink-slow">Waiting for host to press Start...</span>
+                </div>
+                <div v-else class="flex items-center justify-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-crt-amber animate-blink"></span>
+                  <span class="font-mono text-[11px] text-crt-amber/70 animate-blink-slow">Scanning for opponent...</span>
+                </div>
+              </div>
+              <div class="rounded-lg px-3 py-2.5 mb-3 text-left" style="background: linear-gradient(180deg, #12131c, #0f1018); border: 1px solid #252738;">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                  <div class="font-pixel text-[6px] text-retro-muted tracking-wider">MATCH SETTINGS</div>
+                  <span class="font-mono text-[9px] text-crt-cyan/70">{{ canEditRoomSettings ? 'Host controls' : 'View only' }}</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Genre</p>
+                    <select :value="roomSettings.genre" :disabled="!canEditRoomSettings" @change="$emit('update-room-settings', { genre: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
+                      <option v-for="g in roomGenres" :key="g.id" :value="g.id">{{ g.name }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Game mode</p>
+                    <select :value="roomSettings.mode" :disabled="!canEditRoomSettings" @change="$emit('update-room-settings', { mode: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
+                      <option v-for="m in roomModes" :key="m.id" :value="m.id">{{ m.name }}</option>
+                    </select>
+                  </div>
+                </div>
+                <div v-if="roomSettings.mode === 'sprint'" class="mt-2">
+                  <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Sprint time (seconds)</p>
+                  <input
+                    :value="roomSettings.timeLimit"
+                    :disabled="!canEditRoomSettings"
+                    @input="$emit('update-room-settings', { timeLimit: Number($event.target.value) || 120 })"
+                    type="number"
+                    min="10"
+                    max="3600"
+                    class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                  />
+                </div>
+                <div v-else-if="roomSettings.mode === 'challenge'" class="mt-2">
+                  <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Click limit</p>
+                  <input
+                    :value="roomSettings.clickLimit"
+                    :disabled="!canEditRoomSettings"
+                    @input="$emit('update-room-settings', { clickLimit: Number($event.target.value) || 6 })"
+                    type="number"
+                    min="1"
+                    max="200"
+                    class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                  />
+                </div>
+                <div v-else-if="roomSettings.mode === 'custom'" class="mt-2 grid grid-cols-1 gap-2">
+                  <div>
+                    <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Custom start article</p>
+                    <input
+                      :value="roomSettings.customStartTitle"
+                      :disabled="!canEditRoomSettings"
+                      @input="$emit('update-room-settings', { customStartTitle: $event.target.value })"
+                      type="text"
+                      class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Custom target article</p>
+                    <input
+                      :value="roomSettings.customEndTitle"
+                      :disabled="!canEditRoomSettings"
+                      @input="$emit('update-room-settings', { customEndTitle: $event.target.value })"
+                      type="text"
+                      class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                  <button
+                    v-for="mod in roomModifiers"
+                    :key="mod.id"
+                    type="button"
+                    @click="$emit('toggle-room-modifier', mod.id)"
+                    :disabled="!canEditRoomSettings"
+                    class="px-2 py-1 rounded font-mono text-[9px] border transition-all"
+                    :style="roomSettings.modifiers?.includes(mod.id)
+                      ? 'color:#39ff14;border-color:rgba(57,255,20,0.35);background:rgba(57,255,20,0.08);'
+                      : 'color:#9ca3af;border-color:#2a2d3f;background:#0a0b11;'">
+                    {{ mod.name }}
+                  </button>
+                </div>
+                <div class="mt-2 space-y-1.5">
+                  <div v-for="mod in roomModifiers" :key="`desc-match-${mod.id}`" class="text-left">
+                    <p class="font-mono text-[9px] leading-snug" :class="roomSettings.modifiers?.includes(mod.id) ? 'text-crt-green/85' : 'text-retro-muted/65'">
+                      <span class="text-crt-cyan/75">{{ mod.name }}:</span> {{ mod.description || 'No description available.' }}
+                    </p>
+                  </div>
+                </div>
+                <p class="font-mono text-[9px] text-retro-muted/60 mt-2">Settings lock when the match starts.</p>
+                <p class="font-mono text-[9px] mt-2" :class="canEditRoomSettings ? (roomSettingsSaving ? 'text-crt-cyan/80' : 'text-retro-muted/70') : 'text-retro-muted/50'">
+                  {{ canEditRoomSettings ? (roomSettingsSaving ? 'Auto-saving settings...' : 'Settings auto-save after changes.') : 'Host settings (read-only).' }}
+                </p>
               </div>
 
               <div class="flex gap-2">
@@ -158,6 +341,12 @@ defineProps({
   joinBusy: { type: Boolean, required: true },
   unifiedJoinError: { type: String, required: true },
   showLeaveCurrentRoomButton: { type: Boolean, required: true },
+  roomSettings: { type: Object, required: true },
+  canEditRoomSettings: { type: Boolean, default: false },
+  roomSettingsSaving: { type: Boolean, default: false },
+  roomGenres: { type: Array, default: () => [] },
+  roomModes: { type: Array, default: () => [] },
+  roomModifiers: { type: Array, default: () => [] },
 })
 
 defineEmits([
@@ -173,5 +362,8 @@ defineEmits([
   'update:join-room-code',
   'join-by-code',
   'leave-current-room',
+  'update-room-settings',
+  'toggle-room-modifier',
+  'save-room-settings',
 ])
 </script>

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/multiplayer_settings.php';
 
 const MATCH_HEARTBEAT_INTERVAL_SECONDS = 15;
 const MATCH_MISSED_HEARTBEAT_LIMIT = 3;
@@ -28,6 +29,7 @@ function ensureMatchTable() {
         p2_missed_heartbeats INTEGER NOT NULL DEFAULT 0,
         p1_disconnected_at TEXT,
         p2_disconnected_at TEXT,
+        settings_json TEXT,
         status      TEXT    NOT NULL DEFAULT 'waiting',
         created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     )");
@@ -39,6 +41,9 @@ function ensureMatchTable() {
     ensureMatchColumn($db, 'p2_missed_heartbeats', "ALTER TABLE matches ADD COLUMN p2_missed_heartbeats INTEGER NOT NULL DEFAULT 0");
     ensureMatchColumn($db, 'p1_disconnected_at', "ALTER TABLE matches ADD COLUMN p1_disconnected_at TEXT");
     ensureMatchColumn($db, 'p2_disconnected_at', "ALTER TABLE matches ADD COLUMN p2_disconnected_at TEXT");
+    ensureMatchColumn($db, 'settings_json', "ALTER TABLE matches ADD COLUMN settings_json TEXT");
+    ensureMatchColumn($db, 'p1_play_again', "ALTER TABLE matches ADD COLUMN p1_play_again INTEGER NOT NULL DEFAULT 0");
+    ensureMatchColumn($db, 'p2_play_again', "ALTER TABLE matches ADD COLUMN p2_play_again INTEGER NOT NULL DEFAULT 0");
 }
 
 function ensureMatchColumn($db, $columnName, $alterSql) {
@@ -178,7 +183,7 @@ function cleanupStaleMatches() {
     return $stats;
 }
 
-function createMatch($startTitle, $endTitle, $userId) {
+function createMatch($startTitle, $endTitle, $userId, $settings = null) {
     cleanupStaleMatches();
     $startTitle = trim($startTitle);
     $endTitle = trim($endTitle);
@@ -189,21 +194,70 @@ function createMatch($startTitle, $endTitle, $userId) {
         return ['error' => 'Start and end must be different.'];
     }
 
+    $normalizedSettings = normalizeMultiplayerSettings($settings);
     ensureMatchTable();
     $db = getDb();
 
     for ($attempt = 0; $attempt < 10; $attempt++) {
         $code = generateUniqueCode();
         try {
-            $stmt = $db->prepare('INSERT INTO matches (code, start_title, end_title, player1_id, p1_last_seen_at) VALUES (?, ?, ?, ?, datetime(\'now\'))');
-            $stmt->execute([$code, $startTitle, $endTitle, $userId]);
-            return ['code' => $code, 'start_title' => $startTitle, 'end_title' => $endTitle];
+            $stmt = $db->prepare('INSERT INTO matches (code, start_title, end_title, player1_id, p1_last_seen_at, settings_json) VALUES (?, ?, ?, ?, datetime(\'now\'), ?)');
+            $stmt->execute([$code, $startTitle, $endTitle, $userId, encodeMultiplayerSettings($normalizedSettings)]);
+            $created = $db->prepare('SELECT * FROM matches WHERE code = ?');
+            $created->execute([$code]);
+            return formatMatchResult($created->fetch(), $userId);
         } catch (PDOException $e) {
             if (strpos($e->getMessage(), 'UNIQUE') === false) throw $e;
         }
     }
 
     return ['error' => 'Could not generate a unique match code. Try again.'];
+}
+
+function updateMatchSettings($code, $userId, $settings) {
+    cleanupStaleMatches();
+    $code = strtoupper(trim($code));
+    ensureMatchTable();
+    $db = getDb();
+
+    $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+    $stmt->execute([$code]);
+    $match = $stmt->fetch();
+    if (!$match) return ['error' => 'Match not found.'];
+    if ((int)$match['player1_id'] !== (int)$userId) {
+        return ['error' => 'Only the host can update settings.'];
+    }
+    if ($match['status'] !== 'waiting') {
+        return ['error' => 'Settings are locked after the match starts.'];
+    }
+
+    $normalizedSettings = normalizeMultiplayerSettings($settings);
+    $nextStart = trim((string)$match['start_title']);
+    $nextEnd = trim((string)$match['end_title']);
+    if ($normalizedSettings['mode'] === 'custom') {
+        $candidateStart = isset($normalizedSettings['customStartTitle']) ? trim((string)$normalizedSettings['customStartTitle']) : '';
+        $candidateEnd = isset($normalizedSettings['customEndTitle']) ? trim((string)$normalizedSettings['customEndTitle']) : '';
+        if ($candidateStart !== '') $nextStart = $candidateStart;
+        if ($candidateEnd !== '') $nextEnd = $candidateEnd;
+        if ($nextStart === '' || $nextEnd === '') {
+            return ['error' => 'Custom mode requires both start and target titles.'];
+        }
+        if (strcasecmp($nextStart, $nextEnd) === 0) {
+            return ['error' => 'Custom start and target must be different.'];
+        }
+        $normalizedSettings['customStartTitle'] = $nextStart;
+        $normalizedSettings['customEndTitle'] = $nextEnd;
+    } else {
+        $normalizedSettings['customStartTitle'] = null;
+        $normalizedSettings['customEndTitle'] = null;
+    }
+
+    $db->prepare('UPDATE matches SET settings_json = ?, start_title = ?, end_title = ? WHERE code = ?')
+        ->execute([encodeMultiplayerSettings($normalizedSettings), $nextStart, $nextEnd, $code]);
+
+    $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+    $stmt->execute([$code]);
+    return formatMatchResult($stmt->fetch(), $userId);
 }
 
 function joinMatch($code, $userId) {
@@ -221,13 +275,9 @@ function joinMatch($code, $userId) {
 
     if ($match['player1_id'] == $userId) {
         touchMatchPresence($code, $userId);
-        return [
-            'code' => $match['code'],
-            'start_title' => $match['start_title'],
-            'end_title' => $match['end_title'],
-            'status' => $match['status'],
-            'player' => 1,
-        ];
+        $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+        $stmt->execute([$code]);
+        return formatMatchResult($stmt->fetch(), $userId);
     }
 
     if ($match['player2_id'] && $match['player2_id'] != $userId) {
@@ -262,13 +312,7 @@ function joinMatch($code, $userId) {
     $stmt->execute([$code]);
     $updated = $stmt->fetch();
 
-    return [
-        'code' => $updated['code'],
-        'start_title' => $updated['start_title'],
-        'end_title' => $updated['end_title'],
-        'status' => $updated['status'],
-        'player' => ($updated['player1_id'] == $userId ? 1 : 2),
-    ];
+    return formatMatchResult($updated, $userId);
 }
 
 function startMatch($code, $userId) {
@@ -310,7 +354,7 @@ function startMatch($code, $userId) {
                 return ['error' => 'Cannot start until opponent joins.'];
             }
 
-            $stmt = $db->prepare("UPDATE matches SET status = 'active' WHERE code = ? AND status = 'waiting'");
+            $stmt = $db->prepare("UPDATE matches SET status = 'active', p1_play_again = 0, p2_play_again = 0 WHERE code = ? AND status = 'waiting'");
             $stmt->execute([$code]);
             $db->commit();
         } catch (PDOException $e) {
@@ -403,7 +447,18 @@ function quitMatch($code, $userId) {
     $stmt->execute([$code]);
     $match = $stmt->fetch();
     if (!$match) return ['error' => 'Match not found.'];
-    if ($match['status'] === 'finished') return formatMatchResult($match, $userId);
+    if ($match['status'] === 'finished') {
+        if ($match['player1_id'] == $userId) {
+            $db->prepare('UPDATE matches SET p1_quit = 1 WHERE code = ?')->execute([$code]);
+        } elseif ($match['player2_id'] == $userId) {
+            $db->prepare('UPDATE matches SET p2_quit = 1 WHERE code = ?')->execute([$code]);
+        } else {
+            return ['error' => 'You are not in this match.'];
+        }
+        $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+        $stmt->execute([$code]);
+        return formatMatchResult($stmt->fetch(), $userId);
+    }
 
     if ($match['player1_id'] == $userId) {
         $db->prepare('UPDATE matches SET p1_quit = 1 WHERE code = ?')->execute([$code]);
@@ -433,6 +488,95 @@ function quitMatch($code, $userId) {
     $stmt->execute([$code]);
     $updated = $stmt->fetch();
     return formatMatchResult($updated, $userId);
+}
+
+function requestMatchReplay($code, $userId) {
+    cleanupStaleMatches();
+    $code = strtoupper(trim($code));
+    ensureMatchTable();
+    $db = getDb();
+
+    $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+    $stmt->execute([$code]);
+    $match = $stmt->fetch();
+    if (!$match) return ['error' => 'Match not found.'];
+    if ($match['player1_id'] != $userId && $match['player2_id'] != $userId) {
+        return ['error' => 'You are not in this match.'];
+    }
+    if ($match['status'] !== 'finished' && $match['status'] !== 'waiting') {
+        return ['error' => 'Replay is only available after a finished match.'];
+    }
+    if ((int)$match['p1_quit'] === 1 || (int)$match['p2_quit'] === 1) {
+        return ['error' => 'Replay unavailable because a player left the match.'];
+    }
+
+    $isP1 = ((int)$match['player1_id'] === (int)$userId);
+    $readyCol = $isP1 ? 'p1_play_again' : 'p2_play_again';
+    $seenCol = $isP1 ? 'p1_last_seen_at' : 'p2_last_seen_at';
+    $db->prepare("UPDATE matches SET $readyCol = 1, $seenCol = datetime('now') WHERE code = ?")->execute([$code]);
+
+    if ($match['status'] === 'finished') {
+        $db->prepare("
+            UPDATE matches
+            SET status = 'waiting',
+                p1_clicks = NULL,
+                p1_time = NULL,
+                p1_path = NULL,
+                p2_clicks = NULL,
+                p2_time = NULL,
+                p2_path = NULL,
+                p1_quit = 0,
+                p2_quit = 0
+            WHERE code = ?
+        ")->execute([$code]);
+    }
+
+    $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+    $stmt->execute([$code]);
+    return formatMatchResult($stmt->fetch(), $userId);
+}
+
+function reseedMatchPair($code, $userId, $startTitle, $endTitle) {
+    cleanupStaleMatches();
+    $code = strtoupper(trim($code));
+    $startTitle = trim((string)$startTitle);
+    $endTitle = trim((string)$endTitle);
+    if ($startTitle === '' || $endTitle === '') {
+        return ['error' => 'Both start and end titles are required.'];
+    }
+    if (strcasecmp($startTitle, $endTitle) === 0) {
+        return ['error' => 'Start and end must be different.'];
+    }
+
+    ensureMatchTable();
+    $db = getDb();
+    $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+    $stmt->execute([$code]);
+    $match = $stmt->fetch();
+    if (!$match) return ['error' => 'Match not found.'];
+    if ((int)$match['player1_id'] !== (int)$userId) {
+        return ['error' => 'Only the host can reseed this match.'];
+    }
+    if ($match['status'] !== 'waiting') {
+        return ['error' => 'Cannot reseed after match start.'];
+    }
+
+    $db->prepare("
+        UPDATE matches
+        SET start_title = ?,
+            end_title = ?,
+            p1_clicks = NULL,
+            p1_time = NULL,
+            p1_path = NULL,
+            p2_clicks = NULL,
+            p2_time = NULL,
+            p2_path = NULL
+        WHERE code = ?
+    ")->execute([$startTitle, $endTitle, $code]);
+
+    $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+    $stmt->execute([$code]);
+    return formatMatchResult($stmt->fetch(), $userId);
 }
 
 function getUsernamesByIds($db, $ids) {
@@ -584,6 +728,8 @@ function formatMatchResult($match, $userId) {
         'status' => $match['status'],
         'start_title' => $match['start_title'],
         'end_title' => $match['end_title'],
+        'settings' => decodeMultiplayerSettings(isset($match['settings_json']) ? $match['settings_json'] : null),
+        'can_edit_settings' => ($match['status'] === 'waiting' && (int)$match['player1_id'] === (int)$userId),
     ];
 
     $uid = (int)$userId;
@@ -629,7 +775,42 @@ function formatMatchResult($match, $userId) {
         'reconnect_grace_seconds' => MATCH_RECONNECT_GRACE_SECONDS,
     ];
 
+    $result['replay'] = [
+        'you_ready' => (bool)($isP1 ? $match['p1_play_again'] : $match['p2_play_again']),
+        'opponent_ready' => (bool)($isP1 ? $match['p2_play_again'] : $match['p1_play_again']),
+    ];
+
     if ($match['status'] === 'finished') {
+        $targetNorm = strtolower(str_replace(' ', '_', (string)$match['end_title']));
+        $youPath = is_array($result['you']['path']) ? $result['you']['path'] : [];
+        $oppPathRaw = $isP1 ? ($match['p2_path'] ?: '[]') : ($match['p1_path'] ?: '[]');
+        $oppPath = json_decode($oppPathRaw, true);
+        if (!is_array($oppPath)) $oppPath = [];
+
+        $youReached = false;
+        if (!empty($youPath)) {
+            $youLast = strtolower(str_replace(' ', '_', (string)$youPath[count($youPath) - 1]));
+            $youReached = ($youLast === $targetNorm);
+        }
+        $oppReached = false;
+        if (!empty($oppPath)) {
+            $oppLast = strtolower(str_replace(' ', '_', (string)$oppPath[count($oppPath) - 1]));
+            $oppReached = ($oppLast === $targetNorm);
+        }
+
+        if (!$youReached && !$oppReached) {
+            $result['winner'] = 'tie';
+            return $result;
+        }
+        if ($youReached && !$oppReached) {
+            $result['winner'] = 'you';
+            return $result;
+        }
+        if ($oppReached && !$youReached) {
+            $result['winner'] = 'opponent';
+            return $result;
+        }
+
         $yourClicks = $result['you']['clicks'];
         $oppClicks = $result['opponent']['clicks'];
         if ($yourClicks < $oppClicks) $result['winner'] = 'you';

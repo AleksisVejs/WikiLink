@@ -1,37 +1,16 @@
 <template>
   <div class="relative min-h-screen flex flex-col">
 
-    <!-- Top bar -->
-    <header class="relative z-20 glass-header shrink-0">
-      <div class="max-w-6xl mx-auto px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between gap-3">
-
-        <!-- Brand -->
-        <router-link to="/" class="flex items-center gap-2.5 shrink-0 group">
-          <img src="/favicon.svg" alt="WikiLink" class="w-8 h-8 sm:w-9 sm:h-9 drop-shadow-[0_0_8px_rgba(57,255,20,0.3)] group-hover:drop-shadow-[0_0_12px_rgba(57,255,20,0.5)] transition-all" />
-          <span class="font-pixel text-[8px] sm:text-[9px] text-crt-white/80 tracking-wider hidden sm:block">WIKILINK</span>
-        </router-link>
-
-        <!-- Right controls -->
-        <div class="flex items-center gap-1.5 sm:gap-2.5">
-          <router-link to="/" class="site-nav-group" style="text-decoration: none;">
-            <div class="site-nav-icon-btn">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" />
-              </svg>
-            </div>
-            <span class="font-mono text-[10px] text-retro-muted hidden sm:inline pr-1">HOME</span>
-          </router-link>
-          <template v-if="isOwnProfile && auth.user.value">
-            <button @click="handleLogout" class="site-nav-login-btn" style="border-color: rgba(255,68,68,0.2); color: rgba(255,68,68,0.6);" title="Logout">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              <span class="font-mono text-[10px] tracking-wider">LOGOUT</span>
-            </button>
-          </template>
-        </div>
-      </div>
-    </header>
+    <SiteTopNav
+      :user="auth.user.value"
+      :level="progression.level.value"
+      :current-xp="progression.currentXp.value"
+      :next-level-xp="progression.nextLevelXp.value"
+      :xp-percent="progression.progress.value * 100"
+      :show-xp-bar="!!auth.user.value"
+      @login="showAuthModal = true"
+      @logout="auth.logout()"
+    />
 
     <!-- Loading state -->
     <div v-if="pageLoading" class="flex-1 flex items-center justify-center">
@@ -513,6 +492,26 @@
       @close="showInviteModal = false"
       @start-match="startInviteMatch"
     />
+
+    <HomeAuthModal
+      :open="showAuthModal"
+      :mode="authMode"
+      :username="authUsername"
+      :password="authPassword"
+      :confirm-password="authConfirmPassword"
+      :show-password="authShowPassword"
+      :show-confirm-password="authShowConfirmPassword"
+      :error="authError"
+      :loading="auth.loading.value"
+      @close="closeAuthModal"
+      @set-mode="authMode = $event"
+      @submit="submitAuth"
+      @update:username="authUsername = $event"
+      @update:password="authPassword = $event"
+      @update:confirm-password="authConfirmPassword = $event"
+      @toggle-password="authShowPassword = !authShowPassword"
+      @toggle-confirm-password="authShowConfirmPassword = !authShowConfirmPassword"
+    />
   </div>
 </template>
 
@@ -527,6 +526,8 @@ import { useProgression } from '../composables/useProgression'
 import { useAchievements } from '../composables/useAchievements'
 import { useFriends } from '../composables/useFriends'
 import { useWikipedia } from '../composables/useWikipedia'
+import SiteTopNav from '../components/layout/SiteTopNav.vue'
+import HomeAuthModal from '../components/home/HomeAuthModal.vue'
 import ProfileInviteModal from '../components/profile/ProfileInviteModal.vue'
 
 const props = defineProps({ username: String })
@@ -545,6 +546,14 @@ const wiki = useWikipedia()
 const pageLoading = ref(true)
 const notFound = ref(false)
 const activeTab = ref('stats')
+const showAuthModal = ref(false)
+const authMode = ref('login')
+const authUsername = ref('')
+const authPassword = ref('')
+const authConfirmPassword = ref('')
+const authError = ref('')
+const authShowPassword = ref(false)
+const authShowConfirmPassword = ref(false)
 
 const profileData = ref({ username: '', created_at: '' })
 const profileServerStats = ref({ modes: {}, genres: {} })
@@ -673,6 +682,38 @@ const inviteMatchData = ref(null)
 const inviteError = ref('')
 let invitePollInterval = null
 
+watch(authMode, () => {
+  authError.value = ''
+  authConfirmPassword.value = ''
+  authShowPassword.value = false
+  authShowConfirmPassword.value = false
+})
+
+function closeAuthModal() {
+  showAuthModal.value = false
+  authError.value = ''
+  authPassword.value = ''
+  authConfirmPassword.value = ''
+  authShowPassword.value = false
+  authShowConfirmPassword.value = false
+}
+
+async function submitAuth() {
+  authError.value = ''
+  if (authMode.value === 'register' && authPassword.value !== authConfirmPassword.value) {
+    authError.value = 'Passwords do not match.'
+    return
+  }
+  const fn = authMode.value === 'login' ? auth.login : auth.register
+  const err = await fn(authUsername.value, authPassword.value)
+  if (err) {
+    authError.value = err
+    return
+  }
+  closeAuthModal()
+  authUsername.value = ''
+}
+
 function getModeLabel(modeId) {
   return GAME_MODES[modeId]?.name?.toUpperCase() || modeId?.toUpperCase() || 'UNKNOWN'
 }
@@ -793,11 +834,6 @@ async function handleDeleteAccount() {
   } finally {
     deleting.value = false
   }
-}
-
-function handleLogout() {
-  auth.logout()
-  router.push({ name: 'home' })
 }
 
 function debouncedSearch() {

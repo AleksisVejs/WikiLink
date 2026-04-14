@@ -393,6 +393,7 @@ const hintBannerTextClass = computed(() => {
 })
 
 const canReroll = computed(() => {
+  if (isMultiplayerGame.value) return false
   const m = props.mode
   return m !== 'daily' && m !== 'custom' && m !== 'freeplay' && m !== 'trending'
 })
@@ -594,6 +595,33 @@ async function initializeGame() {
       return
     }
 
+    const multiplayerFrom = typeof route.query.from === 'string' ? route.query.from.trim() : ''
+    const multiplayerTo = typeof route.query.to === 'string' ? route.query.to.trim() : ''
+    if (isMultiplayerGame.value && multiplayerFrom && multiplayerTo) {
+      const [startArticle, targetArticle] = await Promise.all([
+        wiki.getArticleSummary(multiplayerFrom),
+        wiki.getArticleSummary(multiplayerTo),
+      ])
+      if (!startArticle || !targetArticle) {
+        toast.error('Could not load multiplayer articles')
+        router.push({ name: 'home' })
+        return
+      }
+      game.initGame(
+        props.mode,
+        startArticle,
+        targetArticle,
+        genreId.value,
+        difficulty.value,
+        customLimitsFromRoute.value,
+        activeModifiers.value
+      )
+      await loadArticle(startArticle.title)
+      sound.playStart()
+      persistMultiplayerSession()
+      return
+    }
+
     if (props.mode === 'daily') {
       let pair = null
       try {
@@ -734,15 +762,13 @@ async function tryRestoreMultiplayerGame() {
   if (!isMultiplayerGame.value) return false
   const saved = loadMultiplayerSession()
   if (!saved || !saved.snapshot || !saved.route) return false
-  if (saved.userId !== (auth.user.value?.id || null)) return false
+  const currentUserId = auth.user.value?.id ?? null
+  const hasToken = !!localStorage.getItem('wikilink_token')
+  if (saved.userId != null && currentUserId != null && saved.userId !== currentUserId) return false
+  if (saved.userId != null && currentUserId == null && !hasToken) return false
   if (saved.route.mode !== props.mode) return false
   const code = activeMultiplayerCode()
   if (!code || saved.code !== code) return false
-  const routeFrom = sessionRouteQuery.value.from || ''
-  const routeTo = sessionRouteQuery.value.to || ''
-  const savedFrom = saved.route.query?.from || ''
-  const savedTo = saved.route.query?.to || ''
-  if (savedFrom !== routeFrom || savedTo !== routeTo) return false
 
   const restored = game.restoreSnapshot(saved.snapshot)
   if (!restored) return false
@@ -1070,14 +1096,9 @@ async function notifyMultiplayerLeave() {
 }
 
 function onBeforeUnloadLeave() {
-  if (!auth.isLoggedIn() || !isMultiplayerGame.value) return
-  const token = localStorage.getItem('wikilink_token')
-  if (!token) return
-  fetch('/api/multiplayer/leave-current', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    keepalive: true,
-  }).catch(() => {})
+  // Treat refresh/tab close as a transient disconnect, not an explicit quit.
+  // Presence/heartbeat grace window handles cleanup without forcing "player quit".
+  return
 }
 
 async function pollMatchPresence() {
@@ -1252,6 +1273,12 @@ function confirmQuit() {
 }
 
 async function goHome() {
+  if (matchCode.value && auth.isLoggedIn()) {
+    await api.post(`/match/quit/${matchCode.value}`).catch(() => {})
+  }
+  if (lobbyCode.value && auth.isLoggedIn()) {
+    await api.post(`/lobby/quit/${lobbyCode.value}`).catch(() => {})
+  }
   await notifyMultiplayerLeave()
   matchPolling.value = false
   if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
@@ -1268,6 +1295,32 @@ async function goHome() {
 }
 
 async function playAgain() {
+  if (matchCode.value && auth.isLoggedIn()) {
+    const replay = await api.post(`/match/replay/${matchCode.value}`).catch((e) => ({ error: e?.message || 'Replay unavailable' }))
+    if (replay?.error) {
+      toast.warn(replay.error)
+      return
+    }
+    clearMultiplayerSession()
+    await router.push({
+      name: 'home',
+      query: { replayType: 'match', replayCode: String(matchCode.value) },
+    })
+    return
+  }
+  if (lobbyCode.value && auth.isLoggedIn()) {
+    const replay = await api.post(`/lobby/replay/${lobbyCode.value}`).catch((e) => ({ error: e?.message || 'Replay unavailable' }))
+    if (replay?.error) {
+      toast.warn(replay.error)
+      return
+    }
+    clearMultiplayerSession()
+    await router.push({
+      name: 'home',
+      query: { replayType: 'lobby', replayCode: String(lobbyCode.value) },
+    })
+    return
+  }
   clearMultiplayerSession()
   resumedSoloAfterQuit.value = false
   showOpponentQuitModal.value = false
@@ -1340,7 +1393,6 @@ onMounted(() => {
     lastActivityHeartbeatAt = Date.now()
     multiplayerHeartbeatTimerId = setInterval(sendMultiplayerHeartbeat, 15000)
   }
-  window.addEventListener('beforeunload', onBeforeUnloadLeave)
   initializeGame()
 })
 
@@ -1352,7 +1404,6 @@ onUnmounted(() => {
   window.removeEventListener('click', onMeaningfulActivity)
   window.removeEventListener('keydown', onMeaningfulActivity)
   window.removeEventListener('focus', onVisibilityOrFocus)
-  window.removeEventListener('beforeunload', onBeforeUnloadLeave)
   document.removeEventListener('visibilitychange', onVisibilityOrFocus)
   clearTimeout(hoverTimer)
   matchPolling.value = false

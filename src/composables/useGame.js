@@ -209,8 +209,10 @@ export function useGame() {
     return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
   })
 
-  function startTimer() {
-    state.startTime = Date.now()
+  function startTimer(preserveStartTime = false) {
+    if (!preserveStartTime || !Number.isFinite(state.startTime)) {
+      state.startTime = Date.now()
+    }
     timerInterval.value = setInterval(() => {
       state.elapsed = Math.floor((Date.now() - state.startTime) / 1000)
       if (state.effectiveTimeLimit) {
@@ -408,6 +410,13 @@ export function useGame() {
 
   function exportSnapshot() {
     if (!state.mode || !state.startArticle || !state.currentArticle) return null
+    const now = Date.now()
+    const liveElapsed = state.status === 'playing' && Number.isFinite(state.startTime)
+      ? Math.floor((now - state.startTime) / 1000)
+      : state.elapsed
+    const liveRemaining = state.effectiveTimeLimit
+      ? Math.max(0, state.effectiveTimeLimit - liveElapsed - state.speedDecayPenalty)
+      : null
     return {
       mode: state.mode,
       genre: state.genre,
@@ -418,8 +427,8 @@ export function useGame() {
       currentArticle: state.currentArticle,
       path: [...state.path],
       clicks: state.clicks,
-      elapsed: state.elapsed,
-      timeRemaining: state.timeRemaining,
+      elapsed: liveElapsed,
+      timeRemaining: liveRemaining,
       effectiveTimeLimit: state.effectiveTimeLimit,
       effectiveClickLimit: state.effectiveClickLimit,
       speedDecayPenalty: state.speedDecayPenalty,
@@ -428,7 +437,7 @@ export function useGame() {
       hintsUsed: state.hintsUsed,
       combo: state.combo,
       lastClickTime: state.lastClickTime,
-      savedAt: Date.now(),
+      savedAt: now,
     }
   }
 
@@ -447,10 +456,19 @@ export function useGame() {
       ? [...snapshot.path]
       : (snapshot.currentArticle ? [snapshot.currentArticle] : [])
     state.clicks = Number.isFinite(snapshot.clicks) ? snapshot.clicks : 0
-    state.elapsed = Number.isFinite(snapshot.elapsed) ? snapshot.elapsed : 0
+    const baseElapsed = Number.isFinite(snapshot.elapsed) ? snapshot.elapsed : 0
+    const savedAt = Number.isFinite(snapshot.savedAt) ? snapshot.savedAt : null
+    const ageSeconds = (state.status === 'playing' && savedAt)
+      ? Math.max(0, Math.floor((Date.now() - savedAt) / 1000))
+      : 0
+    state.elapsed = baseElapsed + ageSeconds
     state.effectiveTimeLimit = Number.isFinite(snapshot.effectiveTimeLimit) ? snapshot.effectiveTimeLimit : null
     state.effectiveClickLimit = Number.isFinite(snapshot.effectiveClickLimit) ? snapshot.effectiveClickLimit : null
-    state.timeRemaining = Number.isFinite(snapshot.timeRemaining) ? snapshot.timeRemaining : state.effectiveTimeLimit
+    if (state.effectiveTimeLimit) {
+      state.timeRemaining = Math.max(0, state.effectiveTimeLimit - state.elapsed - state.speedDecayPenalty)
+    } else {
+      state.timeRemaining = null
+    }
     state.speedDecayPenalty = Number.isFinite(snapshot.speedDecayPenalty) ? snapshot.speedDecayPenalty : 0
     state.modifiers = Array.isArray(snapshot.modifiers) ? [...snapshot.modifiers] : []
     state.hints = Number.isFinite(snapshot.hints) ? snapshot.hints : 3
@@ -460,7 +478,7 @@ export function useGame() {
 
     if (state.status === 'playing') {
       state.startTime = Date.now() - (state.elapsed * 1000)
-      startTimer()
+      startTimer(true)
     } else {
       state.startTime = Date.now() - (state.elapsed * 1000)
     }

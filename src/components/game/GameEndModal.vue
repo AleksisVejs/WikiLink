@@ -152,10 +152,24 @@
                   <div class="font-pixel text-[6px] text-crt-cyan tracking-[0.15em]">GROUP LEADERBOARD</div>
                   <span v-if="lobbyYourRank != null" class="font-mono text-[9px] text-crt-green">You: #{{ lobbyYourRank }}</span>
                 </div>
+                <div v-if="lobbyResult.leaderboard.every(row => !row.reached_target)" class="mb-2 rounded px-2 py-1 font-mono text-[10px] text-crt-amber text-center" style="background: rgba(255,191,0,0.06); border: 1px solid rgba(255,191,0,0.2);">
+                  Nobody reached the target. Result is a tie.
+                </div>
+                <div class="mb-1 px-1 py-1 rounded font-mono text-[9px] text-retro-muted/70" style="background: rgba(37,39,56,0.35); border: 1px solid rgba(37,39,56,0.55);">
+                  <div class="flex items-center gap-2">
+                    <span class="w-7 text-right shrink-0">Rank</span>
+                    <span class="flex-1">Player</span>
+                    <span class="shrink-0 tabular-nums">Clicks</span>
+                    <span class="shrink-0 tabular-nums w-12 text-right">Time</span>
+                  </div>
+                </div>
                 <div class="space-y-0.5 font-mono text-[11px] max-h-[220px] overflow-y-auto">
                   <div v-for="row in lobbyResult.leaderboard" :key="row.user_id" class="flex items-center gap-2 py-1 rounded px-1" :class="{ 'bg-crt-green/[0.04] border-l-2 border-l-crt-green': currentUserId != null && row.user_id === currentUserId }">
                     <span class="text-retro-muted w-7 text-right shrink-0 flex items-center justify-end">
-                      <template v-if="row.rank === 1">
+                      <template v-if="!row.reached_target">
+                        <span class="font-pixel text-[7px] text-crt-red/85">DNF</span>
+                      </template>
+                      <template v-else-if="row.rank === 1">
                         <svg class="w-4 h-4 text-arcade-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                         </svg>

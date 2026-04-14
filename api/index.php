@@ -24,6 +24,7 @@ require_once __DIR__ . '/challenge.php';
 require_once __DIR__ . '/stats.php';
 require_once __DIR__ . '/user_stats.php';
 require_once __DIR__ . '/trending.php';
+require_once __DIR__ . '/multiplayer_settings.php';
 require_once __DIR__ . '/match.php';
 require_once __DIR__ . '/lobby.php';
 require_once __DIR__ . '/friends.php';
@@ -299,8 +300,17 @@ if ($method === 'POST' && $uri === '/match/create') {
     $result = createMatch(
         isset($body['startTitle']) ? $body['startTitle'] : '',
         isset($body['endTitle']) ? $body['endTitle'] : '',
-        $user['id']
+        $user['id'],
+        isset($body['settings']) ? $body['settings'] : null
     );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /match/settings/:code
+if ($method === 'POST' && preg_match('#^/match/settings/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = updateMatchSettings($m[1], $user['id'], isset($body['settings']) ? $body['settings'] : null);
     jsonResponse($result, isset($result['error']) ? 400 : 200);
 }
 
@@ -336,6 +346,26 @@ if ($method === 'POST' && preg_match('#^/match/start/([A-Za-z0-9]+)$#', $uri, $m
 if ($method === 'POST' && preg_match('#^/match/quit/([A-Za-z0-9]+)$#', $uri, $m)) {
     $user = requireAuth();
     $result = quitMatch($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /match/replay/:code
+if ($method === 'POST' && preg_match('#^/match/replay/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = requestMatchReplay($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /match/reseed/:code
+if ($method === 'POST' && preg_match('#^/match/reseed/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = reseedMatchPair(
+        $m[1],
+        $user['id'],
+        isset($body['startTitle']) ? $body['startTitle'] : '',
+        isset($body['endTitle']) ? $body['endTitle'] : ''
+    );
     jsonResponse($result, isset($result['error']) ? 400 : 200);
 }
 
@@ -389,8 +419,17 @@ if ($method === 'POST' && $uri === '/lobby/create') {
         isset($body['startTitle']) ? $body['startTitle'] : '',
         isset($body['endTitle']) ? $body['endTitle'] : '',
         $user['id'],
-        $max
+        $max,
+        isset($body['settings']) ? $body['settings'] : null
     );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /lobby/settings/:code
+if ($method === 'POST' && preg_match('#^/lobby/settings/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = updateLobbySettings($m[1], $user['id'], isset($body['settings']) ? $body['settings'] : null);
     jsonResponse($result, isset($result['error']) ? 400 : 200);
 }
 
@@ -435,6 +474,33 @@ if ($method === 'POST' && preg_match('#^/lobby/ping/([A-Za-z0-9]+)$#', $uri, $m)
     $user = requireAuth();
     touchLobbyPresence($m[1], $user['id']);
     jsonResponse(['ok' => true]);
+}
+
+// POST /lobby/replay/:code
+if ($method === 'POST' && preg_match('#^/lobby/replay/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = requestLobbyReplay($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /lobby/reseed/:code
+if ($method === 'POST' && preg_match('#^/lobby/reseed/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = reseedLobbyPair(
+        $m[1],
+        $user['id'],
+        isset($body['startTitle']) ? $body['startTitle'] : '',
+        isset($body['endTitle']) ? $body['endTitle'] : ''
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /lobby/quit/:code
+if ($method === 'POST' && preg_match('#^/lobby/quit/([A-Za-z0-9]+)$#', $uri, $m)) {
+    $user = requireAuth();
+    $result = quitLobby($m[1], $user['id']);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
 }
 
 // GET /user/search?q=...
