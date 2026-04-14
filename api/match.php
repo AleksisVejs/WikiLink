@@ -57,6 +57,12 @@ function cleanupStaleMatches() {
           AND (COALESCE(p1_quit, 0) = 1 OR COALESCE(p2_quit, 0) = 1)
           AND created_at < datetime('now', '-15 minutes')");
 
+    // Safety net: very old active matches should not block new rooms forever.
+    $db->exec("UPDATE matches
+        SET status = 'finished'
+        WHERE status = 'active'
+          AND created_at < datetime('now', '-12 hours')");
+
     // Keep DB lean: remove old finished rows.
     $db->exec("DELETE FROM matches
         WHERE status = 'finished'
