@@ -528,12 +528,7 @@ function processPostGame(won) {
     setTimeout(() => showLevelUp.value = false, 2500)
   }
 
-  const dailyData = game.getDailyStatus()
-  let dailyCompletions = 0
-  try {
-    const allDaily = JSON.parse(localStorage.getItem('wikilink_daily') || '{}')
-    dailyCompletions = Object.values(allDaily).filter(d => d.completed).length
-  } catch { /* ignore */ }
+  const dailyCompletions = game.getDailyCompletions()
 
   const newUnlocks = achievements.checkAchievements({
     won,

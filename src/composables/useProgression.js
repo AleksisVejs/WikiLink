@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
+import { useApi } from './useApi.js'
 
-const XP_KEY = 'wikilink_progression'
+const XP_KEY_BASE = 'wikilink_progression'
 
 function xpForLevel(level) {
   return level * 200
@@ -18,14 +19,28 @@ function levelFromXp(totalXp) {
 
 function loadProgression() {
   try {
-    return JSON.parse(localStorage.getItem(XP_KEY)) || { totalXp: 0 }
+    return JSON.parse(localStorage.getItem(XP_KEY_BASE)) || { totalXp: 0 }
   } catch {
     return { totalXp: 0 }
   }
 }
 
-function saveProgression(data) {
-  localStorage.setItem(XP_KEY, JSON.stringify(data))
+function loadProgressionByKey(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || { totalXp: 0 }
+  } catch {
+    return { totalXp: 0 }
+  }
+}
+
+function saveProgressionByKey(key, data) {
+  localStorage.setItem(key, JSON.stringify(data))
+}
+
+function totalXpFromStats(stats) {
+  const value = Number(stats?.progression?.totalXp)
+  if (!Number.isFinite(value) || value < 0) return null
+  return Math.round(value)
 }
 
 const MODE_XP = {
@@ -52,6 +67,34 @@ function modifierMultiplier(modifierCount) {
 
 const totalXp = ref(loadProgression().totalXp)
 let xpCheatRegistered = false
+const api = useApi()
+let lastSyncedXp = totalXp.value
+let activeProgressionKey = XP_KEY_BASE
+
+export function hydrateProgressionFromStats(stats, userId = null) {
+  if (!userId) {
+    activeProgressionKey = XP_KEY_BASE
+    const guestTotalXp = Math.max(0, Number(loadProgressionByKey(activeProgressionKey).totalXp) || 0)
+    totalXp.value = guestTotalXp
+    lastSyncedXp = guestTotalXp
+    return
+  }
+
+  activeProgressionKey = `${XP_KEY_BASE}_${userId}`
+  const serverTotalXp = totalXpFromStats(stats) ?? 0
+  totalXp.value = serverTotalXp
+  saveProgressionByKey(activeProgressionKey, { totalXp: serverTotalXp })
+  lastSyncedXp = serverTotalXp
+}
+
+function syncXpToServer() {
+  const token = localStorage.getItem('wikilink_token')
+  if (!token) return
+  if (totalXp.value === lastSyncedXp) return
+  const payloadXp = totalXp.value
+  lastSyncedXp = payloadXp
+  api.post('/progression/sync', { totalXp: payloadXp }).catch(() => {})
+}
 
 export function useProgression() {
   const levelInfo = computed(() => levelFromXp(totalXp.value))
@@ -124,7 +167,8 @@ export function useProgression() {
     const totalReward = rewards.reduce((sum, r) => sum + r.xp, 0)
 
     totalXp.value += totalReward
-    saveProgression({ totalXp: totalXp.value })
+    saveProgressionByKey(activeProgressionKey, { totalXp: totalXp.value })
+    syncXpToServer()
 
     const newLevel = level.value
     const leveledUp = newLevel > previousLevel
@@ -140,7 +184,8 @@ export function useProgression() {
 
     const previousLevel = level.value
     totalXp.value += parsed
-    saveProgression({ totalXp: totalXp.value })
+    saveProgressionByKey(activeProgressionKey, { totalXp: totalXp.value })
+    syncXpToServer()
 
     const newLevel = level.value
     const leveledUp = newLevel > previousLevel

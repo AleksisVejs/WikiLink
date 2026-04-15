@@ -259,6 +259,16 @@ if ($method === 'GET' && $uri === '/daily/leaderboard') {
     jsonResponse(['date' => $date, 'scores' => getDailyLeaderboard($date)]);
 }
 
+// GET /daily/status (logged-in: current daily completion + total completions)
+if ($method === 'GET' && $uri === '/daily/status') {
+    $user = requireAuth();
+    $date = isset($_GET['date']) ? $_GET['date'] : gmdate('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        jsonResponse(['error' => 'Invalid date format.'], 400);
+    }
+    jsonResponse(getUserDailyStatus($user['id'], $date));
+}
+
 // POST /challenge
 if ($method === 'POST' && $uri === '/challenge') {
     requireRateLimit('challenge', 10, 60);
@@ -297,6 +307,35 @@ if ($method === 'POST' && $uri === '/stats/game') {
     $stats = recordGameResult($user['id'], $mode, $genre, $clicks, $time, $won);
     incrementGlobalGame($clicks, $won);
     jsonResponse(['ok' => true, 'stats' => $stats]);
+}
+
+// POST /progression/sync (logged-in: sync total XP across devices)
+if ($method === 'POST' && $uri === '/progression/sync') {
+    $user = requireAuth();
+    requireRateLimit('progression_sync', 30, 60);
+    $body = jsonInput();
+    $totalXp = (int)(isset($body['totalXp']) ? $body['totalXp'] : 0);
+    $stats = setUserProgressionXp($user['id'], $totalXp);
+    jsonResponse([
+        'ok' => true,
+        'totalXp' => (int)($stats['progression']['totalXp'] ?? 0),
+        'stats' => $stats,
+    ]);
+}
+
+// POST /achievements/sync (logged-in: sync achievement state across devices)
+if ($method === 'POST' && $uri === '/achievements/sync') {
+    $user = requireAuth();
+    requireRateLimit('achievements_sync', 30, 60);
+    $body = jsonInput();
+    $unlocked = (isset($body['unlocked']) && is_array($body['unlocked'])) ? $body['unlocked'] : [];
+    $noHintWins = (int)(isset($body['noHintWins']) ? $body['noHintWins'] : 0);
+    $stats = setUserAchievementsState($user['id'], $unlocked, $noHintWins);
+    jsonResponse([
+        'ok' => true,
+        'achievements' => $stats['achievements'] ?? ['unlocked' => [], 'noHintWins' => 0],
+        'stats' => $stats,
+    ]);
 }
 
 // POST /stats/increment (anonymous: global stats only)

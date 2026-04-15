@@ -160,6 +160,11 @@ function loadDaily() {
   catch { return {} }
 }
 
+function localDailyCompletionsCount() {
+  const daily = loadDaily()
+  return Object.values(daily).filter(d => d?.completed).length
+}
+
 // --- Game composable ---
 
 export function useGame() {
@@ -187,6 +192,7 @@ export function useGame() {
   })
 
   const timerInterval = ref(null)
+  const dailyServerStatus = ref(null)
 
   const NO_BACK_MODES = ['daily', 'challenge']
 
@@ -356,6 +362,18 @@ export function useGame() {
     const daily = loadDaily()
     daily[utcDateKey()] = { completed: true, clicks: state.clicks, time: state.elapsed }
     localStorage.setItem(DAILY_KEY, JSON.stringify(daily))
+    if (dailyServerStatus.value?.date === utcDateKey()) {
+      dailyServerStatus.value = {
+        ...dailyServerStatus.value,
+        completed: true,
+        clicks: state.clicks,
+        time: state.elapsed,
+        totalCompletions: Math.max(
+          Number(dailyServerStatus.value.totalCompletions) || 0,
+          localDailyCompletionsCount(),
+        ),
+      }
+    }
   }
 
   async function cheatDailyResult(clicks = 3, time = 30, submitToServer = true) {
@@ -386,7 +404,59 @@ export function useGame() {
   }
 
   function getStats() { return loadStats() }
-  function getDailyStatus() { return loadDaily()[utcDateKey()] || null }
+  function getDailyStatus() {
+    const localStatus = loadDaily()[utcDateKey()] || null
+    if (!localStorage.getItem('wikilink_token')) return localStatus
+    if (!dailyServerStatus.value || dailyServerStatus.value.date !== utcDateKey()) {
+      refreshDailyStatus().catch(() => {})
+      return localStatus
+    }
+    return {
+      completed: !!dailyServerStatus.value.completed,
+      clicks: dailyServerStatus.value.clicks,
+      time: dailyServerStatus.value.time,
+    }
+  }
+
+  function getDailyCompletions() {
+    const localCount = localDailyCompletionsCount()
+    if (!localStorage.getItem('wikilink_token')) return localCount
+    if (!dailyServerStatus.value || dailyServerStatus.value.date !== utcDateKey()) {
+      refreshDailyStatus().catch(() => {})
+    }
+    const serverCount = Number(dailyServerStatus.value?.totalCompletions) || 0
+    return serverCount
+  }
+
+  async function refreshDailyStatus(date = utcDateKey()) {
+    const token = localStorage.getItem('wikilink_token')
+    if (!token) return null
+    try {
+      const api = useApi()
+      const data = await api.get(`/daily/status?date=${encodeURIComponent(date)}`)
+      if (data && typeof data === 'object') {
+        dailyServerStatus.value = {
+          date: data.date || date,
+          completed: !!data.completed,
+          clicks: Number.isFinite(data.clicks) ? data.clicks : null,
+          time: Number.isFinite(data.time) ? data.time : null,
+          totalCompletions: Math.max(0, Number(data.totalCompletions) || 0),
+        }
+      }
+      if (dailyServerStatus.value?.completed && dailyServerStatus.value.date === date) {
+        const daily = loadDaily()
+        daily[date] = {
+          completed: true,
+          clicks: dailyServerStatus.value.clicks,
+          time: dailyServerStatus.value.time,
+        }
+        localStorage.setItem(DAILY_KEY, JSON.stringify(daily))
+      }
+      return dailyServerStatus.value
+    } catch {
+      return null
+    }
+  }
 
   function goBack() {
     if (!isPlaying.value || state.path.length <= 1 || backDisabled.value) return null
@@ -519,6 +589,8 @@ export function useGame() {
     dailyCheatRegistered = true
   }
 
+  refreshDailyStatus()
+
   return {
     state,
     GAME_MODES,
@@ -542,6 +614,8 @@ export function useGame() {
     resetGame,
     getStats,
     getDailyStatus,
+    getDailyCompletions,
+    refreshDailyStatus,
     cheatDailyResult,
     getEffectiveLimits,
     LIMIT_BOUNDS,

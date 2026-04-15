@@ -117,3 +117,26 @@ function getUserDailyStreak($userId) {
     }
     return $streak;
 }
+
+function getUserDailyStatus($userId, $date) {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        $date = gmdate('Y-m-d');
+    }
+
+    $db = getDb();
+    $todayStmt = $db->prepare('SELECT clicks, time_seconds FROM daily_scores WHERE user_id = ? AND date = ? LIMIT 1');
+    $todayStmt->execute([(int)$userId, $date]);
+    $today = $todayStmt->fetch();
+
+    $countStmt = $db->prepare('SELECT COUNT(*) as total FROM daily_scores WHERE user_id = ?');
+    $countStmt->execute([(int)$userId]);
+    $totalCompletions = (int)($countStmt->fetch()['total'] ?? 0);
+
+    return [
+        'date' => $date,
+        'completed' => !!$today,
+        'clicks' => $today ? (int)$today['clicks'] : null,
+        'time' => $today ? (int)$today['time_seconds'] : null,
+        'totalCompletions' => $totalCompletions,
+    ];
+}

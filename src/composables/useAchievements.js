@@ -1,6 +1,8 @@
 import { ref, computed } from 'vue'
+import { useApi } from './useApi.js'
 
-const ACHIEVEMENTS_KEY = 'wikilink_achievements'
+const ACHIEVEMENTS_KEY_BASE = 'wikilink_achievements'
+const NO_HINT_WINS_KEY_BASE = 'wikilink_nohint_wins'
 
 const ACHIEVEMENTS = {
   speed_demon:      { id: 'speed_demon',      name: 'Speed Demon',      description: 'Win a game in under 30 seconds',     xp: 50,  category: 'speed' },
@@ -28,18 +30,85 @@ const ACHIEVEMENTS = {
 
 function loadAchievements() {
   try {
-    return JSON.parse(localStorage.getItem(ACHIEVEMENTS_KEY)) || {}
+    return JSON.parse(localStorage.getItem(ACHIEVEMENTS_KEY_BASE)) || {}
   } catch {
     return {}
   }
 }
 
-function saveAchievements(data) {
-  localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(data))
+function loadAchievementsByKey(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || {}
+  } catch {
+    return {}
+  }
+}
+
+function saveAchievementsByKey(key, data) {
+  localStorage.setItem(key, JSON.stringify(data))
+}
+
+function loadNoHintWinsByKey(key) {
+  const parsed = Number(localStorage.getItem(key))
+  if (!Number.isFinite(parsed) || parsed < 0) return 0
+  return Math.round(parsed)
+}
+
+function saveNoHintWinsByKey(key, value) {
+  localStorage.setItem(key, String(Math.max(0, Math.round(Number(value) || 0))))
 }
 
 const unlockedMap = ref(loadAchievements())
 const recentUnlocks = ref([])
+const noHintWins = ref(loadNoHintWinsByKey(NO_HINT_WINS_KEY_BASE))
+const api = useApi()
+let lastSyncedState = JSON.stringify({
+  unlocked: unlockedMap.value,
+  noHintWins: noHintWins.value,
+})
+let activeAchievementsKey = ACHIEVEMENTS_KEY_BASE
+let activeNoHintWinsKey = NO_HINT_WINS_KEY_BASE
+
+function syncAchievementsToServer() {
+  const token = localStorage.getItem('wikilink_token')
+  if (!token) return
+  const payload = {
+    unlocked: unlockedMap.value,
+    noHintWins: noHintWins.value,
+  }
+  const serialized = JSON.stringify(payload)
+  if (serialized === lastSyncedState) return
+  lastSyncedState = serialized
+  api.post('/achievements/sync', payload).catch(() => {})
+}
+
+export function hydrateAchievementsFromStats(stats, userId = null) {
+  if (!userId) {
+    activeAchievementsKey = ACHIEVEMENTS_KEY_BASE
+    activeNoHintWinsKey = NO_HINT_WINS_KEY_BASE
+    const guestUnlocked = loadAchievementsByKey(activeAchievementsKey)
+    const guestNoHintWins = loadNoHintWinsByKey(activeNoHintWinsKey)
+    unlockedMap.value = guestUnlocked
+    noHintWins.value = guestNoHintWins
+    lastSyncedState = JSON.stringify({ unlocked: guestUnlocked, noHintWins: guestNoHintWins })
+    return
+  }
+
+  activeAchievementsKey = `${ACHIEVEMENTS_KEY_BASE}_${userId}`
+  activeNoHintWinsKey = `${NO_HINT_WINS_KEY_BASE}_${userId}`
+  const serverUnlocked = stats?.achievements?.unlocked
+  const serverNoHintWinsRaw = Number(stats?.achievements?.noHintWins)
+  const normalizedUnlocked = (serverUnlocked && typeof serverUnlocked === 'object') ? serverUnlocked : {}
+  const normalizedNoHintWins = (Number.isFinite(serverNoHintWinsRaw) && serverNoHintWinsRaw >= 0)
+    ? Math.round(serverNoHintWinsRaw)
+    : 0
+
+  unlockedMap.value = normalizedUnlocked
+  noHintWins.value = normalizedNoHintWins
+  saveAchievementsByKey(activeAchievementsKey, normalizedUnlocked)
+  saveNoHintWinsByKey(activeNoHintWinsKey, normalizedNoHintWins)
+  lastSyncedState = JSON.stringify({ unlocked: normalizedUnlocked, noHintWins: normalizedNoHintWins })
+}
 
 export function useAchievements() {
   const unlockedCount = computed(() => Object.keys(unlockedMap.value).length)
@@ -50,7 +119,8 @@ export function useAchievements() {
     if (!ACHIEVEMENTS[id]) return false
 
     unlockedMap.value[id] = { unlockedAt: new Date().toISOString() }
-    saveAchievements(unlockedMap.value)
+    saveAchievementsByKey(activeAchievementsKey, unlockedMap.value)
+    syncAchievementsToServer()
     recentUnlocks.value.push(ACHIEVEMENTS[id])
     return true
   }
@@ -104,10 +174,11 @@ export function useAchievements() {
 
       if (modifiers.length >= 3 && unlock('modifier_master')) newUnlocks.push('modifier_master')
 
-      const noHintWins = parseInt(localStorage.getItem('wikilink_nohint_wins') || '0')
       if (hintsUsed === 0) {
-        const newCount = noHintWins + 1
-        localStorage.setItem('wikilink_nohint_wins', String(newCount))
+        const newCount = noHintWins.value + 1
+        noHintWins.value = newCount
+        saveNoHintWinsByKey(activeNoHintWinsKey, newCount)
+        syncAchievementsToServer()
         if (newCount >= 10 && unlock('no_hints')) newUnlocks.push('no_hints')
       }
     }
