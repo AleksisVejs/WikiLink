@@ -1,8 +1,8 @@
 <?php
 
-const MULTIPLAYER_ALLOWED_MODES = ['classic', 'sprint', 'challenge', 'custom'];
-const MULTIPLAYER_ALLOWED_MODIFIERS = ['fog', 'blackout', 'noback', 'speedDecay'];
-const MULTIPLAYER_ALLOWED_GENRES = ['random', 'history', 'science', 'geography', 'culture', 'technology', 'sports'];
+const MULTIPLAYER_ALLOWED_MODES = ['classic', 'sprint', 'challenge', 'custom', 'sudden'];
+const MULTIPLAYER_ALLOWED_MODIFIERS = ['fog', 'blackout', 'noback', 'speeddecay', 'suddendeath'];
+const MULTIPLAYER_ALLOWED_GENRES = ['random', 'history', 'science', 'geography', 'technology', 'sports', 'nature', 'music', 'movies', 'food'];
 
 function normalizeMultiplayerSettings($input) {
     $payload = is_array($input) ? $input : [];
@@ -15,10 +15,20 @@ function normalizeMultiplayerSettings($input) {
 
     $modifiersRaw = isset($payload['modifiers']) && is_array($payload['modifiers']) ? $payload['modifiers'] : [];
     $modifiers = [];
+    $modifierCanonicalMap = [
+        'fog' => 'fog',
+        'blackout' => 'blackout',
+        'noback' => 'noback',
+        'speeddecay' => 'speedDecay',
+        'suddendeath' => 'suddenDeath',
+    ];
     foreach ($modifiersRaw as $mod) {
         $modId = strtolower(trim((string)$mod));
-        if (in_array($modId, MULTIPLAYER_ALLOWED_MODIFIERS, true) && !in_array($modId, $modifiers, true)) {
-            $modifiers[] = $modId;
+        if (in_array($modId, MULTIPLAYER_ALLOWED_MODIFIERS, true)) {
+            $canonicalId = isset($modifierCanonicalMap[$modId]) ? $modifierCanonicalMap[$modId] : $modId;
+            if (!in_array($canonicalId, $modifiers, true)) {
+                $modifiers[] = $canonicalId;
+            }
         }
     }
     if (count($modifiers) > 4) $modifiers = array_slice($modifiers, 0, 4);
@@ -38,6 +48,8 @@ function normalizeMultiplayerSettings($input) {
     $customStartTitle = null;
     $customEndTitle = null;
     if ($mode === 'custom') {
+        // Custom mode uses explicit titles, so keep genre fixed.
+        $genre = 'random';
         $customStartTitle = isset($payload['customStartTitle']) ? trim((string)$payload['customStartTitle']) : null;
         $customEndTitle = isset($payload['customEndTitle']) ? trim((string)$payload['customEndTitle']) : null;
         if ($customStartTitle === '') $customStartTitle = null;

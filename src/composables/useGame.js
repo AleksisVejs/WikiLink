@@ -75,6 +75,7 @@ const MODIFIERS = {
   blackout:  { id: 'blackout',  name: 'Blackout',      description: '30% of links randomly disabled' },
   noback:    { id: 'noback',    name: 'No Back',       description: 'Back button is disabled' },
   speedDecay:{ id: 'speedDecay',name: 'Speed Decay',   description: 'Timer speeds up with each click (Sprint only)' },
+  suddenDeath:{ id: 'suddenDeath',name: 'Sudden Death', description: 'First player to reach target ends the room instantly' },
 }
 
 const DIFFICULTIES = {

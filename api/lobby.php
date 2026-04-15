@@ -465,6 +465,14 @@ function startLobby($code, $userId) {
     if ($lobby['status'] !== 'waiting') {
         return ['error' => 'Lobby has already started.'];
     }
+    $settings = decodeMultiplayerSettings(isset($lobby['settings_json']) ? $lobby['settings_json'] : null);
+    if (isset($settings['mode']) && $settings['mode'] === 'custom') {
+        $startNorm = strtolower(trim(str_replace('_', ' ', (string)$lobby['start_title'])));
+        $endNorm = strtolower(trim(str_replace('_', ' ', (string)$lobby['end_title'])));
+        if ($startNorm !== '' && $startNorm === $endNorm) {
+            return ['error' => 'Custom start and target must be different.'];
+        }
+    }
 
     try {
         $db->beginTransaction();
@@ -518,9 +526,19 @@ function submitLobbyResult($code, $userId, $clicks, $time, $path) {
         return ['error' => 'You are not in this lobby.'];
     }
 
-    $pathJson = json_encode(is_array($path) ? $path : []);
+    $pathArray = is_array($path) ? $path : [];
+    $pathJson = json_encode($pathArray);
     $safeClicks = max(0, (int)$clicks);
     $safeTime = max(0, (int)$time);
+    $settings = decodeMultiplayerSettings(isset($lobby['settings_json']) ? $lobby['settings_json'] : null);
+    $isSuddenDeath = (isset($settings['mode']) && $settings['mode'] === 'sudden')
+        || (isset($settings['modifiers']) && is_array($settings['modifiers']) && in_array('suddenDeath', $settings['modifiers'], true));
+    $targetNorm = strtolower(str_replace(' ', '_', (string)$lobby['end_title']));
+    $submittedReachedTarget = false;
+    if (!empty($pathArray)) {
+        $submittedLast = strtolower(str_replace(' ', '_', (string)$pathArray[count($pathArray) - 1]));
+        $submittedReachedTarget = ($submittedLast === $targetNorm);
+    }
 
     try {
         $db->beginTransaction();
@@ -535,7 +553,9 @@ function submitLobbyResult($code, $userId, $clicks, $time, $path) {
         ');
         $stmt->execute([$lobbyId]);
         $row = $stmt->fetch();
-        if ((int)$row['total'] > 0 && (int)$row['submitted'] === (int)$row['total']) {
+        if ($isSuddenDeath && $submittedReachedTarget) {
+            $db->prepare("UPDATE lobbies SET status = 'finished' WHERE id = ?")->execute([$lobbyId]);
+        } elseif ((int)$row['total'] > 0 && (int)$row['submitted'] === (int)$row['total']) {
             $db->prepare("UPDATE lobbies SET status = 'finished' WHERE id = ?")->execute([$lobbyId]);
         }
         $db->commit();

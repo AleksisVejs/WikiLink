@@ -101,6 +101,17 @@ function initSchema($db) {
         "CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id, status)",
         "CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id, status)",
 
+        "CREATE TABLE IF NOT EXISTS head_to_head_stats (
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            opponent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            wins INTEGER NOT NULL DEFAULT 0,
+            losses INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (user_id, opponent_id)
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_h2h_user ON head_to_head_stats(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_h2h_opponent ON head_to_head_stats(opponent_id)",
+
         "CREATE TABLE IF NOT EXISTS game_invites (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             sender_user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

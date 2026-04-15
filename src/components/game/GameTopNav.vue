@@ -115,11 +115,11 @@
             </div>
           </div>
 
-          <button @click="$emit('toggle-mute')" class="flex items-center justify-center w-8 h-8 rounded-lg transition-all hover:bg-retro-surface/50" :title="muted ? 'Unmute' : 'Mute'">
-            <svg v-if="!muted" class="w-3.5 h-3.5 text-retro-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button @click="$emit('toggle-mute')" class="game-nav-mute-btn" :title="muted ? 'Unmute' : 'Mute'">
+            <svg v-if="!muted" class="w-3.5 h-3.5 game-nav-mute-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M12 6l-4 4H4v4h4l4 4V6z" />
             </svg>
-            <svg v-else class="w-3.5 h-3.5 text-retro-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-else class="w-3.5 h-3.5 game-nav-mute-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
             </svg>
           </button>

@@ -57,7 +57,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div>
                     <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Genre</p>
-                    <select :value="roomSettings.genre" :disabled="!canEditRoomSettings" @change="$emit('update-room-settings', { genre: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
+                    <select :value="roomSettings.genre" :disabled="!canEditRoomSettings || roomSettings.mode === 'custom'" @change="$emit('update-room-settings', { genre: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
                       <option v-for="g in roomGenres" :key="g.id" :value="g.id">{{ g.name }}</option>
                     </select>
                   </div>
@@ -203,7 +203,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div>
                     <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Genre</p>
-                    <select :value="roomSettings.genre" :disabled="!canEditRoomSettings" @change="$emit('update-room-settings', { genre: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
+                    <select :value="roomSettings.genre" :disabled="!canEditRoomSettings || roomSettings.mode === 'custom'" @change="$emit('update-room-settings', { genre: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
                       <option v-for="g in roomGenres" :key="g.id" :value="g.id">{{ g.name }}</option>
                     </select>
                   </div>

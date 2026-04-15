@@ -334,6 +334,14 @@ function startMatch($code, $userId) {
     if ($match['status'] === 'finished') {
         return ['error' => 'Match is already finished.'];
     }
+    $settings = decodeMultiplayerSettings(isset($match['settings_json']) ? $match['settings_json'] : null);
+    if (isset($settings['mode']) && $settings['mode'] === 'custom') {
+        $startNorm = strtolower(trim(str_replace('_', ' ', (string)$match['start_title'])));
+        $endNorm = strtolower(trim(str_replace('_', ' ', (string)$match['end_title'])));
+        if ($startNorm !== '' && $startNorm === $endNorm) {
+            return ['error' => 'Custom start and target must be different.'];
+        }
+    }
 
     if ($match['status'] !== 'active') {
         try {
@@ -385,9 +393,19 @@ function submitMatchResult($code, $userId, $clicks, $time, $path) {
     if ($match['status'] === 'finished') return ['error' => 'Match is already finished.'];
     if ($match['status'] === 'waiting') return ['error' => 'Match has not started yet.'];
 
-    $pathJson = json_encode(is_array($path) ? $path : []);
+    $pathArray = is_array($path) ? $path : [];
+    $pathJson = json_encode($pathArray);
     $safeClicks = max(0, (int)$clicks);
     $safeTime = max(0, (int)$time);
+    $settings = decodeMultiplayerSettings(isset($match['settings_json']) ? $match['settings_json'] : null);
+    $isSuddenDeath = (isset($settings['mode']) && $settings['mode'] === 'sudden')
+        || (isset($settings['modifiers']) && is_array($settings['modifiers']) && in_array('suddenDeath', $settings['modifiers'], true));
+    $targetNorm = strtolower(str_replace(' ', '_', (string)$match['end_title']));
+    $submittedReachedTarget = false;
+    if (!empty($pathArray)) {
+        $submittedLast = strtolower(str_replace(' ', '_', (string)$pathArray[count($pathArray) - 1]));
+        $submittedReachedTarget = ($submittedLast === $targetNorm);
+    }
 
     try {
         $db->beginTransaction();
@@ -406,9 +424,14 @@ function submitMatchResult($code, $userId, $clicks, $time, $path) {
         $stmt->execute([$code]);
         $updated = $stmt->fetch();
 
-        if ($updated['p1_clicks'] !== null && $updated['p2_clicks'] !== null) {
+        if ($isSuddenDeath && $submittedReachedTarget) {
             $db->prepare('UPDATE matches SET status = \'finished\' WHERE code = ?')->execute([$code]);
             $updated['status'] = 'finished';
+            recordHeadToHeadFromMatch($db, $updated, (int)$userId, true, true);
+        } elseif ($updated['p1_clicks'] !== null && $updated['p2_clicks'] !== null) {
+            $db->prepare('UPDATE matches SET status = \'finished\' WHERE code = ?')->execute([$code]);
+            $updated['status'] = 'finished';
+            recordHeadToHeadFromMatch($db, $updated, (int)$userId, false, false);
         }
         $db->commit();
     } catch (PDOException $e) {
@@ -417,6 +440,52 @@ function submitMatchResult($code, $userId, $clicks, $time, $path) {
     }
 
     return formatMatchResult($updated, $userId);
+}
+
+function recordHeadToHeadFromMatch($db, $match, $finisherUserId, $isSuddenDeath, $submittedReachedTarget) {
+    $p1 = isset($match['player1_id']) ? (int)$match['player1_id'] : 0;
+    $p2 = isset($match['player2_id']) ? (int)$match['player2_id'] : 0;
+    if ($p1 <= 0 || $p2 <= 0 || $p1 === $p2) return;
+
+    $winnerId = 0;
+    if ($isSuddenDeath && $submittedReachedTarget) {
+        $winnerId = (int)$finisherUserId;
+    } else {
+        $p1Clicks = isset($match['p1_clicks']) ? (int)$match['p1_clicks'] : null;
+        $p2Clicks = isset($match['p2_clicks']) ? (int)$match['p2_clicks'] : null;
+        $p1Time = isset($match['p1_time']) ? (int)$match['p1_time'] : null;
+        $p2Time = isset($match['p2_time']) ? (int)$match['p2_time'] : null;
+
+        if ($p1Clicks === null || $p2Clicks === null || $p1Time === null || $p2Time === null) return;
+
+        if ($p1Clicks < $p2Clicks) {
+            $winnerId = $p1;
+        } elseif ($p2Clicks < $p1Clicks) {
+            $winnerId = $p2;
+        } elseif ($p1Time < $p2Time) {
+            $winnerId = $p1;
+        } elseif ($p2Time < $p1Time) {
+            $winnerId = $p2;
+        }
+    }
+
+    // Perfect tie: do not increment W/L.
+    if ($winnerId !== $p1 && $winnerId !== $p2) return;
+
+    $loserId = ($winnerId === $p1) ? $p2 : $p1;
+
+    $upsert = $db->prepare("
+        INSERT INTO head_to_head_stats (user_id, opponent_id, wins, losses, updated_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(user_id, opponent_id)
+        DO UPDATE SET
+          wins = wins + excluded.wins,
+          losses = losses + excluded.losses,
+          updated_at = datetime('now')
+    ");
+
+    $upsert->execute([$winnerId, $loserId, 1, 0]);
+    $upsert->execute([$loserId, $winnerId, 0, 1]);
 }
 
 function touchMatchPresence($code, $userId) {

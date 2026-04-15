@@ -129,15 +129,16 @@
     <!-- Level up overlay -->
     <transition name="fade">
       <div v-if="showLevelUp" class="level-up-overlay">
-        <div class="text-center animate-scale-in">
-          <div class="w-14 h-14 rounded-xl mx-auto mb-3 flex items-center justify-center" style="background: rgba(57,255,20,0.1); border: 1px solid rgba(57,255,20,0.25); box-shadow: 0 0 30px rgba(57,255,20,0.15);">
+        <div class="level-up-card text-center animate-scale-in">
+          <div class="level-up-icon-wrap">
             <svg class="w-7 h-7 text-crt-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
             </svg>
           </div>
-          <div class="font-pixel text-[9px] text-crt-green tracking-[0.3em] mb-2">LEVEL UP!</div>
-          <div class="font-pixel text-4xl text-neon-green mb-1">{{ progression.level.value }}</div>
-          <div class="font-mono text-sm text-retro-light">Keep playing to unlock more</div>
+          <div class="font-pixel text-[10px] text-crt-green tracking-[0.3em] mb-2">LEVEL UP!</div>
+          <div class="font-pixel text-5xl text-neon-green mb-2 leading-none">{{ progression.level.value }}</div>
+          <div class="font-mono text-sm text-retro-light">Your power just increased</div>
+          <div class="font-mono text-[11px] text-crt-green/80 mt-1 tracking-wide">Keep going for more unlocks</div>
         </div>
       </div>
     </transition>
@@ -310,8 +311,12 @@ const targetCategoriesCache = ref(null)
 const activeModifiers = computed(() => {
   const modParam = route.query.modifiers
   if (!modParam) return []
-  const valid = modParam.split(',').filter(id => id && game.MODIFIERS[id])
-  if (valid.length !== modParam.split(',').filter(Boolean).length) {
+  const parsed = modParam.split(',').filter(Boolean)
+  const known = parsed.filter(id => game.MODIFIERS[id])
+  const isMultiplayerRoute = !!route.query.match || !!route.query.lobby
+  const valid = known
+    .filter(id => isMultiplayerRoute || id !== 'suddenDeath')
+  if (known.length !== parsed.length) {
     toast.error('Invalid modifier detected — removed unknown modifiers')
   }
   return valid
@@ -367,6 +372,29 @@ const sessionRouteQuery = computed(() => {
   }
   return out
 })
+
+function isSuddenDeathMultiplayer(result) {
+  const modifiers = Array.isArray(result?.settings?.modifiers) ? result.settings.modifiers : []
+  return (result?.settings?.mode || '') === 'sudden' || modifiers.includes('suddenDeath')
+}
+
+function applySuddenDeathRemoteFinish(result, source = 'match') {
+  if (!isSuddenDeathMultiplayer(result)) return
+  if (result?.status !== 'finished') return
+  if (!game.isPlaying.value) return
+
+  if (source === 'match') {
+    if (result?.winner === 'you') game.endGame('won')
+    else game.endGame('lost')
+    return
+  }
+
+  const uid = auth.user.value?.id
+  const leaderboard = Array.isArray(result?.leaderboard) ? result.leaderboard : []
+  const me = leaderboard.find(row => row?.user_id === uid)
+  if (me && Number(me.rank) === 1) game.endGame('won')
+  else game.endGame('lost')
+}
 
 function loadOpponentQuitAckMap() {
   try {
@@ -437,7 +465,7 @@ const hintBannerTextClass = computed(() => {
 const canReroll = computed(() => {
   if (isMultiplayerGame.value) return false
   const m = props.mode
-  return m !== 'daily' && m !== 'custom' && m !== 'freeplay' && m !== 'trending'
+  return m !== 'daily' && m !== 'custom' && m !== 'freeplay'
 })
 
 const showEndModal = computed(() => game.isGameOver.value || freeplayFinished.value)
@@ -508,6 +536,12 @@ watch(() => game.state.combo, (val) => {
 })
 
 function processPostGame(won) {
+  if (isMultiplayerGame.value) {
+    // Multiplayer rounds do not grant XP rewards.
+    xpRewardData.value = null
+    return
+  }
+
   const stats = game.getStats()
 
   const xpResult = progression.awardXp({
@@ -1169,9 +1203,9 @@ async function pollMatchPresence() {
   try {
     const result = await api.get(`/match/${matchCode.value}`)
     matchResult.value = result
-    const hasFreshChange = !!result?.opponent?.quit
-    presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, hasFreshChange)
     if (result?.opponent?.quit) {
+      const hasFreshChange = true
+      presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, hasFreshChange)
       if (isOpponentQuitAcked(matchCode.value)) {
         matchPresencePollTimerId = setTimeout(pollMatchPresence, presencePollDelayMs.value)
         return
@@ -1179,7 +1213,14 @@ async function pollMatchPresence() {
       opponentQuitName.value = result.opponent?.username || 'Opponent'
       showOpponentQuitModal.value = true
       if (matchPresencePollTimerId) { clearTimeout(matchPresencePollTimerId); matchPresencePollTimerId = null }
+      return
     }
+    if (result?.status === 'finished') {
+      applySuddenDeathRemoteFinish(result, 'match')
+      return
+    }
+    const hasFreshChange = false
+    presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, hasFreshChange)
   } catch {
     presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, false)
   }
@@ -1298,6 +1339,7 @@ async function pollLobbyResult() {
     lobbyPollDelayMs.value = nextPollDelay(lobbyPollDelayMs.value, hasFreshChange)
     if (showLobbyPlayerLeftModal.value) return
     if (result.status === 'finished') {
+      applySuddenDeathRemoteFinish(result, 'lobby')
       lobbyPolling.value = false
       return
     }
@@ -1351,7 +1393,16 @@ async function rerollPair() {
   if (!canReroll.value || rerolling.value || !game.isPlaying.value) return
   rerolling.value = true
   try {
-    const pair = await wiki.getRandomPairByGenre(genre.value)
+    let pair = null
+    if (props.mode === 'trending') {
+      pair = await trending.getTrendingPair()
+      if (!pair) {
+        toast.warn('Trending data unavailable, falling back to random')
+        pair = await wiki.getRandomPairByGenre(genre.value)
+      }
+    } else {
+      pair = await wiki.getRandomPairByGenre(genre.value)
+    }
     if (!pair) { toast.error('Could not find a new pair'); return }
     game.initGame(props.mode, pair.start, pair.end, genreId.value, difficulty.value, customLimitsFromRoute.value, activeModifiers.value)
     previewCache = {}

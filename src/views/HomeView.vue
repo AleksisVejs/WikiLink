@@ -429,7 +429,7 @@
                 <span v-if="activeModifiers.length > 0" class="font-mono text-[9px] text-crt-green ml-1">{{ (1.25 ** activeModifiers.length).toFixed(2) }}x XP</span>
               </div>
               <div class="flex flex-wrap gap-1.5 sm:gap-2">
-                <button v-for="mod in filteredModifiers" :key="mod.id"
+                <button v-for="mod in soloModifiers" :key="mod.id"
                   @click="toggleModifier(mod.id)"
                   class="modifier-chip"
                   :class="{ active: activeModifiers.includes(mod.id) }"
@@ -729,7 +729,7 @@ const groupStartLoading = ref(false)
 const groupError = ref('')
 let groupPollTimer = null
 const editableRoomSettings = ref({
-  mode: 'custom',
+  mode: 'classic',
   genre: 'random',
   modifiers: [],
   timeLimit: 120,
@@ -746,6 +746,8 @@ const roomSettingsAutosaveRetry = ref(false)
 const multiplayerInviteLoading = ref(false)
 const multiplayerInviteError = ref('')
 const suppressModalFriendInvites = ref(false)
+const MULTIPLAYER_WAITING_POLL_MS = 300
+const ROOM_SETTINGS_AUTOSAVE_DELAY_MS = 250
 
 const genres = Object.values(GENRES)
 const modifierList = Object.values(MODIFIERS)
@@ -907,7 +909,7 @@ function toMultiplayerSettingsPayload() {
 function hydrateRoomSettingsFromResult(result) {
   const raw = result?.settings || {}
   editableRoomSettings.value = {
-    mode: raw.mode || 'custom',
+    mode: raw.mode || 'classic',
     genre: raw.genre || 'random',
     modifiers: Array.isArray(raw.modifiers) ? [...raw.modifiers] : [],
     timeLimit: raw.timeLimit ?? 120,
@@ -924,6 +926,14 @@ function updateRoomSettingsDraft(patch) {
     ...patch,
   }
   roomSettingsDirty.value = true
+  const isCustomMode = editableRoomSettings.value.mode === 'custom'
+  if (isCustomMode) {
+    const start = String(editableRoomSettings.value.customStartTitle || '').trim()
+    const end = String(editableRoomSettings.value.customEndTitle || '').trim()
+    // While user is editing custom titles, avoid autosaving partial/empty values
+    // that would be normalized back to the previous server value and feel "sticky".
+    if (!start || !end || start.toLowerCase() === end.toLowerCase()) return
+  }
   scheduleRoomSettingsAutosave()
 }
 
@@ -931,8 +941,16 @@ function toggleRoomModifier(modId) {
   if (!canEditRoomSettings.value) return
   const current = Array.isArray(editableRoomSettings.value.modifiers) ? [...editableRoomSettings.value.modifiers] : []
   const idx = current.indexOf(modId)
-  if (idx >= 0) current.splice(idx, 1)
-  else current.push(modId)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+  } else {
+    // Backend persists max 4 modifiers; block extra locally to prevent "auto-disable" after save.
+    if (current.length >= 4) {
+      toast.warn('You can enable up to 4 modifiers at once.')
+      return
+    }
+    current.push(modId)
+  }
   editableRoomSettings.value = {
     ...editableRoomSettings.value,
     modifiers: current,
@@ -986,6 +1004,7 @@ const filteredModifiers = computed(() => {
     return true
   })
 })
+const soloModifiers = computed(() => filteredModifiers.value.filter(m => m.id !== 'suddenDeath'))
 
 const difficulties = computed(() => {
   const mode = selectedModeId.value
@@ -1070,7 +1089,8 @@ function startGame() {
     }
   }
   if (selectedModeId.value === 'custom') { query.from = customStartTitle.value.trim(); query.to = customEndTitle.value.trim() }
-  if (activeModifiers.value.length > 0) query.modifiers = activeModifiers.value.join(',')
+  const soloModifiers = activeModifiers.value.filter(id => id !== 'suddenDeath')
+  if (soloModifiers.length > 0) query.modifiers = soloModifiers.join(',')
   router.push({ name: 'game', params: { mode: selectedModeId.value }, query })
 }
 
@@ -1237,7 +1257,7 @@ function startMatchPolling() {
         }
       }
     } catch { /* ignore */ }
-  }, 3000)
+  }, MULTIPLAYER_WAITING_POLL_MS)
 }
 
 function stopMatchPolling() {
@@ -1292,7 +1312,7 @@ function startGroupLobbyPolling() {
         router.push(buildMultiplayerRoute(r, 'lobby', r.code))
       }
     } catch { /* ignore */ }
-  }, 3000)
+  }, MULTIPLAYER_WAITING_POLL_MS)
 }
 
 async function createGroupLobby() {
@@ -1327,6 +1347,16 @@ async function createGroupLobby() {
 
 async function postStartGroupLobby() {
   if (!groupLobbyCode.value || !groupLobbyData.value?.is_host) return
+  const saved = await flushPendingRoomSettings()
+  if (!saved) return
+  if (editableRoomSettings.value.mode === 'custom') {
+    const start = String(editableRoomSettings.value.customStartTitle || '').trim().toLowerCase()
+    const end = String(editableRoomSettings.value.customEndTitle || '').trim().toLowerCase()
+    if (!start || !end || start === end) {
+      groupError.value = 'Custom start and target must be different.'
+      return
+    }
+  }
   groupStartLoading.value = true
   groupError.value = ''
   try {
@@ -1351,10 +1381,9 @@ async function postStartGroupLobby() {
     }
     const r = await api.post(`/lobby/start/${groupLobbyCode.value}`)
     if (r.error) { groupError.value = r.error; return }
-    stopGroupLobbyPolling()
-    sound.playStart()
-    showMatchModal.value = false
-    router.push(buildMultiplayerRoute(r, 'lobby', r.code))
+    // Do not force host into game before polling catches up for all players.
+    // Poll loop will transition both sides as soon as backend status flips to active.
+    if (!groupPollTimer) startGroupLobbyPolling()
   } catch (e) {
     groupError.value = e.message || 'Failed to start'
   } finally {
@@ -1455,6 +1484,18 @@ async function joinByCode(prefer = 'match') {
 
 async function saveRoomSettings() {
   if (!canEditRoomSettings.value) return
+  if (editableRoomSettings.value.mode === 'custom') {
+    const start = String(editableRoomSettings.value.customStartTitle || '').trim()
+    const end = String(editableRoomSettings.value.customEndTitle || '').trim()
+    if (!start || !end) {
+      toast.warn('Custom mode requires both start and target articles.')
+      return
+    }
+    if (start.toLowerCase() === end.toLowerCase()) {
+      toast.warn('Custom start and target must be different.')
+      return
+    }
+  }
   if (roomSettingsSaving.value) {
     roomSettingsAutosaveRetry.value = true
     return
@@ -1495,6 +1536,26 @@ async function saveRoomSettings() {
   }
 }
 
+async function flushPendingRoomSettings() {
+  if (!canEditRoomSettings.value) return true
+
+  if (roomSettingsAutosaveTimer) {
+    clearTimeout(roomSettingsAutosaveTimer)
+    roomSettingsAutosaveTimer = null
+  }
+
+  if (roomSettingsSaving.value) {
+    roomSettingsAutosaveRetry.value = true
+    while (roomSettingsSaving.value) {
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+  }
+
+  if (!roomSettingsDirty.value) return true
+  await saveRoomSettings()
+  return !roomSettingsDirty.value
+}
+
 function scheduleRoomSettingsAutosave() {
   if (!canEditRoomSettings.value) return
   if (roomSettingsAutosaveTimer) clearTimeout(roomSettingsAutosaveTimer)
@@ -1502,7 +1563,7 @@ function scheduleRoomSettingsAutosave() {
     roomSettingsAutosaveTimer = null
     if (!roomSettingsDirty.value) return
     saveRoomSettings()
-  }, 500)
+  }, ROOM_SETTINGS_AUTOSAVE_DELAY_MS)
 }
 
 async function joinInvitedMatchFromRoute() {
@@ -1776,8 +1837,18 @@ async function closeMatchModal() {
   multiplayerInviteError.value = ''
 }
 
-function startCreatedMatch() {
+async function startCreatedMatch() {
   if (!matchCode.value || matchStatus.value !== 'ready') return
+  const saved = await flushPendingRoomSettings()
+  if (!saved) return
+  if (editableRoomSettings.value.mode === 'custom') {
+    const start = String(editableRoomSettings.value.customStartTitle || '').trim().toLowerCase()
+    const end = String(editableRoomSettings.value.customEndTitle || '').trim().toLowerCase()
+    if (!start || !end || start === end) {
+      toast.warn('Custom start and target must be different.')
+      return
+    }
+  }
   const startFlow = async () => {
     if (replayMatchWaitingMode.value && editableRoomSettings.value.mode !== 'custom') {
       const genre = genres.find(g => g.id === editableRoomSettings.value.genre) || genres.find(g => g.id === 'random')
@@ -1796,9 +1867,8 @@ function startCreatedMatch() {
   startFlow().then(match => {
     replayMatchWaitingMode.value = false
     replayLobbyWaitingMode.value = false
-    sound.playStart()
-    showMatchModal.value = false
-    router.push(buildMultiplayerRoute(match, 'match', matchCode.value))
+    // Keep host in waiting flow; poller will route as soon as active state is observed.
+    if (!matchPollTimer) startMatchPolling()
   }).catch((e) => toast.error(e?.message || 'Failed to start match'))
 }
 

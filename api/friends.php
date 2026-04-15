@@ -69,6 +69,10 @@ function removeFriend($userId, $friendshipId) {
 
 function getFriendsList($userId) {
     $db = getDb();
+    $hasHeadToHeadTableStmt = $db->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'head_to_head_stats' LIMIT 1");
+    $hasHeadToHeadTable = (bool)$hasHeadToHeadTableStmt->fetchColumn();
+    $hasMatchesTableStmt = $db->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'matches' LIMIT 1");
+    $hasMatchesTable = (bool)$hasMatchesTableStmt->fetchColumn();
     $stmt = $db->prepare("
         SELECT f.id as friendship_id, f.status, f.created_at,
                CASE WHEN f.user_id = ? THEN f.friend_id ELSE f.user_id END as friend_user_id,
@@ -93,8 +97,68 @@ function getFriendsList($userId) {
             $totalGames += ($m['gamesPlayed'] ?? 0);
             $totalWins += ($m['gamesWon'] ?? 0);
         }
+
+        // Head-to-head 1v1 record against this friend (ties are ignored).
+        $vsWins = 0;
+        $vsLosses = 0;
+        if ($hasHeadToHeadTable) {
+            $h2hStatsStmt = $db->prepare("
+                SELECT wins, losses
+                FROM head_to_head_stats
+                WHERE user_id = ? AND opponent_id = ?
+                LIMIT 1
+            ");
+            $h2hStatsStmt->execute([(int)$userId, (int)$f['friend_user_id']]);
+            $h2hStatsRow = $h2hStatsStmt->fetch();
+            if ($h2hStatsRow) {
+                $vsWins = (int)($h2hStatsRow['wins'] ?? 0);
+                $vsLosses = (int)($h2hStatsRow['losses'] ?? 0);
+            }
+        }
+
+        // Backfill fallback for old data created before persistent H2H tracking existed.
+        if ($vsWins === 0 && $vsLosses === 0 && $hasMatchesTable) {
+            $h2hStmt = $db->prepare("
+                SELECT
+                  player1_id, player2_id,
+                  p1_clicks, p2_clicks,
+                  p1_time, p2_time
+                FROM matches
+                WHERE status = 'finished'
+                  AND p1_clicks IS NOT NULL
+                  AND p2_clicks IS NOT NULL
+                  AND (
+                    (player1_id = ? AND player2_id = ?)
+                    OR
+                    (player1_id = ? AND player2_id = ?)
+                  )
+            ");
+            $h2hStmt->execute([$userId, $f['friend_user_id'], $f['friend_user_id'], $userId]);
+            $h2hRows = $h2hStmt->fetchAll();
+
+            foreach ($h2hRows as $row) {
+                $isP1 = ((int)$row['player1_id'] === (int)$userId);
+                $yourClicks = (int)($isP1 ? $row['p1_clicks'] : $row['p2_clicks']);
+                $oppClicks = (int)($isP1 ? $row['p2_clicks'] : $row['p1_clicks']);
+                $yourTime = (int)($isP1 ? $row['p1_time'] : $row['p2_time']);
+                $oppTime = (int)($isP1 ? $row['p2_time'] : $row['p1_time']);
+
+                if ($yourClicks < $oppClicks) {
+                    $vsWins++;
+                } elseif ($oppClicks < $yourClicks) {
+                    $vsLosses++;
+                } elseif ($yourTime < $oppTime) {
+                    $vsWins++;
+                } elseif ($oppTime < $yourTime) {
+                    $vsLosses++;
+                }
+            }
+        }
+
         $f['total_games'] = $totalGames;
         $f['total_wins'] = $totalWins;
+        $f['vs_wins'] = $vsWins;
+        $f['vs_losses'] = $vsLosses;
         $f['profile_icon'] = $f['profile_icon'] ?: 'rookie';
         $f['profile_accent'] = $f['profile_accent'] ?: 'rank';
         $f['profile_title'] = $f['profile_title'] ?: 'newcomer';

@@ -379,8 +379,12 @@
                     <div class="min-w-0">
                       <div class="font-mono text-[11px] text-crt-white truncate hover:text-crt-cyan transition-colors">{{ friend.username }}</div>
                       <div class="flex items-center gap-1.5 mt-0.5">
-                        <span class="font-mono text-[9px] px-1.5 py-0.5 rounded text-crt-green" style="background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.2);">{{ friend.total_wins }}W</span>
-                        <span class="font-mono text-[9px] px-1.5 py-0.5 rounded text-retro-muted" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">{{ friend.total_games }}G</span>
+                        <span class="font-mono text-[9px] px-1.5 py-0.5 rounded text-crt-green" style="background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.2);">
+                          {{ Number(friend.vs_wins || 0) }}W
+                        </span>
+                        <span class="font-mono text-[9px] px-1.5 py-0.5 rounded text-crt-red/80" style="background: rgba(255,68,68,0.08); border: 1px solid rgba(255,68,68,0.2);">
+                          {{ Number(friend.vs_losses || 0) }}L
+                        </span>
                       </div>
                     </div>
                   </router-link>
