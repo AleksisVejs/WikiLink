@@ -30,6 +30,8 @@ function ensureMatchTable() {
         p1_disconnected_at TEXT,
         p2_disconnected_at TEXT,
         settings_json TEXT,
+        winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        finished_at TEXT,
         status      TEXT    NOT NULL DEFAULT 'waiting',
         created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     )");
@@ -42,6 +44,8 @@ function ensureMatchTable() {
     ensureMatchColumn($db, 'p1_disconnected_at', "ALTER TABLE matches ADD COLUMN p1_disconnected_at TEXT");
     ensureMatchColumn($db, 'p2_disconnected_at', "ALTER TABLE matches ADD COLUMN p2_disconnected_at TEXT");
     ensureMatchColumn($db, 'settings_json', "ALTER TABLE matches ADD COLUMN settings_json TEXT");
+    ensureMatchColumn($db, 'winner_user_id', "ALTER TABLE matches ADD COLUMN winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL");
+    ensureMatchColumn($db, 'finished_at', "ALTER TABLE matches ADD COLUMN finished_at TEXT");
     ensureMatchColumn($db, 'p1_play_again', "ALTER TABLE matches ADD COLUMN p1_play_again INTEGER NOT NULL DEFAULT 0");
     ensureMatchColumn($db, 'p2_play_again', "ALTER TABLE matches ADD COLUMN p2_play_again INTEGER NOT NULL DEFAULT 0");
 }
@@ -362,7 +366,7 @@ function startMatch($code, $userId) {
                 return ['error' => 'Cannot start until opponent joins.'];
             }
 
-            $stmt = $db->prepare("UPDATE matches SET status = 'active', p1_play_again = 0, p2_play_again = 0 WHERE code = ? AND status = 'waiting'");
+            $stmt = $db->prepare("UPDATE matches SET status = 'active', p1_play_again = 0, p2_play_again = 0, winner_user_id = NULL, finished_at = NULL WHERE code = ? AND status = 'waiting'");
             $stmt->execute([$code]);
             $db->commit();
         } catch (PDOException $e) {
@@ -425,12 +429,21 @@ function submitMatchResult($code, $userId, $clicks, $time, $path) {
         $updated = $stmt->fetch();
 
         if ($isSuddenDeath && $submittedReachedTarget) {
-            $db->prepare('UPDATE matches SET status = \'finished\' WHERE code = ?')->execute([$code]);
-            $updated['status'] = 'finished';
-            recordHeadToHeadFromMatch($db, $updated, (int)$userId, true, true);
+            $claim = $db->prepare("UPDATE matches SET status = 'finished', winner_user_id = ?, finished_at = datetime('now') WHERE code = ? AND status = 'active' AND winner_user_id IS NULL");
+            $claim->execute([(int)$userId, $code]);
+
+            $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+            $stmt->execute([$code]);
+            $updated = $stmt->fetch();
+
+            if ((int)$claim->rowCount() > 0 && (int)$updated['winner_user_id'] === (int)$userId) {
+                recordHeadToHeadFromMatch($db, $updated, (int)$userId, true, true);
+            }
         } elseif ($updated['p1_clicks'] !== null && $updated['p2_clicks'] !== null) {
-            $db->prepare('UPDATE matches SET status = \'finished\' WHERE code = ?')->execute([$code]);
-            $updated['status'] = 'finished';
+            $db->prepare("UPDATE matches SET status = 'finished', finished_at = COALESCE(finished_at, datetime('now')) WHERE code = ?")->execute([$code]);
+            $stmt = $db->prepare('SELECT * FROM matches WHERE code = ?');
+            $stmt->execute([$code]);
+            $updated = $stmt->fetch();
             recordHeadToHeadFromMatch($db, $updated, (int)$userId, false, false);
         }
         $db->commit();
@@ -520,7 +533,21 @@ function quitMatch($code, $userId) {
         if ($match['player1_id'] == $userId) {
             $db->prepare('UPDATE matches SET p1_quit = 1 WHERE code = ?')->execute([$code]);
         } elseif ($match['player2_id'] == $userId) {
-            $db->prepare('UPDATE matches SET p2_quit = 1 WHERE code = ?')->execute([$code]);
+            // In finished rooms, guest leaving should free slot 2 immediately so the
+            // host does not see stale "ready/opponent present" state on replay flow.
+            $db->prepare("
+                UPDATE matches
+                SET player2_id = NULL,
+                    p2_quit = 0,
+                    p2_clicks = NULL,
+                    p2_time = NULL,
+                    p2_path = NULL,
+                    p2_last_seen_at = NULL,
+                    p2_missed_heartbeats = 0,
+                    p2_disconnected_at = NULL,
+                    p2_play_again = 0
+                WHERE code = ?
+            ")->execute([$code]);
         } else {
             return ['error' => 'You are not in this match.'];
         }
@@ -530,7 +557,12 @@ function quitMatch($code, $userId) {
     }
 
     if ($match['player1_id'] == $userId) {
-        $db->prepare('UPDATE matches SET p1_quit = 1 WHERE code = ?')->execute([$code]);
+        if ($match['status'] === 'active') {
+            $db->prepare("UPDATE matches SET p1_quit = 1, status = 'finished', finished_at = COALESCE(finished_at, datetime('now')) WHERE code = ?")
+                ->execute([$code]);
+        } else {
+            $db->prepare('UPDATE matches SET p1_quit = 1 WHERE code = ?')->execute([$code]);
+        }
     } elseif ($match['player2_id'] == $userId) {
         // In waiting rooms, guest leaving should not destroy host's room.
         if ($match['status'] === 'waiting') {
@@ -547,7 +579,12 @@ function quitMatch($code, $userId) {
                 WHERE code = ?
             ")->execute([$code]);
         } else {
-            $db->prepare('UPDATE matches SET p2_quit = 1 WHERE code = ?')->execute([$code]);
+            if ($match['status'] === 'active') {
+                $db->prepare("UPDATE matches SET p2_quit = 1, status = 'finished', finished_at = COALESCE(finished_at, datetime('now')) WHERE code = ?")
+                    ->execute([$code]);
+            } else {
+                $db->prepare('UPDATE matches SET p2_quit = 1 WHERE code = ?')->execute([$code]);
+            }
         }
     } else {
         return ['error' => 'You are not in this match.'];
@@ -595,7 +632,9 @@ function requestMatchReplay($code, $userId) {
                 p2_time = NULL,
                 p2_path = NULL,
                 p1_quit = 0,
-                p2_quit = 0
+                p2_quit = 0,
+                winner_user_id = NULL,
+                finished_at = NULL
             WHERE code = ?
         ")->execute([$code]);
     }
@@ -639,7 +678,9 @@ function reseedMatchPair($code, $userId, $startTitle, $endTitle) {
             p1_path = NULL,
             p2_clicks = NULL,
             p2_time = NULL,
-            p2_path = NULL
+            p2_path = NULL,
+            winner_user_id = NULL,
+            finished_at = NULL
         WHERE code = ?
     ")->execute([$startTitle, $endTitle, $code]);
 
@@ -692,6 +733,11 @@ function getOpenMatchForUser($userId) {
         SELECT *
         FROM matches
         WHERE
+          COALESCE(status, '') != 'finished'
+          AND finished_at IS NULL
+          AND winner_user_id IS NULL
+          AND NOT (p1_clicks IS NOT NULL AND p2_clicks IS NOT NULL)
+          AND
           (
             player1_id = ?
             AND COALESCE(p1_quit, 0) = 0
@@ -793,6 +839,7 @@ function formatMatchResult($match, $userId) {
         'end_title' => $match['end_title'],
         'settings' => decodeMultiplayerSettings(isset($match['settings_json']) ? $match['settings_json'] : null),
         'can_edit_settings' => ($match['status'] === 'waiting' && (int)$match['player1_id'] === (int)$userId),
+        'winner_user_id' => isset($match['winner_user_id']) && $match['winner_user_id'] !== null ? (int)$match['winner_user_id'] : null,
     ];
 
     $uid = (int)$userId;
@@ -827,6 +874,7 @@ function formatMatchResult($match, $userId) {
         'profile_accent' => $oppId && isset($users[$oppId]['profile_accent']) ? $users[$oppId]['profile_accent'] : 'rank',
         'clicks' => $isP1 ? $match['p2_clicks'] : $match['p1_clicks'],
         'time' => $isP1 ? $match['p2_time'] : $match['p1_time'],
+        'path' => json_decode($isP1 ? ($match['p2_path'] ?: '[]') : ($match['p1_path'] ?: '[]'), true),
         'submitted' => ($isP1 ? $match['p2_clicks'] : $match['p1_clicks']) !== null,
         'quit' => (bool)($isP1 ? $match['p2_quit'] : $match['p1_quit']),
         'presence' => [
@@ -848,6 +896,14 @@ function formatMatchResult($match, $userId) {
     ];
 
     if ($match['status'] === 'finished') {
+        if (!empty($match['winner_user_id'])) {
+            $winnerId = (int)$match['winner_user_id'];
+            if ($winnerId === (int)$userId) $result['winner'] = 'you';
+            elseif ($oppId > 0 && $winnerId === (int)$oppId) $result['winner'] = 'opponent';
+            else $result['winner'] = 'tie';
+            return $result;
+        }
+
         $targetNorm = strtolower(str_replace(' ', '_', (string)$match['end_title']));
         $youPath = is_array($result['you']['path']) ? $result['you']['path'] : [];
         $oppPathRaw = $isP1 ? ($match['p2_path'] ?: '[]') : ($match['p1_path'] ?: '[]');

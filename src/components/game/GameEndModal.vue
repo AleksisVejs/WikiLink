@@ -147,6 +147,34 @@
                     <div class="font-terminal text-base text-crt-white">{{ matchResult.opponent?.clicks }} <span class="text-retro-muted text-xs">/ {{ formatLeaderboardTime(matchResult.opponent?.time || 0) }}</span></div>
                   </div>
                 </div>
+                <div class="mt-2 grid grid-cols-1 gap-2">
+                  <div class="rounded px-2 py-1.5" style="background: rgba(57,255,20,0.03); border: 1px solid rgba(57,255,20,0.1);">
+                    <div class="font-pixel text-[6px] text-crt-green/70 mb-1">YOU PATH</div>
+                    <div class="flex items-center gap-1 overflow-x-auto pb-0.5 font-mono text-[9px]">
+                      <template v-for="(article, idx) in (matchResult.you?.path || [])" :key="`you-path-${idx}`">
+                        <span v-if="idx > 0" class="text-retro-border/40 shrink-0 text-[8px]">&rsaquo;</span>
+                        <span class="shrink-0 whitespace-nowrap px-1 py-0.5 rounded"
+                              :class="idx === 0 ? 'text-crt-white' : idx === (matchResult.you?.path || []).length - 1 ? 'text-crt-green' : 'text-retro-muted'">
+                          {{ String(article || '').replace(/_/g, ' ') }}
+                        </span>
+                      </template>
+                      <span v-if="!(matchResult.you?.path || []).length" class="text-retro-muted/70">No path submitted</span>
+                    </div>
+                  </div>
+                  <div class="rounded px-2 py-1.5" style="background: rgba(180,76,255,0.03); border: 1px solid rgba(180,76,255,0.1);">
+                    <div class="font-pixel text-[6px] text-arcade-purple/70 mb-1">OPPONENT PATH</div>
+                    <div class="flex items-center gap-1 overflow-x-auto pb-0.5 font-mono text-[9px]">
+                      <template v-for="(article, idx) in (matchResult.opponent?.path || [])" :key="`opp-path-${idx}`">
+                        <span v-if="idx > 0" class="text-retro-border/40 shrink-0 text-[8px]">&rsaquo;</span>
+                        <span class="shrink-0 whitespace-nowrap px-1 py-0.5 rounded"
+                              :class="idx === 0 ? 'text-crt-white' : idx === (matchResult.opponent?.path || []).length - 1 ? 'text-arcade-purple' : 'text-retro-muted'">
+                          {{ String(article || '').replace(/_/g, ' ') }}
+                        </span>
+                      </template>
+                      <span v-if="!(matchResult.opponent?.path || []).length" class="text-retro-muted/70">No path submitted</span>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div v-else class="text-center py-1">
                 <span class="font-mono text-[11px] text-retro-muted animate-blink">Waiting for {{ matchResult.opponent?.username || 'opponent' }}...</span>
@@ -214,6 +242,54 @@
                     </div>
                     <span class="text-crt-green shrink-0 tabular-nums">{{ row.clicks }}</span>
                     <span class="text-retro-muted shrink-0 tabular-nums w-12 text-right">{{ formatLeaderboardTime(row.time) }}</span>
+                  </div>
+                </div>
+                <div v-if="currentUserId != null" class="mt-2 rounded px-2 py-1.5"
+                     style="background: rgba(57,255,20,0.04); border: 1px solid rgba(57,255,20,0.18);">
+                  <div class="font-pixel text-[6px] text-crt-green/80 mb-1">YOUR PATH</div>
+                  <div class="flex items-center gap-1 overflow-x-auto pb-0.5 font-mono text-[9px]">
+                    <template
+                      v-for="(article, idx) in (lobbyResult.leaderboard.find(r => r.user_id === currentUserId)?.path || [])"
+                      :key="`my-lobby-path-${idx}`"
+                    >
+                      <span v-if="idx > 0" class="text-retro-border/40 shrink-0 text-[8px]">&rsaquo;</span>
+                      <span
+                        class="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded border"
+                        :class="idx === 0
+                          ? 'text-crt-white border-crt-white/20'
+                          : idx === (lobbyResult.leaderboard.find(r => r.user_id === currentUserId)?.path || []).length - 1
+                            ? 'text-crt-green border-crt-green/30'
+                            : 'text-retro-muted border-retro-border/40'"
+                        style="background: rgba(16,18,27,0.7);"
+                      >
+                        {{ String(article || '').replace(/_/g, ' ') }}
+                      </span>
+                    </template>
+                    <span v-if="!(lobbyResult.leaderboard.find(r => r.user_id === currentUserId)?.path || []).length" class="text-retro-muted/70">
+                      No path submitted
+                    </span>
+                  </div>
+                </div>
+
+                <div class="mt-2 space-y-1.5 max-h-[180px] overflow-y-auto">
+                  <div
+                    v-for="row in lobbyResult.leaderboard"
+                    :key="`path-${row.user_id}`"
+                    class="rounded px-2 py-1.5"
+                    style="background: rgba(0,229,255,0.03); border: 1px solid rgba(0,229,255,0.12);"
+                    v-show="currentUserId == null || row.user_id !== currentUserId"
+                  >
+                    <div class="font-pixel text-[6px] text-crt-cyan/75 mb-1">{{ row.username }} PATH</div>
+                    <div class="flex items-center gap-1 overflow-x-auto pb-0.5 font-mono text-[9px]">
+                      <template v-for="(article, idx) in (row.path || [])" :key="`lobby-path-${row.user_id}-${idx}`">
+                        <span v-if="idx > 0" class="text-retro-border/40 shrink-0 text-[8px]">&rsaquo;</span>
+                        <span class="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded border"
+                              :class="idx === 0 ? 'text-crt-white' : idx === (row.path || []).length - 1 ? 'text-crt-cyan' : 'text-retro-muted'">
+                          {{ String(article || '').replace(/_/g, ' ') }}
+                        </span>
+                      </template>
+                      <span v-if="!(row.path || []).length" class="text-retro-muted/70">No path submitted</span>
+                    </div>
                   </div>
                 </div>
               </template>

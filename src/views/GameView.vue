@@ -255,12 +255,12 @@ const matchResult = ref(null)
 const matchPolling = ref(false)
 let matchPollTimerId = null
 let matchPresencePollTimerId = null
-const POLL_MIN_MS = 1000
-const POLL_MAX_MS = 5000
-const POLL_STEP_MS = 500
-const matchPollDelayMs = ref(POLL_MIN_MS)
-const lobbyPollDelayMs = ref(POLL_MIN_MS)
-const presencePollDelayMs = ref(POLL_MIN_MS)
+const RESULT_POLL = { min: 800, max: 4000, step: 400 }
+const LOBBY_POLL = { min: 800, max: 4000, step: 400 }
+const PRESENCE_POLL = { min: 600, max: 2400, step: 300 }
+const matchPollDelayMs = ref(RESULT_POLL.min)
+const lobbyPollDelayMs = ref(LOBBY_POLL.min)
+const presencePollDelayMs = ref(PRESENCE_POLL.min)
 const showOpponentQuitModal = ref(false)
 const opponentQuitName = ref('')
 const resumedSoloAfterQuit = ref(false)
@@ -271,6 +271,7 @@ let lobbyPollTimerId = null
 let multiplayerPersistTimerId = null
 let multiplayerHeartbeatTimerId = null
 let activityHeartbeatTimerId = null
+let immediateRefreshTimerId = null
 const showLobbyPlayerLeftModal = ref(false)
 const lobbyLeftPlayerNames = ref([])
 const lobbyLeftPlayersLabel = computed(() => {
@@ -282,10 +283,12 @@ const lobbyLeftPlayersLabel = computed(() => {
 })
 let lastActivityHeartbeatAt = 0
 const ACTIVITY_HEARTBEAT_MIN_GAP_MS = 10000
+const IMMEDIATE_REFRESH_THROTTLE_MS = 2000
+let lastImmediateRefreshAt = 0
 
-function nextPollDelay(currentDelay, hasFreshChange) {
-  if (hasFreshChange) return POLL_MIN_MS
-  return Math.min(currentDelay + POLL_STEP_MS, POLL_MAX_MS)
+function nextPollDelay(currentDelay, hasFreshChange, config) {
+  if (hasFreshChange) return config.min
+  return Math.min(currentDelay + config.step, config.max)
 }
 
 const lobbyYourRank = computed(() => {
@@ -308,6 +311,7 @@ const showLevelUp = ref(false)
 const showHintMenu = ref(false)
 const hintResult = ref(null)
 const targetCategoriesCache = ref(null)
+const isLeavingGame = ref(false)
 const activeModifiers = computed(() => {
   const modParam = route.query.modifiers
   if (!modParam) return []
@@ -468,7 +472,10 @@ const canReroll = computed(() => {
   return m !== 'daily' && m !== 'custom' && m !== 'freeplay'
 })
 
-const showEndModal = computed(() => game.isGameOver.value || freeplayFinished.value)
+const showEndModal = computed(() => {
+  if (showOpponentQuitModal.value || showLobbyPlayerLeftModal.value) return false
+  return game.isGameOver.value || freeplayFinished.value
+})
 
 const endModalStyle = computed(() => {
   if (freeplayFinished.value) return 'background: #0d0e15; border: 2px solid rgba(0,229,255,0.4); box-shadow: 0 0 40px rgba(0,229,255,0.15);'
@@ -665,6 +672,7 @@ watch(processedResult, (result) => {
 })
 
 async function initializeGame() {
+  isLeavingGame.value = false
   initialLoading.value = true
   freeplayFinished.value = false
   bootStep.value = 0
@@ -835,11 +843,16 @@ function scheduleActivityHeartbeat() {
 
 function onMeaningfulActivity() {
   scheduleActivityHeartbeat()
+  if (game.isPlaying.value && !showOpponentQuitModal.value && !showLobbyPlayerLeftModal.value) {
+    triggerImmediateRefresh()
+  }
 }
 
 function onVisibilityOrFocus() {
   if (document.visibilityState === 'visible') {
     scheduleActivityHeartbeat()
+    triggerImmediateRefresh()
+    if (props.mode === 'daily' && showEndModal.value) loadDailyLeaderboard()
   }
 }
 
@@ -916,6 +929,7 @@ function handleLinkClick(event) {
 
   sound.playNavigate()
   const gameOver = game.navigateTo(title)
+  triggerImmediateRefresh()
   if (!gameOver || game.isWon.value) {
     loadArticle(title)
   }
@@ -974,6 +988,7 @@ async function handleGoBack() {
   if (title) {
     sound.playBack()
     toast.info('Went back one page')
+    triggerImmediateRefresh()
     await loadArticle(title)
   }
 }
@@ -998,6 +1013,7 @@ async function fetchArticleCategories(title) {
 async function useHintAction(type) {
   if (!game.useHint()) return
   sound.playHint()
+  triggerImmediateRefresh()
   showHintMenu.value = false
 
   if (type === 'category' && game.state.targetArticle) {
@@ -1155,7 +1171,7 @@ async function submitMatchResult() {
     matchResult.value = result
     if (result.status !== 'finished') {
       matchPolling.value = true
-      matchPollDelayMs.value = POLL_MIN_MS
+      matchPollDelayMs.value = RESULT_POLL.min
       pollMatchResult()
     }
   } catch { /* ignore */ }
@@ -1167,16 +1183,17 @@ async function pollMatchResult() {
     const prevStatus = matchResult.value?.status || null
     const prevOpponentSubmitted = !!matchResult.value?.opponent?.submitted
     const result = await api.get(`/match/${matchCode.value}`)
+    if (isLeavingGame.value) return
     matchResult.value = result
     const hasFreshChange = prevStatus !== result.status
       || prevOpponentSubmitted !== !!result?.opponent?.submitted
-    matchPollDelayMs.value = nextPollDelay(matchPollDelayMs.value, hasFreshChange)
+    matchPollDelayMs.value = nextPollDelay(matchPollDelayMs.value, hasFreshChange, RESULT_POLL)
     if (result.status === 'finished') {
       matchPolling.value = false
       return
     }
   } catch {
-    matchPollDelayMs.value = nextPollDelay(matchPollDelayMs.value, false)
+    matchPollDelayMs.value = nextPollDelay(matchPollDelayMs.value, false, RESULT_POLL)
   }
   matchPollTimerId = setTimeout(pollMatchResult, matchPollDelayMs.value)
 }
@@ -1202,10 +1219,11 @@ async function pollMatchPresence() {
   if (!matchCode.value || !auth.isLoggedIn() || game.isGameOver.value || showOpponentQuitModal.value) return
   try {
     const result = await api.get(`/match/${matchCode.value}`)
+    if (isLeavingGame.value) return
     matchResult.value = result
     if (result?.opponent?.quit) {
       const hasFreshChange = true
-      presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, hasFreshChange)
+      presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, hasFreshChange, PRESENCE_POLL)
       if (isOpponentQuitAcked(matchCode.value)) {
         matchPresencePollTimerId = setTimeout(pollMatchPresence, presencePollDelayMs.value)
         return
@@ -1220,9 +1238,9 @@ async function pollMatchPresence() {
       return
     }
     const hasFreshChange = false
-    presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, hasFreshChange)
+    presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, hasFreshChange, PRESENCE_POLL)
   } catch {
-    presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, false)
+    presencePollDelayMs.value = nextPollDelay(presencePollDelayMs.value, false, PRESENCE_POLL)
   }
   if (!showOpponentQuitModal.value) {
     matchPresencePollTimerId = setTimeout(pollMatchPresence, presencePollDelayMs.value)
@@ -1242,7 +1260,7 @@ async function syncMultiplayerIdentityAndPolling() {
       }
     }
     if (!game.isGameOver.value && !showOpponentQuitModal.value && !matchPresencePollTimerId) {
-      presencePollDelayMs.value = POLL_MIN_MS
+      presencePollDelayMs.value = PRESENCE_POLL.min
       pollMatchPresence()
     }
   }
@@ -1257,7 +1275,7 @@ async function syncMultiplayerIdentityAndPolling() {
     }
     if (!lobbyPolling.value) {
       lobbyPolling.value = true
-      lobbyPollDelayMs.value = POLL_MIN_MS
+      lobbyPollDelayMs.value = LOBBY_POLL.min
       pollLobbyResult()
     }
   }
@@ -1298,7 +1316,7 @@ async function submitLobbyResult() {
     if (result.status !== 'finished') {
       if (!lobbyPolling.value) {
         lobbyPolling.value = true
-        lobbyPollDelayMs.value = POLL_MIN_MS
+        lobbyPollDelayMs.value = LOBBY_POLL.min
         pollLobbyResult()
       }
     }
@@ -1314,6 +1332,7 @@ async function pollLobbyResult() {
       ? lobbyResult.value.players.filter(p => p.submitted).length
       : 0
     const result = await api.get(`/lobby/${lobbyCode.value}`)
+    if (isLeavingGame.value) return
     lobbyResult.value = result
     const nextPlayers = Array.isArray(result?.players) ? result.players : []
     const nextIds = new Set(nextPlayers.map(p => p.user_id))
@@ -1336,7 +1355,7 @@ async function pollLobbyResult() {
       ? result.players.filter(p => p.submitted).length
       : 0
     const hasFreshChange = prevStatus !== result.status || prevSubmitted !== nextSubmitted
-    lobbyPollDelayMs.value = nextPollDelay(lobbyPollDelayMs.value, hasFreshChange)
+    lobbyPollDelayMs.value = nextPollDelay(lobbyPollDelayMs.value, hasFreshChange, LOBBY_POLL)
     if (showLobbyPlayerLeftModal.value) return
     if (result.status === 'finished') {
       applySuddenDeathRemoteFinish(result, 'lobby')
@@ -1344,9 +1363,71 @@ async function pollLobbyResult() {
       return
     }
   } catch {
-    lobbyPollDelayMs.value = nextPollDelay(lobbyPollDelayMs.value, false)
+    lobbyPollDelayMs.value = nextPollDelay(lobbyPollDelayMs.value, false, LOBBY_POLL)
   }
   lobbyPollTimerId = setTimeout(pollLobbyResult, lobbyPollDelayMs.value)
+}
+
+async function refreshMatchNow() {
+  if (!matchCode.value || !auth.isLoggedIn()) return
+  try {
+    const result = await api.get(`/match/${matchCode.value}`)
+    if (isLeavingGame.value) return
+    matchResult.value = result
+    if (result?.status === 'finished') {
+      applySuddenDeathRemoteFinish(result, 'match')
+      matchPolling.value = false
+    }
+  } catch {
+    // ignore transient refresh failures
+  }
+}
+
+async function refreshLobbyNow() {
+  if (!lobbyCode.value || !auth.isLoggedIn()) return
+  try {
+    const result = await api.get(`/lobby/${lobbyCode.value}`)
+    if (isLeavingGame.value) return
+    lobbyResult.value = result
+    if (result?.status === 'finished') {
+      applySuddenDeathRemoteFinish(result, 'lobby')
+      lobbyPolling.value = false
+    }
+  } catch {
+    // ignore transient refresh failures
+  }
+}
+
+function triggerImmediateRefresh() {
+  if (!isMultiplayerGame.value || !auth.isLoggedIn()) return
+
+  const now = Date.now()
+  const elapsed = now - lastImmediateRefreshAt
+
+  const runRefresh = () => {
+    lastImmediateRefreshAt = Date.now()
+    if (matchCode.value) {
+      presencePollDelayMs.value = PRESENCE_POLL.min
+      refreshMatchNow()
+      return
+    }
+    if (lobbyCode.value) {
+      lobbyPollDelayMs.value = LOBBY_POLL.min
+      refreshLobbyNow()
+    }
+  }
+
+  if (elapsed >= IMMEDIATE_REFRESH_THROTTLE_MS) {
+    if (immediateRefreshTimerId) { clearTimeout(immediateRefreshTimerId); immediateRefreshTimerId = null }
+    runRefresh()
+    return
+  }
+
+  if (immediateRefreshTimerId) return
+  immediateRefreshTimerId = setTimeout(() => {
+    immediateRefreshTimerId = null
+    runRefresh()
+  }, IMMEDIATE_REFRESH_THROTTLE_MS - elapsed)
 }
 
 async function resumeSoloAfterLobbyPlayerLeft(playerName = 'Player') {
@@ -1422,13 +1503,28 @@ function confirmQuit() {
 }
 
 async function goHome() {
-  if (matchCode.value && auth.isLoggedIn()) {
-    await api.post(`/match/quit/${matchCode.value}`).catch(() => {})
+  if (isLeavingGame.value) return
+  isLeavingGame.value = true
+
+  const activeMatchCode = matchCode.value
+  const activeLobbyCode = lobbyCode.value
+  const canNotifyServer = auth.isLoggedIn()
+  const shouldLeaveCurrent = isMultiplayerGame.value
+
+  if (canNotifyServer && shouldLeaveCurrent) {
+    // Ensure backend receives at least one leave signal before route transition.
+    // Keep it snappy with a short timeout so Home remains responsive.
+    const leaveCall = notifyMultiplayerLeave().catch(() => {})
+    const leaveTimeout = new Promise(resolve => setTimeout(resolve, 1200))
+    await Promise.race([leaveCall, leaveTimeout])
   }
-  if (lobbyCode.value && auth.isLoggedIn()) {
-    await api.post(`/lobby/quit/${lobbyCode.value}`).catch(() => {})
+  if (canNotifyServer && activeMatchCode) {
+    api.post(`/match/quit/${activeMatchCode}`).catch(() => {})
   }
-  await notifyMultiplayerLeave()
+  if (canNotifyServer && activeLobbyCode) {
+    api.post(`/lobby/quit/${activeLobbyCode}`).catch(() => {})
+  }
+
   matchPolling.value = false
   if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
   if (matchPresencePollTimerId) { clearTimeout(matchPresencePollTimerId); matchPresencePollTimerId = null }
@@ -1436,11 +1532,12 @@ async function goHome() {
   if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
   if (multiplayerHeartbeatTimerId) { clearInterval(multiplayerHeartbeatTimerId); multiplayerHeartbeatTimerId = null }
   if (activityHeartbeatTimerId) { clearTimeout(activityHeartbeatTimerId); activityHeartbeatTimerId = null }
+  if (immediateRefreshTimerId) { clearTimeout(immediateRefreshTimerId); immediateRefreshTimerId = null }
   showLobbyPlayerLeftModal.value = false
   lobbyLeftPlayerNames.value = []
   clearMultiplayerSession()
   game.resetGame()
-  router.push({ name: 'home' })
+  await router.push({ name: 'home' })
 }
 
 async function playAgain() {
@@ -1555,6 +1652,7 @@ onUnmounted(() => {
   if (multiplayerPersistTimerId) { clearInterval(multiplayerPersistTimerId); multiplayerPersistTimerId = null }
   if (multiplayerHeartbeatTimerId) { clearInterval(multiplayerHeartbeatTimerId); multiplayerHeartbeatTimerId = null }
   if (activityHeartbeatTimerId) { clearTimeout(activityHeartbeatTimerId); activityHeartbeatTimerId = null }
+  if (immediateRefreshTimerId) { clearTimeout(immediateRefreshTimerId); immediateRefreshTimerId = null }
   persistMultiplayerSession()
   game.resetGame()
 })

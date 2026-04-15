@@ -16,6 +16,8 @@ function ensureLobbyTables() {
         host_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         max_players  INTEGER NOT NULL DEFAULT 8,
         settings_json TEXT,
+        winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        finished_at  TEXT,
         status       TEXT    NOT NULL DEFAULT 'waiting',
         created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
     )");
@@ -34,6 +36,8 @@ function ensureLobbyTables() {
     )");
     $db->exec('CREATE INDEX IF NOT EXISTS idx_lobby_players_lobby ON lobby_players(lobby_id)');
     ensureLobbyColumn($db, 'settings_json', "ALTER TABLE lobbies ADD COLUMN settings_json TEXT");
+    ensureLobbyColumn($db, 'winner_user_id', "ALTER TABLE lobbies ADD COLUMN winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL");
+    ensureLobbyColumn($db, 'finished_at', "ALTER TABLE lobbies ADD COLUMN finished_at TEXT");
     ensureLobbyPlayersColumn($db, 'last_seen_at', "ALTER TABLE lobby_players ADD COLUMN last_seen_at TEXT");
     ensureLobbyPlayersColumn($db, 'missed_heartbeats', "ALTER TABLE lobby_players ADD COLUMN missed_heartbeats INTEGER NOT NULL DEFAULT 0");
     ensureLobbyPlayersColumn($db, 'disconnected_at', "ALTER TABLE lobby_players ADD COLUMN disconnected_at TEXT");
@@ -227,6 +231,8 @@ function buildLobbyLeaderboard($players, $targetTitle) {
     if (count($finishers) === 0) {
         // Nobody reached the target: treat as a tie, do not reward "fastest failure".
         foreach ($nonFinishers as $p) {
+            $rowPath = json_decode($p['path'] ?: '[]', true);
+            if (!is_array($rowPath)) $rowPath = [];
             $board[] = [
                 'rank' => 1,
                 'user_id' => (int)$p['user_id'],
@@ -236,6 +242,7 @@ function buildLobbyLeaderboard($players, $targetTitle) {
                 'profile_pinned_badge' => isset($p['profile_pinned_badge']) ? (string)$p['profile_pinned_badge'] : '',
                 'clicks' => (int)$p['clicks'],
                 'time' => (int)$p['time_seconds'],
+                'path' => $rowPath,
                 'reached_target' => false,
             ];
         }
@@ -244,6 +251,8 @@ function buildLobbyLeaderboard($players, $targetTitle) {
 
     $rank = 1;
     foreach ($finishers as $p) {
+        $rowPath = json_decode($p['path'] ?: '[]', true);
+        if (!is_array($rowPath)) $rowPath = [];
         $board[] = [
             'rank' => $rank++,
             'user_id' => (int)$p['user_id'],
@@ -253,11 +262,14 @@ function buildLobbyLeaderboard($players, $targetTitle) {
             'profile_pinned_badge' => isset($p['profile_pinned_badge']) ? (string)$p['profile_pinned_badge'] : '',
             'clicks' => (int)$p['clicks'],
             'time' => (int)$p['time_seconds'],
+            'path' => $rowPath,
             'reached_target' => true,
         ];
     }
     $dnfRank = $rank;
     foreach ($nonFinishers as $p) {
+        $rowPath = json_decode($p['path'] ?: '[]', true);
+        if (!is_array($rowPath)) $rowPath = [];
         $board[] = [
             'rank' => $dnfRank,
             'user_id' => (int)$p['user_id'],
@@ -267,6 +279,7 @@ function buildLobbyLeaderboard($players, $targetTitle) {
             'profile_pinned_badge' => isset($p['profile_pinned_badge']) ? (string)$p['profile_pinned_badge'] : '',
             'clicks' => (int)$p['clicks'],
             'time' => (int)$p['time_seconds'],
+            'path' => $rowPath,
             'reached_target' => false,
         ];
     }
@@ -309,6 +322,7 @@ function formatLobbyResponse($lobby, $userId) {
         'host_id' => (int)$lobby['host_id'],
         'max_players' => (int)$lobby['max_players'],
         'is_host' => ((int)$lobby['host_id'] === (int)$userId),
+        'winner_user_id' => isset($lobby['winner_user_id']) && $lobby['winner_user_id'] !== null ? (int)$lobby['winner_user_id'] : null,
         'settings' => decodeMultiplayerSettings(isset($lobby['settings_json']) ? $lobby['settings_json'] : null),
         'can_edit_settings' => ($lobby['status'] === 'waiting' && (int)$lobby['host_id'] === (int)$userId),
         'players' => $players,
@@ -320,6 +334,18 @@ function formatLobbyResponse($lobby, $userId) {
     ];
     if ($lobby['status'] === 'finished') {
         $out['leaderboard'] = buildLobbyLeaderboard($playersRaw, $lobby['end_title']);
+        if (!empty($lobby['winner_user_id'])) {
+            $winnerId = (int)$lobby['winner_user_id'];
+            foreach ($out['leaderboard'] as &$row) {
+                if ((int)$row['user_id'] === $winnerId) {
+                    $row['rank'] = 1;
+                    $row['reached_target'] = true;
+                } elseif ((int)$row['rank'] < 2) {
+                    $row['rank'] = 2;
+                }
+            }
+            unset($row);
+        }
     }
     return $out;
 }
@@ -482,19 +508,33 @@ function startLobby($code, $userId) {
             return ['error' => 'Lobby has already started.'];
         }
 
-        $count = lobbyPlayerCount($db, (int)$fresh['id']);
+        $lobbyId = (int)$fresh['id'];
+        $count = lobbyPlayerCount($db, $lobbyId);
         if ($count < 2) {
             if ($db->inTransaction()) $db->rollBack();
             return ['error' => 'Need at least two players to start.'];
         }
 
-        $stmt = $db->prepare("UPDATE lobbies SET status = 'active' WHERE code = ? AND status = 'waiting'");
+        // Replay waiting room: only players who pressed Play Again are considered joined.
+        // If any replay_ready flag is present, enforce readiness and prune stale members.
+        $readyStmt = $db->prepare('SELECT COUNT(*) FROM lobby_players WHERE lobby_id = ? AND replay_ready = 1');
+        $readyStmt->execute([$lobbyId]);
+        $readyCount = (int)$readyStmt->fetchColumn();
+        if ($readyCount > 0) {
+            if ($readyCount < 2) {
+                if ($db->inTransaction()) $db->rollBack();
+                return ['error' => 'Need at least two replay-ready players to start.'];
+            }
+            $db->prepare('DELETE FROM lobby_players WHERE lobby_id = ? AND replay_ready = 0')->execute([$lobbyId]);
+        }
+
+        $stmt = $db->prepare("UPDATE lobbies SET status = 'active', winner_user_id = NULL, finished_at = NULL WHERE code = ? AND status = 'waiting'");
         $stmt->execute([$code]);
         if ($stmt->rowCount() === 0) {
             if ($db->inTransaction()) $db->rollBack();
             return ['error' => 'Could not start lobby.'];
         }
-        $db->prepare('UPDATE lobby_players SET replay_ready = 0 WHERE lobby_id = ?')->execute([(int)$fresh['id']]);
+        $db->prepare('UPDATE lobby_players SET replay_ready = 0 WHERE lobby_id = ?')->execute([$lobbyId]);
         $db->commit();
     } catch (PDOException $e) {
         if ($db->inTransaction()) $db->rollBack();
@@ -554,9 +594,10 @@ function submitLobbyResult($code, $userId, $clicks, $time, $path) {
         $stmt->execute([$lobbyId]);
         $row = $stmt->fetch();
         if ($isSuddenDeath && $submittedReachedTarget) {
-            $db->prepare("UPDATE lobbies SET status = 'finished' WHERE id = ?")->execute([$lobbyId]);
+            $claim = $db->prepare("UPDATE lobbies SET status = 'finished', winner_user_id = ?, finished_at = datetime('now') WHERE id = ? AND status = 'active' AND winner_user_id IS NULL");
+            $claim->execute([(int)$userId, $lobbyId]);
         } elseif ((int)$row['total'] > 0 && (int)$row['submitted'] === (int)$row['total']) {
-            $db->prepare("UPDATE lobbies SET status = 'finished' WHERE id = ?")->execute([$lobbyId]);
+            $db->prepare("UPDATE lobbies SET status = 'finished', finished_at = COALESCE(finished_at, datetime('now')) WHERE id = ?")->execute([$lobbyId]);
         }
         $db->commit();
     } catch (PDOException $e) {
@@ -603,7 +644,7 @@ function requestLobbyReplay($code, $userId) {
     }
 
     if ($lobby['status'] === 'finished') {
-        $db->prepare("UPDATE lobbies SET status = 'waiting' WHERE id = ?")->execute([$lobbyId]);
+        $db->prepare("UPDATE lobbies SET status = 'waiting', winner_user_id = NULL, finished_at = NULL WHERE id = ?")->execute([$lobbyId]);
         $db->prepare('UPDATE lobby_players SET clicks = NULL, time_seconds = NULL, path = NULL, replay_ready = 0 WHERE lobby_id = ?')->execute([$lobbyId]);
     }
 
@@ -637,7 +678,7 @@ function reseedLobbyPair($code, $userId, $startTitle, $endTitle) {
         return ['error' => 'Cannot reseed after lobby start.'];
     }
 
-    $db->prepare("UPDATE lobbies SET start_title = ?, end_title = ? WHERE code = ?")
+    $db->prepare("UPDATE lobbies SET start_title = ?, end_title = ?, winner_user_id = NULL, finished_at = NULL WHERE code = ?")
         ->execute([$startTitle, $endTitle, $code]);
     $db->prepare("UPDATE lobby_players SET clicks = NULL, time_seconds = NULL, path = NULL WHERE lobby_id = ?")
         ->execute([(int)$lobby['id']]);

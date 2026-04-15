@@ -587,7 +587,8 @@
       :match-tab="matchTab"
       :group-view="groupView"
       :group-lobby-code="groupLobbyCode"
-      :group-lobby-data="groupLobbyData"
+      :group-lobby-data="displayGroupLobbyData"
+      :group-can-start="groupCanStart"
       :current-user-id="auth.user.value?.id ?? null"
       :group-start-loading="groupStartLoading"
       :group-error="groupError"
@@ -712,6 +713,7 @@ const matchStatus = ref(null)
 const matchOpponentUsername = ref('')
 const replayMatchWaitingMode = ref(false)
 const replayLobbyWaitingMode = ref(false)
+const replayMatchSawOpponentMissing = ref(false)
 const joinedMatchCode = ref('')
 const matchOpponentLeftNotified = ref(false)
 let matchPollTimer = null
@@ -728,15 +730,19 @@ const groupLoading = ref(false)
 const groupStartLoading = ref(false)
 const groupError = ref('')
 let groupPollTimer = null
-const editableRoomSettings = ref({
-  mode: 'classic',
-  genre: 'random',
-  modifiers: [],
-  timeLimit: 120,
-  clickLimit: 6,
-  customStartTitle: '',
-  customEndTitle: '',
-})
+function createDefaultRoomSettings() {
+  return {
+    mode: 'classic',
+    genre: 'random',
+    modifiers: [],
+    timeLimit: 120,
+    clickLimit: 6,
+    customStartTitle: '',
+    customEndTitle: '',
+  }
+}
+
+const editableRoomSettings = ref(createDefaultRoomSettings())
 const roomSettingsSaving = ref(false)
 const roomSettingsDirty = ref(false)
 const lastSeenMatchSettingsSignature = ref('')
@@ -878,6 +884,26 @@ const canEditRoomSettings = computed(() => {
   const isHostRoom = !!matchCode.value
   const isStillWaiting = matchStatus.value === 'waiting' || matchStatus.value === 'ready'
   return isHostRoom && isStillWaiting
+})
+const replayReadyPlayers = computed(() => {
+  const players = Array.isArray(groupLobbyData.value?.players) ? groupLobbyData.value.players : []
+  return players.filter(p => !!p?.replay_ready)
+})
+const displayGroupLobbyData = computed(() => {
+  const lobby = groupLobbyData.value
+  if (!lobby) return null
+  if (!replayLobbyWaitingMode.value) return lobby
+  return {
+    ...lobby,
+    players: replayReadyPlayers.value,
+  }
+})
+const groupCanStart = computed(() => {
+  const lobby = groupLobbyData.value
+  if (!lobby || !lobby.is_host || lobby.status !== 'waiting') return false
+  if (replayLobbyWaitingMode.value) return replayReadyPlayers.value.length >= 2
+  const totalPlayers = Array.isArray(lobby.players) ? lobby.players.length : 0
+  return totalPlayers >= 2
 })
 const canInviteFriends = computed(() =>
   !suppressModalFriendInvites.value &&
@@ -1123,7 +1149,10 @@ async function refreshResumeSession() {
   try {
     if (saved.route?.query?.match) {
       const m = await api.get(`/match/${saved.code}`)
-      if (!m || m.error || m.status === 'finished' || m.you?.quit) {
+      const isEffectivelyFinished = m?.status === 'finished'
+        || m?.winner_user_id != null
+        || (m?.you?.submitted && m?.opponent?.submitted)
+      if (!m || m.error || isEffectivelyFinished || m.you?.quit) {
         clearMultiplayerSession()
         resumeMultiplayerSession.value = null
         return
@@ -1161,6 +1190,7 @@ async function createMatch() {
   suppressModalFriendInvites.value = false
   replayMatchWaitingMode.value = false
   replayLobbyWaitingMode.value = false
+  replayMatchSawOpponentMissing.value = false
   matchLoading.value = true
   matchError.value = ''
   try {
@@ -1195,14 +1225,14 @@ function startMatchPolling() {
     if (!code) { stopMatchPolling(); return }
     try {
       const result = await api.get(`/match/${code}`)
-      const hadOpponentBefore = !!matchOpponentUsername.value
       const signature = roomSettingsSignature(result?.settings)
       if (!canEditRoomSettings.value && lastSeenMatchSettingsSignature.value && signature !== lastSeenMatchSettingsSignature.value) {
         toast.info('Host updated match settings.')
       }
       lastSeenMatchSettingsSignature.value = signature
       if (result?.settings && (!canEditRoomSettings.value || !roomSettingsDirty.value)) hydrateRoomSettingsFromResult(result)
-      if (result.opponent?.username) {
+      const opponentPresent = !!result?.opponent?.username && !result?.opponent?.quit
+      if (opponentPresent) {
         matchOpponentUsername.value = result.opponent.username
       } else {
         matchOpponentUsername.value = ''
@@ -1240,7 +1270,7 @@ function startMatchPolling() {
         return
       }
       if (matchCode.value) {
-        const hasOpponent = !!result.opponent?.username
+        const hasOpponent = !!result?.opponent?.username && !result?.opponent?.quit
         if (hasOpponent) {
           matchOpponentLeftNotified.value = false
         } else if (matchStatus.value === 'ready' && !matchOpponentLeftNotified.value) {
@@ -1249,9 +1279,12 @@ function startMatchPolling() {
           matchOpponentUsername.value = ''
         }
         if (replayMatchWaitingMode.value) {
+          if (!hasOpponent) replayMatchSawOpponentMissing.value = true
           const opponentReplayReady = !!result?.replay?.opponent_ready
-          const opponentRejoinedNow = hasOpponent && !hadOpponentBefore
-          matchStatus.value = hasOpponent && (opponentReplayReady || opponentRejoinedNow) ? 'ready' : 'waiting'
+          const opponentRejoinedAfterMissing = hasOpponent && replayMatchSawOpponentMissing.value
+          matchStatus.value = hasOpponent && (opponentReplayReady || opponentRejoinedAfterMissing)
+            ? 'ready'
+            : 'waiting'
         } else {
           matchStatus.value = hasOpponent ? 'ready' : 'waiting'
         }
@@ -1278,6 +1311,16 @@ function resetGroupLobbyUi() {
   groupLoading.value = false
   groupStartLoading.value = false
   joinRoomCode.value = ''
+  editableRoomSettings.value = createDefaultRoomSettings()
+  roomSettingsDirty.value = false
+  lastSeenMatchSettingsSignature.value = ''
+  lastSeenLobbySettingsSignature.value = ''
+  roomSettingsAutosaveRetry.value = false
+  if (roomSettingsAutosaveTimer) {
+    clearTimeout(roomSettingsAutosaveTimer)
+    roomSettingsAutosaveTimer = null
+  }
+  replayMatchSawOpponentMissing.value = false
 }
 
 function switchPvpHub(mode) {
@@ -1318,6 +1361,7 @@ function startGroupLobbyPolling() {
 async function createGroupLobby() {
   if (!auth.user.value) { toast.warn('Login required'); showAuthModal.value = true; return }
   replayLobbyWaitingMode.value = false
+  replayMatchSawOpponentMissing.value = false
   groupLoading.value = true
   groupError.value = ''
   try {
@@ -1401,6 +1445,7 @@ async function joinByCode(prefer = 'match') {
   suppressModalFriendInvites.value = false
   replayMatchWaitingMode.value = false
   replayLobbyWaitingMode.value = false
+  replayMatchSawOpponentMissing.value = false
   const code = joinRoomCode.value.trim().toUpperCase()
   if (!code || code.length < 4) {
     matchError.value = 'Enter a valid room code'
@@ -1627,12 +1672,14 @@ async function openHostedMatchFromRoute() {
   handlingHostMatch = true
   replayMatchWaitingMode.value = false
   replayLobbyWaitingMode.value = false
+  replayMatchSawOpponentMissing.value = false
   matchLoading.value = true
   matchError.value = ''
   groupError.value = ''
 
+  let existing = null
   try {
-    const existing = await api.get(`/match/${hostCode}`)
+    existing = await api.get(`/match/${hostCode}`)
     if (!existing || existing.error || existing.status === 'finished' || existing.you?.quit) {
       toast.info('That match is already closed. Create a new one.')
       const nextQuery = { ...route.query }
@@ -1662,6 +1709,8 @@ async function openHostedMatchFromRoute() {
   matchStatus.value = 'waiting'
   matchOpponentUsername.value = ''
   matchError.value = ''
+  hydrateRoomSettingsFromResult(existing)
+  lastSeenMatchSettingsSignature.value = roomSettingsSignature(existing?.settings)
   hostInviteId.value = Number(route.query.hostInviteId) || null
   hostInviteUser.value = typeof route.query.hostInviteUser === 'string' ? route.query.hostInviteUser : ''
   startMatchPolling()
@@ -1706,11 +1755,17 @@ async function openReplayRoomFromRoute() {
         if (result.can_edit_settings) {
           matchCode.value = result.code
           joinedMatchCode.value = ''
-          matchStatus.value = result?.replay?.opponent_ready ? 'ready' : 'waiting'
+          const hasOpponent = !!result?.opponent?.username && !result?.opponent?.quit
+          replayMatchSawOpponentMissing.value = !hasOpponent
+          const opponentReplayReady = !!result?.replay?.opponent_ready
+          matchStatus.value = hasOpponent && (opponentReplayReady || replayMatchSawOpponentMissing.value)
+            ? 'ready'
+            : 'waiting'
         } else {
           matchCode.value = ''
           joinedMatchCode.value = result.code
           matchStatus.value = 'joined_waiting'
+          replayMatchSawOpponentMissing.value = false
         }
         matchOpponentUsername.value = result.opponent?.username || ''
         hydrateRoomSettingsFromResult(result)
@@ -1730,6 +1785,7 @@ async function openReplayRoomFromRoute() {
       } else {
         replayMatchWaitingMode.value = false
         replayLobbyWaitingMode.value = true
+        replayMatchSawOpponentMissing.value = false
         groupLobbyCode.value = result.code
         groupLobbyData.value = result
         hydrateRoomSettingsFromResult(result)
@@ -1834,6 +1890,7 @@ async function closeMatchModal() {
   suppressModalFriendInvites.value = false
   replayMatchWaitingMode.value = false
   replayLobbyWaitingMode.value = false
+  replayMatchSawOpponentMissing.value = false
   multiplayerInviteError.value = ''
 }
 
@@ -1966,6 +2023,7 @@ watch(showMatchModal, (val) => {
     }
     replayMatchWaitingMode.value = false
     replayLobbyWaitingMode.value = false
+    replayMatchSawOpponentMissing.value = false
     multiplayerInviteError.value = ''
     suppressModalFriendInvites.value = false
     resetGroupLobbyUi()

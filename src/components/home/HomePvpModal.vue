@@ -139,7 +139,7 @@
               <div v-if="groupLobbyData?.status === 'waiting'" class="flex flex-col gap-2">
                 <div v-if="groupLobbyData?.is_host" class="flex gap-2">
                   <button type="button" @click="$emit('copy-group-code')" class="btn-retro-ghost flex-1 !py-2 text-[10px]">COPY CODE</button>
-                  <button type="button" @click="$emit('start-group')" :disabled="groupStartLoading || (groupLobbyData?.players?.length || 0) < 2" class="flex-1 !py-2 !text-[9px]" :class="(groupLobbyData?.players?.length || 0) >= 2 ? 'btn-retro-primary' : 'btn-retro-ghost opacity-40 cursor-not-allowed'">
+                  <button type="button" @click="$emit('start-group')" :disabled="groupStartLoading || !groupCanStart" class="flex-1 !py-2 !text-[9px]" :class="groupCanStart ? 'btn-retro-primary' : 'btn-retro-ghost opacity-40 cursor-not-allowed'">
                     {{ groupStartLoading ? '...' : 'START' }}
                   </button>
                 </div>
@@ -427,6 +427,7 @@ defineProps({
   groupView: { type: String, required: true },
   groupLobbyCode: { type: String, required: true },
   groupLobbyData: { type: Object, default: null },
+  groupCanStart: { type: Boolean, default: false },
   currentUserId: { type: Number, default: null },
   groupStartLoading: { type: Boolean, required: true },
   groupError: { type: String, required: true },
