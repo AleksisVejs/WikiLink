@@ -37,7 +37,7 @@
       </div>
     </div>
 
-    <div v-else class="max-w-4xl mx-auto px-2.5 sm:px-5 py-3 sm:py-8">
+    <div v-else class="max-w-[1320px] mx-auto px-2.5 sm:px-5 py-3 sm:py-8">
       <div v-if="loading" class="space-y-4 animate-fade-in">
         <div class="skeleton h-10 w-3/4 rounded-lg"></div>
         <div class="skeleton h-px w-full"></div>
@@ -62,24 +62,100 @@
         <button @click="$emit('retry')" class="btn-retro-secondary">RETRY</button>
       </div>
 
-      <article v-else-if="articleData" class="animate-fade-in rounded-xl sm:rounded-2xl p-3 sm:p-5"
-               style="background: linear-gradient(180deg, #0f111a, #0b0c13); border: 1px solid rgba(37,39,56,0.75); box-shadow: 0 8px 24px rgba(0,0,0,0.35);">
-        <h1 class="font-terminal text-xl sm:text-4xl text-crt-cyan mb-3 sm:mb-5 pb-2.5 sm:pb-4 relative leading-tight" style="text-shadow: 0 0 12px rgba(0,229,255,0.25);" v-html="articleData.displayTitle"></h1>
-        <div class="retro-divider mb-4 sm:mb-5 -mt-1"></div>
-        <div
-          class="wiki-content"
-          :class="{ 'fog-mode': hasFogModifier }"
-          @click="$emit('link-click', $event)"
-          @mouseover="$emit('link-hover', $event)"
-          @mouseout="$emit('link-hover-end', $event)"
-          v-html="processedHtml"
-        ></div>
-      </article>
+      <div v-else-if="articleData"
+           class="grid gap-3 xl:gap-4 xl:items-start"
+           :class="sectionOutline.length > 0 && !sourceTableCollapsed ? 'xl:grid-cols-[220px_minmax(0,1fr)]' : 'xl:grid-cols-[32px_minmax(0,1fr)]'">
+        <aside v-if="sectionOutline.length > 0"
+               class="animate-fade-in toc-shell"
+               :class="sourceTableCollapsed ? 'fixed left-0 top-1/2 -translate-y-1/2 z-20 xl:static xl:translate-y-0 xl:sticky xl:top-20' : 'fixed inset-y-0 left-0 right-0 z-[70] bg-[#0f111a] xl:static xl:bg-transparent xl:z-auto xl:sticky xl:top-20'">
+          <Transition name="toc-toggle" mode="out-in">
+            <div v-if="sourceTableCollapsed"
+                 class="toc-toggle-handle w-8 sm:w-9 xl:w-8 h-24 sm:h-28 xl:h-32 rounded-r-lg xl:rounded-r-xl border-y border-r border-[rgba(37,39,56,0.55)] bg-[#11131d] flex items-center justify-center xl:-ml-5"
+                 style="box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);">
+              <button
+                type="button"
+                class="w-full h-full rounded-r-lg xl:rounded-r-xl flex flex-col items-center justify-center gap-1 text-crt-cyan/80 hover:text-crt-cyan hover:bg-crt-cyan/[0.06] transition-colors"
+                title="Open table of contents"
+                aria-label="Open table of contents"
+                @click="sourceTableCollapsed = false"
+              >
+                <svg class="w-4 h-4 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+                <span class="hidden xl:block font-pixel text-[6px] tracking-[0.18em] [writing-mode:vertical-rl] rotate-180 select-none">
+                  TOC
+                </span>
+              </button>
+            </div>
+
+            <div v-else
+                 class="toc-panel h-full xl:h-auto xl:max-h-[calc(100vh-6rem)] overflow-hidden rounded-none xl:rounded-2xl border-0 xl:border xl:border-[rgba(37,39,56,0.5)] bg-[#0f111a] xl:bg-[#11131d]"
+                 style="box-shadow: none;">
+              <div class="sticky top-0 z-10 border-b border-[rgba(37,39,56,0.5)] bg-[#11131d] xl:rounded-t-2xl overflow-hidden">
+                <div class="h-[2px] bg-gradient-to-r from-transparent via-[#00e5ff]/60 to-transparent"></div>
+                <div class="flex items-center justify-between gap-2 px-3 py-3 sm:px-4 xl:px-3 xl:py-3">
+                  <div>
+                    <div class="font-pixel text-[7px] text-crt-cyan tracking-[0.18em]">TABLE OF CONTENTS</div>
+                    <div class="hidden xl:block font-mono text-[9px] text-retro-muted/80 mt-1">Jump through article sections</div>
+                  </div>
+                  <button
+                    type="button"
+                    class="w-6 h-6 rounded-md flex items-center justify-center text-crt-cyan/70 hover:text-crt-cyan hover:bg-crt-cyan/[0.06] transition-colors"
+                    title="Close table of contents"
+                    aria-label="Close table of contents"
+                    @click="sourceTableCollapsed = true"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <nav class="overflow-y-auto max-h-[calc(100vh-5.75rem)] xl:max-h-[calc(100vh-10.5rem)] px-3 py-3 sm:px-4 sm:py-4 xl:px-2 xl:py-2 space-y-1.5 xl:space-y-1">
+                <a
+                  v-for="section in sectionOutline"
+                  :key="section.id"
+                  :href="`#${section.id}`"
+                  class="group block rounded-lg xl:rounded-xl px-2.5 py-2 xl:px-2.5 xl:py-1.5 font-mono text-[11px] xl:text-[10px] leading-snug text-retro-light/75 border-l-2 border-transparent transition-colors hover:text-crt-cyan hover:bg-crt-cyan/[0.05] hover:border-crt-cyan/40"
+                  :class="section.level === 'h3'
+                    ? 'ml-3 xl:ml-2 pl-3 xl:pl-2.5 text-[10px] xl:text-[9px] text-retro-muted border-l-retro-border/30'
+                    : 'bg-white/[0.02]'"
+                  @click="handleSectionClick"
+                >
+                  <span class="flex items-start gap-2">
+                    <span
+                      class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full transition-colors"
+                      :class="section.level === 'h3' ? 'bg-retro-border/70 group-hover:bg-crt-cyan/70' : 'bg-crt-cyan/70 group-hover:bg-crt-cyan'"
+                    ></span>
+                    <span class="min-w-0">{{ section.title }}</span>
+                  </span>
+                </a>
+              </nav>
+            </div>
+          </Transition>
+        </aside>
+
+        <article class="animate-fade-in rounded-xl sm:rounded-2xl p-3 sm:p-5 min-w-0"
+                 style="background: linear-gradient(180deg, #0f111a, #0b0c13); border: 1px solid rgba(37,39,56,0.75); box-shadow: 0 8px 24px rgba(0,0,0,0.35);">
+          <h1 class="font-terminal text-xl sm:text-4xl text-crt-cyan mb-3 sm:mb-5 pb-2.5 sm:pb-4 relative leading-tight" style="text-shadow: 0 0 12px rgba(0,229,255,0.25);" v-html="articleData.displayTitle"></h1>
+          <div class="retro-divider mb-4 sm:mb-5 -mt-1"></div>
+          <div
+            class="wiki-content"
+            :class="{ 'fog-mode': hasFogModifier }"
+            @click="$emit('link-click', $event)"
+            @mouseover="$emit('link-hover', $event)"
+            @mouseout="$emit('link-hover-end', $event)"
+            v-html="processedHtml"
+          ></div>
+        </article>
+      </div>
     </div>
   </main>
 </template>
 
 <script setup>
+import { ref } from 'vue'
+
 defineProps({
   initialLoading: { type: Boolean, required: true },
   bootStep: { type: Number, required: true },
@@ -89,8 +165,17 @@ defineProps({
   error: { type: String, default: '' },
   articleData: { type: Object, default: null },
   processedHtml: { type: String, required: true },
+  sectionOutline: { type: Array, default: () => [] },
   hasFogModifier: { type: Boolean, required: true },
 })
+
+const sourceTableCollapsed = ref(true)
+
+function handleSectionClick() {
+  if (window.innerWidth < 1280) {
+    sourceTableCollapsed.value = true
+  }
+}
 
 defineEmits(['close-hint-menu', 'retry', 'link-click', 'link-hover', 'link-hover-end'])
 </script>

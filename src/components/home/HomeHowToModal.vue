@@ -18,33 +18,36 @@
           <div class="space-y-4 font-mono text-sm text-retro-light leading-relaxed">
             <div>
               <h3 class="font-pixel text-[8px] text-crt-green mb-1.5 tracking-wider">THE GOAL</h3>
-              <p class="text-[12px]">Navigate from a <span class="text-crt-green">starting Wikipedia article</span> to a <span class="text-crt-magenta">target article</span> by clicking only the links within each page.</p>
+              <p class="text-[12px]">Navigate from a <span class="text-crt-green">starting Wikipedia article</span> to a <span class="text-crt-magenta">target article</span> using only the links inside each Wikipedia page. Reach the target in as few clicks and as little time as possible.</p>
             </div>
             <div>
-              <h3 class="font-pixel text-[8px] text-crt-amber mb-1.5 tracking-wider">GAME MODES</h3>
+              <h3 class="font-pixel text-[8px] text-crt-amber mb-1.5 tracking-wider">MODES</h3>
               <ul class="space-y-1 text-[12px]">
-                <li><span class="text-crt-blue">Classic</span> -- fewest clicks, no timer</li>
-                <li><span class="text-arcade-orange">Sprint</span> -- beat the clock</li>
-                <li><span class="text-crt-magenta">Click Limit</span> -- limited number of clicks</li>
-                <li><span style="color:#ff5c3a">Trending</span> -- navigate between trending articles</li>
-                <li><span class="text-arcade-gold">Custom</span> -- choose your own articles</li>
-                <li><span class="text-crt-green">Freeplay</span> -- explore with no target</li>
-                <li><span class="text-crt-amber">Daily</span> -- same pair for everyone, once per day</li>
+                <li><span class="text-crt-blue">Classic</span> -- no timer, lowest click count wins</li>
+                <li><span class="text-arcade-orange">Sprint</span> -- reach the target before the timer runs out</li>
+                <li><span class="text-crt-magenta">Click Limit</span> -- finish within a fixed click budget, with no going back</li>
+                <li><span style="color:#ff5c3a">Trending</span> -- classic rules, but the route uses trending Wikipedia pages</li>
+                <li><span class="text-arcade-gold">Custom</span> -- choose your own start and target articles</li>
+                <li><span class="text-crt-green">Freeplay</span> -- explore freely with no target article</li>
+                <li><span class="text-crt-amber">Daily</span> -- one shared route per day for everyone, with no going back</li>
+                <li><span class="text-arcade-purple">Multiplayer</span> -- race friends in 1v1 duels or group lobbies</li>
               </ul>
             </div>
             <div>
-              <h3 class="font-pixel text-[8px] text-crt-cyan mb-1.5 tracking-wider">CONTROLS</h3>
+              <h3 class="font-pixel text-[8px] text-crt-cyan mb-1.5 tracking-wider">RULES &amp; CONTROLS</h3>
               <ul class="space-y-1 text-[12px]">
-                <li><span class="text-crt-green">Green links</span> = clickable Wikipedia links</li>
-                <li><span class="text-retro-muted">Gray links</span> = disabled (external or excluded)</li>
-                <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-cyan">Backspace</kbd> Go back one page</li>
-                <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-amber">R</kbd> Reroll for a new pair</li>
-                <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-red">Esc</kbd> Quit current game</li>
+                <li><span class="text-crt-green">Green links</span> = valid article links you can click</li>
+                <li><span class="text-retro-muted">Gray links</span> = disabled, excluded, or non-playable links</li>
+                <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-cyan">Backspace</kbd> go back one page when the mode allows it</li>
+                <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-amber">R</kbd> reroll for a new pair in supported solo modes</li>
+                <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-red">Esc</kbd> quit the current run</li>
+                <li>Daily and Click Limit runs disable backtracking by default</li>
+                <li>Optional modifiers can hide links, disable some links, or make runs more chaotic for extra challenge</li>
               </ul>
             </div>
             <div>
               <h3 class="font-pixel text-[8px] text-crt-magenta mb-1.5 tracking-wider">TIPS</h3>
-              <p class="text-[12px]">Hover over green links to preview the article before clicking. Look for broad topics like countries, dates, or people to bridge between unrelated subjects.</p>
+              <p class="text-[12px]">Use broad hub pages like countries, historical events, famous people, or major topics to bridge unrelated articles. If you get stuck, zoom out and route through categories that connect lots of pages.</p>
             </div>
           </div>
         </div>

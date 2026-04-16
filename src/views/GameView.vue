@@ -57,6 +57,7 @@
       :error="wiki.error.value || ''"
       :article-data="articleData"
       :processed-html="processedHtml"
+      :section-outline="sectionOutline"
       :has-fog-modifier="game.state.modifiers.includes('fog')"
       @close-hint-menu="showHintMenu = false"
       @retry="loadArticle(game.state.currentArticle)"
@@ -622,8 +623,18 @@ function processPostGame(won) {
   }
 }
 
+function slugifyHeading(text, fallbackIndex) {
+  const base = String(text || '')
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return base || `section-${fallbackIndex}`
+}
+
 function buildProcessedHtml(data) {
-  if (!data?.html) return { html: '', allowedTitles: new Set() }
+  if (!data?.html) return { html: '', allowedTitles: new Set(), sectionOutline: [] }
   const parser = new DOMParser()
   const doc = parser.parseFromString(data.html, 'text/html')
 
@@ -636,6 +647,8 @@ function buildProcessedHtml(data) {
 
   const links = doc.querySelectorAll('a[href]')
   const allowedTitles = new Set(data.links || [])
+  const sectionOutline = []
+  const usedSectionIds = new Set()
 
   links.forEach(link => {
     const href = link.getAttribute('href')
@@ -674,11 +687,57 @@ function buildProcessedHtml(data) {
     })
   }
 
-  return { html: doc.body.innerHTML, allowedTitles }
+  doc.querySelectorAll('table').forEach((table, tableIndex) => {
+    const cellCount = table.querySelectorAll('th, td').length
+    const rows = Array.from(table.querySelectorAll('tr'))
+    const colCount = rows.length > 0
+      ? Math.max(...rows.map(row => row.children.length || 0))
+      : 0
+    const hasSidebarRole = table.classList.contains('infobox')
+      || table.classList.contains('sidebar')
+      || table.closest('.infobox, .sidebar')
+
+    if (cellCount >= 24 || colCount >= 5) {
+      table.classList.add('wiki-table--dense')
+    }
+
+    if (!hasSidebarRole && !table.parentElement?.classList.contains('wiki-table-wrap')) {
+      const wrapper = doc.createElement('div')
+      wrapper.className = 'wiki-table-wrap'
+      if (cellCount >= 24 || colCount >= 5) wrapper.classList.add('wiki-table-wrap--wide')
+      table.parentNode?.insertBefore(wrapper, table)
+      wrapper.appendChild(table)
+    }
+
+    if (!table.getAttribute('data-table-index')) {
+      table.setAttribute('data-table-index', String(tableIndex))
+    }
+  })
+
+  doc.querySelectorAll('h2, h3').forEach((heading, index) => {
+    const text = heading.textContent?.replace(/\[\w+\]$/g, '').trim()
+    if (!text) return
+
+    let sectionId = slugifyHeading(text, index + 1)
+    while (usedSectionIds.has(sectionId)) {
+      sectionId = `${sectionId}-${index + 1}`
+    }
+    usedSectionIds.add(sectionId)
+    heading.id = sectionId
+
+    sectionOutline.push({
+      id: sectionId,
+      title: text,
+      level: heading.tagName.toLowerCase(),
+    })
+  })
+
+  return { html: doc.body.innerHTML, allowedTitles, sectionOutline }
 }
 
 const processedResult = computed(() => buildProcessedHtml(articleData.value))
 const processedHtml = computed(() => processedResult.value.html)
+const sectionOutline = computed(() => processedResult.value.sectionOutline)
 
 watch(processedResult, (result) => {
   validLinks.value = result.allowedTitles

@@ -18,118 +18,203 @@
 
     <!-- Main -->
     <main class="flex-1 flex flex-col items-center justify-center min-h-0 px-3 sm:px-4 py-3 sm:py-5 md:py-6 relative z-10">
-      <div class="max-w-4xl w-full">
+      <div class="max-w-5xl w-full">
 
-        <!-- Title area -->
-        <header class="text-center mb-5 sm:mb-6 animate-fade-in">
-          <div class="retro-divider max-w-[200px] sm:max-w-xs mx-auto mb-3 sm:mb-4"></div>
-          <h1 class="font-pixel text-2xl sm:text-4xl md:text-5xl mb-1.5 sm:mb-2 leading-tight sm:leading-relaxed tracking-wide">
-            <span class="text-neon-green">WIKI</span><span class="text-neon-cyan">LINK</span>
-          </h1>
-          <p class="font-terminal text-base sm:text-lg text-crt-white/50 tracking-[0.2em] mb-2">The Wiki Game</p>
-          <div class="retro-divider max-w-[200px] sm:max-w-xs mx-auto mt-3 sm:mt-4"></div>
-        </header>
-
-        <!-- Global stats bar -->
-        <section v-if="globalStats" class="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-5 animate-fade-in">
-          <div class="stat-pill">
-            <div class="font-terminal text-base sm:text-lg text-crt-green tabular-nums">{{ globalStats.totalGames }}</div>
-            <div class="font-mono text-[7px] sm:text-[8px] text-retro-muted tracking-wider">GAMES</div>
-          </div>
-          <div class="stat-pill">
-            <div class="font-terminal text-base sm:text-lg text-crt-cyan tabular-nums">{{ globalStats.totalPlayers }}</div>
-            <div class="font-mono text-[7px] sm:text-[8px] text-retro-muted tracking-wider">PLAYERS</div>
-          </div>
-          <div class="stat-pill">
-            <div class="font-terminal text-base sm:text-lg text-crt-amber tabular-nums">{{ globalStats.totalClicks }}</div>
-            <div class="font-mono text-[7px] sm:text-[8px] text-retro-muted tracking-wider">CLICKS</div>
-          </div>
-        </section>
-
-        <!-- Trending ticker -->
-        <section v-if="trending.trendingArticles.value.length > 0" class="mb-3 sm:mb-4 animate-fade-in">
-          <div class="flex items-center gap-2 mb-1">
-            <svg class="w-3.5 h-3.5 text-arcade-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-            </svg>
-            <span class="font-pixel text-[7px] text-arcade-orange tracking-[0.15em]">TRENDING NOW</span>
-          </div>
-          <div class="trending-ticker rounded-lg py-1.5" style="background: rgba(255,92,58,0.04); border: 1px solid rgba(255,92,58,0.15);">
-            <div class="trending-ticker-track">
-              <div class="trending-ticker-set">
-                <span v-for="(article, idx) in trending.trendingArticles.value.slice(0, 20)" :key="`a-${idx}`"
-                      class="trending-ticker-item font-mono text-[11px] text-retro-light/70">
-                  {{ article.title }}
-                  <span class="text-arcade-orange/60 ml-1">{{ trending.formatViews(article.views) }}</span>
-                </span>
+        <!-- Hero -->
+        <section class="home-hero-shell mb-4 sm:mb-5 md:mb-6 animate-fade-in">
+          <div class="home-hero-glow"></div>
+          <div>
+            <div class="home-hero-panel">
+              <div class="inline-flex items-center gap-2 self-start rounded-full border border-crt-cyan/20 bg-crt-cyan/[0.05] px-3 py-1">
+                <span class="h-1.5 w-1.5 rounded-full bg-crt-green animate-glow-pulse"></span>
+                <span class="font-mono text-[9px] uppercase tracking-[0.24em] text-crt-cyan/80">Arcade Wiki Run</span>
               </div>
-              <div class="trending-ticker-set">
-                <span v-for="(article, idx) in trending.trendingArticles.value.slice(0, 20)" :key="`b-${idx}`"
-                      class="trending-ticker-item font-mono text-[11px] text-retro-light/70">
-                  {{ article.title }}
-                  <span class="text-arcade-orange/60 ml-1">{{ trending.formatViews(article.views) }}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        <!-- Daily challenge banner -->
-        <section v-if="!dailyCompleted" class="mb-3 sm:mb-4 animate-slide-up">
-          <button @click="startDaily"
-                  :disabled="hasActiveMultiplayerSession"
-                  class="daily-banner w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group touch-manipulation relative overflow-hidden"
-                  :class="{ 'opacity-50 cursor-not-allowed': hasActiveMultiplayerSession }"
-                  style="background: linear-gradient(135deg, rgba(255,191,0,0.06), rgba(255,107,43,0.03)); border: 1.5px solid rgba(255,191,0,0.2);">
-            <div class="absolute top-0 left-0 right-0 h-[1px]" style="background: linear-gradient(90deg, transparent, rgba(255,191,0,0.3), transparent);"></div>
-            <div class="flex items-center gap-3 min-w-0">
-              <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                   style="background: rgba(255,191,0,0.08); border: 1px solid rgba(255,191,0,0.15);">
-                <svg class="w-5 h-5 text-crt-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div class="text-left min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="font-pixel text-[8px] text-crt-amber tracking-[0.15em]">DAILY CHALLENGE</span>
-                  <span class="font-mono text-[9px] px-1.5 py-0.5 rounded" style="color: #39ff14; background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.2);">2x XP</span>
+              <div class="home-hero-layout">
+                <div class="home-hero-copy">
+                  <div class="retro-divider max-w-[220px] sm:max-w-xs mb-4"></div>
+                  <h1 class="font-pixel text-3xl sm:text-5xl md:text-6xl leading-tight tracking-wide">
+                    <span class="text-neon-green">WIKI</span><span class="text-neon-cyan">LINK</span>
+                  </h1>
+                  <p class="mt-2 font-terminal text-sm sm:text-lg text-crt-white/55 tracking-[0.22em] uppercase">The Wiki Game</p>
+                  <p class="mt-4 max-w-2xl font-mono text-[12px] sm:text-sm leading-6 text-retro-light/72">
+                    Race from one Wikipedia page to another, test your routing instincts, and climb the boards with faster, smarter runs.
+                  </p>
+
+                  <div v-if="trending.trendingArticles.value.length > 0" class="home-strip-card mt-5">
+                    <div class="flex items-center gap-2 mb-2">
+                      <svg class="w-3.5 h-3.5 text-arcade-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                      </svg>
+                      <span class="font-pixel text-[7px] text-arcade-orange tracking-[0.15em]">TRENDING NOW</span>
+                    </div>
+                    <div class="trending-ticker rounded-lg py-1.5" style="background: rgba(255,92,58,0.04); border: 1px solid rgba(255,92,58,0.15);">
+                      <div class="trending-ticker-track">
+                        <div class="trending-ticker-set">
+                          <span v-for="(article, idx) in trending.trendingArticles.value.slice(0, 20)" :key="`hero-a-${idx}`"
+                                class="trending-ticker-item font-mono text-[11px] text-retro-light/70">
+                            {{ article.title }}
+                            <span class="text-arcade-orange/60 ml-1">{{ trending.formatViews(article.views) }}</span>
+                          </span>
+                        </div>
+                        <div class="trending-ticker-set">
+                          <span v-for="(article, idx) in trending.trendingArticles.value.slice(0, 20)" :key="`hero-b-${idx}`"
+                                class="trending-ticker-item font-mono text-[11px] text-retro-light/70">
+                            {{ article.title }}
+                            <span class="text-arcade-orange/60 ml-1">{{ trending.formatViews(article.views) }}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <p class="font-mono text-[10px] sm:text-[11px] text-retro-muted mt-0.5 break-words">Same pair for everyone today. Can you beat it?</p>
+
+                <div class="home-hero-side">
+                  <div class="flex flex-wrap gap-2.5">
+                    <button
+                      type="button"
+                      @click="showHowTo = true"
+                      class="home-hero-action"
+                    >
+                      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8.228 9c.55-1.165 1.85-2 3.272-2 1.933 0 3.5 1.567 3.5 3.5 0 1.283-.69 2.404-1.718 3.014-.658.39-1.282.86-1.282 1.736V16m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>How To Play</span>
+                    </button>
+                    <router-link
+                      v-if="auth.user.value"
+                      :to="`/profile/${auth.user.value.username}`"
+                      class="home-hero-action"
+                    >
+                      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5.121 17.804A9 9 0 1118.88 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>My Profile</span>
+                    </router-link>
+                    <button
+                      v-else
+                      type="button"
+                      @click="showAuthModal = true"
+                      class="home-hero-action"
+                    >
+                      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12H3m0 0l4-4m-4 4l4 4m6 3h5a2 2 0 002-2V7a2 2 0 00-2-2h-5" />
+                      </svg>
+                      <span>Login</span>
+                    </button>
+                  </div>
+
+                  <div v-if="globalStats" class="grid grid-cols-1 gap-2.5 sm:grid-cols-3 lg:grid-cols-1">
+                    <div class="home-hero-stat">
+                      <div class="font-terminal text-lg sm:text-xl text-crt-green tabular-nums">{{ globalStats.totalGames }}</div>
+                      <div class="font-mono text-[9px] tracking-[0.24em] text-retro-muted uppercase">Games Played</div>
+                    </div>
+                    <div class="home-hero-stat">
+                      <div class="font-terminal text-lg sm:text-xl text-crt-cyan tabular-nums">{{ globalStats.totalPlayers }}</div>
+                      <div class="font-mono text-[9px] tracking-[0.24em] text-retro-muted uppercase">Players Joined</div>
+                    </div>
+                    <div class="home-hero-stat">
+                      <div class="font-terminal text-lg sm:text-xl text-crt-amber tabular-nums">{{ globalStats.totalClicks }}</div>
+                      <div class="font-mono text-[9px] tracking-[0.24em] text-retro-muted uppercase">Links Clicked</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <svg class="w-5 h-5 text-crt-amber/30 group-hover:text-crt-amber group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+          </div>
         </section>
-        <section v-else class="mb-3 sm:mb-4 animate-slide-up">
-          <div class="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl relative overflow-hidden"
-               style="background: rgba(57,255,20,0.03); border: 1.5px solid rgba(57,255,20,0.18);">
-            <div class="absolute top-0 left-0 right-0 h-[1px]" style="background: linear-gradient(90deg, transparent, rgba(57,255,20,0.25), transparent);"></div>
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                   style="background: rgba(57,255,20,0.06); border: 1px solid rgba(57,255,20,0.12);">
-                <svg class="w-5 h-5 text-crt-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+
+        <section class="mb-4 sm:mb-5 animate-fade-in">
+          <div class="home-section-header">
+            <h2 class="home-section-title">Jump into the action</h2>
+          </div>
+
+          <div class="grid gap-3 sm:gap-4 lg:grid-cols-2">
+            <section v-if="!dailyCompleted" class="animate-slide-up flex">
+              <button @click="startDaily"
+                      :disabled="hasActiveMultiplayerSession"
+                      class="home-action-card home-action-card--amber w-full h-full text-left"
+                      :class="{ 'opacity-50 cursor-not-allowed': hasActiveMultiplayerSession }">
+                <div class="home-action-card__bar"></div>
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-start gap-3 min-w-0">
+                    <div class="home-action-card__icon home-action-card__icon--amber">
+                      <svg class="w-5 h-5 text-crt-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="font-pixel text-[8px] text-crt-amber tracking-[0.15em]">DAILY CHALLENGE</span>
+                        <span class="home-feature-chip">2x XP</span>
+                      </div>
+                      <p class="mt-1 font-terminal text-lg text-crt-white">One route for everyone today</p>
+                      <p class="mt-1 font-mono text-[11px] text-retro-muted break-words">Same pair for every player. Fewer clicks win, and faster time breaks ties.</p>
+                    </div>
+                  </div>
+                  <svg class="w-5 h-5 text-crt-amber/30 group-hover:text-crt-amber transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </button>
+            </section>
+            <section v-else class="animate-slide-up flex">
+              <div class="home-action-card home-action-card--green w-full h-full">
+                <div class="home-action-card__bar"></div>
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-start gap-3 min-w-0">
+                    <div class="home-action-card__icon home-action-card__icon--green">
+                      <svg class="w-5 h-5 text-crt-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div class="min-w-0">
+                      <div class="font-pixel text-[8px] text-crt-green tracking-[0.15em]">DAILY COMPLETE</div>
+                      <p class="mt-1 font-terminal text-lg text-crt-white">Your result is locked in</p>
+                      <p class="mt-1 font-mono text-[11px] text-retro-muted break-words">
+                        {{ dailyStatus.clicks }} clicks in {{ formatTime(dailyStatus.time) }}
+                        <span v-if="auth.streak.value > 1" class="text-crt-amber ml-1 inline-flex items-center gap-0.5">
+                          <svg class="w-3 h-3 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /></svg>
+                          {{ auth.streak.value }}-day streak
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <button @click.stop="shareDailyResult" class="btn-retro-ghost flex items-center gap-1.5 px-2.5 py-1.5 text-xs shrink-0" title="Share result">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    <span class="hidden sm:inline">SHARE</span>
+                  </button>
+                </div>
               </div>
-              <div>
-                <div class="font-pixel text-[8px] text-crt-green tracking-[0.15em]">DAILY COMPLETE</div>
-                <p class="font-mono text-[10px] text-retro-muted mt-0.5">
-                  {{ dailyStatus.clicks }} clicks &middot; {{ formatTime(dailyStatus.time) }}
-                  <span v-if="auth.streak.value > 1" class="text-crt-amber ml-1 inline-flex items-center gap-0.5">
-                    <svg class="w-3 h-3 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /></svg>
-                    {{ auth.streak.value }}-day streak
-                  </span>
-                </p>
-              </div>
-            </div>
-            <button @click="shareDailyResult" class="btn-retro-ghost flex items-center gap-1.5 px-2.5 py-1.5 text-xs shrink-0" title="Share result">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-              <span class="hidden sm:inline">SHARE</span>
-            </button>
+            </section>
+
+            <section class="animate-slide-up flex">
+              <button @click="showMatchModal = true" class="home-action-card home-action-card--purple w-full h-full text-left">
+                <div class="home-action-card__bar"></div>
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-start gap-3 min-w-0">
+                    <div class="home-action-card__icon home-action-card__icon--purple">
+                      <svg class="w-5 h-5 text-arcade-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                    </div>
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="font-pixel text-[8px] text-arcade-purple tracking-[0.15em]">PVP</span>
+                        <span class="font-mono text-[9px] text-retro-muted uppercase tracking-[0.18em]">1v1 or group</span>
+                      </div>
+                      <p class="mt-1 font-terminal text-lg text-crt-white">Play against real people</p>
+                      <p class="mt-1 font-mono text-[11px] text-retro-muted break-words">Challenge a friend, make a room, or host a lobby for up to 8 players.</p>
+                    </div>
+                  </div>
+                  <svg class="w-5 h-5 text-arcade-purple/30 group-hover:text-arcade-purple transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </button>
+            </section>
           </div>
         </section>
 
@@ -232,32 +317,6 @@
           </transition>
         </section>
 
-        <!-- 1v1 Match banner -->
-        <section class="mb-3 sm:mb-4 animate-slide-up">
-          <button @click="showMatchModal = true"
-                  class="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group touch-manipulation relative overflow-hidden"
-                  style="background: linear-gradient(135deg, rgba(180,76,255,0.05), rgba(76,159,255,0.03)); border: 1.5px solid rgba(180,76,255,0.2);">
-            <div class="absolute top-0 left-0 right-0 h-[1px]" style="background: linear-gradient(90deg, transparent, rgba(180,76,255,0.3), transparent);"></div>
-            <div class="flex items-center gap-3 min-w-0">
-              <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 relative"
-                   style="background: rgba(180,76,255,0.08); border: 1px solid rgba(180,76,255,0.15);">
-                <svg class="w-5 h-5 text-arcade-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <div class="text-left min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="font-pixel text-[8px] text-arcade-purple tracking-[0.15em]">PVP</span>
-                </div>
-                <p class="font-mono text-[10px] sm:text-[11px] text-retro-muted mt-0.5 break-words">Challenge a friend or create a lobby of up to 8 players.</p>
-              </div>
-            </div>
-            <svg class="w-5 h-5 text-arcade-purple/30 group-hover:text-arcade-purple group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </section>
-
         <section v-if="resumeMultiplayerSession" class="mb-3 sm:mb-4 animate-slide-up">
           <button @click="resumeMultiplayer"
                   class="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-300 group touch-manipulation relative overflow-hidden"
@@ -291,23 +350,10 @@
           </button>
         </section>
 
-        <section class="mb-3 sm:mb-4 animate-slide-up">
-          <div class="rounded-xl p-3 sm:p-4" style="background: rgba(0,229,255,0.03); border: 1.5px solid rgba(0,229,255,0.15);">
-            <div class="font-pixel text-[8px] text-crt-cyan tracking-[0.16em] mb-3">ROUND FLOW</div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <div class="rounded-lg px-3 py-2.5" style="background: #12131c; border: 1px solid #252738;">
-                <p class="font-pixel text-[7px] tracking-wider text-crt-cyan mb-1">1. PICK STYLE</p>
-                <p class="font-mono text-[10px] text-retro-muted">Choose category and game type.</p>
-              </div>
-              <div class="rounded-lg px-3 py-2.5" style="background: #12131c; border: 1px solid #252738;">
-                <p class="font-pixel text-[7px] tracking-wider text-crt-amber mb-1">2. SET RULES</p>
-                <p class="font-mono text-[10px] text-retro-muted">Apply limits and optional modifiers.</p>
-              </div>
-              <div class="rounded-lg px-3 py-2.5" style="background: #12131c; border: 1px solid #252738;">
-                <p class="font-pixel text-[7px] tracking-wider text-crt-green mb-1">3. START ROUND</p>
-                <p class="font-mono text-[10px] text-retro-muted">Jump in with one clear objective.</p>
-              </div>
-            </div>
+        <!-- Display frame (game config) -->
+        <section class="mb-4 sm:mb-5 animate-slide-up">
+          <div class="home-section-header">
+            <h2 class="home-section-title">Build your next round</h2>
           </div>
         </section>
 
@@ -334,7 +380,7 @@
           <div v-if="selectedModeId !== 'custom'" class="p-3 sm:p-4 md:p-5">
             <div class="flex items-center gap-2.5 mb-2.5 sm:mb-3">
               <div class="w-1 h-4 rounded-full bg-crt-amber"></div>
-              <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">1. PICK CATEGORY</span>
+              <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">PICK CATEGORY</span>
             </div>
             <div class="flex flex-wrap gap-1.5 sm:gap-2">
               <button v-for="g in genres" :key="g.id"
@@ -356,7 +402,7 @@
           <div class="p-3 sm:p-4 md:p-5">
             <div class="flex items-center gap-2.5 mb-2.5 sm:mb-3">
               <div class="w-1 h-4 rounded-full bg-crt-cyan"></div>
-              <span class="font-pixel text-[8px] text-crt-cyan tracking-[0.2em]">2. PICK GAME TYPE</span>
+              <span class="font-pixel text-[8px] text-crt-cyan tracking-[0.2em]">PICK GAME TYPE</span>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
               <button v-for="mode in displayModes" :key="mode.id"
@@ -392,7 +438,7 @@
             <div class="p-3 sm:p-4 md:p-5">
               <div class="flex items-center gap-2.5 mb-2.5 sm:mb-3">
                 <div class="w-1 h-4 rounded-full bg-crt-magenta"></div>
-                <span class="font-pixel text-[8px] text-crt-magenta tracking-[0.2em]">3. SET DIFFICULTY</span>
+                <span class="font-pixel text-[8px] text-crt-magenta tracking-[0.2em]">SET DIFFICULTY</span>
               </div>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 <button v-for="d in difficulties" :key="d.id"
@@ -425,7 +471,7 @@
             <div class="p-3 sm:p-4 md:p-5">
               <div class="flex items-center gap-2.5 mb-2.5 sm:mb-3">
                 <div class="w-1 h-4 rounded-full bg-crt-amber"></div>
-                <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">4. OPTIONAL MODIFIERS</span>
+                <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">OPTIONAL MODIFIERS</span>
                 <span v-if="activeModifiers.length > 0" class="font-mono text-[9px] text-crt-green ml-1">{{ (1.25 ** activeModifiers.length).toFixed(2) }}x XP</span>
               </div>
               <div class="flex flex-wrap gap-1.5 sm:gap-2">
@@ -448,7 +494,7 @@
             <div class="p-3 sm:p-4 md:p-5">
               <div class="flex items-center gap-2.5 mb-2.5 sm:mb-3">
                 <div class="w-1 h-4 rounded-full bg-crt-amber"></div>
-                <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">3. CHOOSE ARTICLES</span>
+                <span class="font-pixel text-[8px] text-crt-amber tracking-[0.2em]">CHOOSE ARTICLES</span>
               </div>
               <p class="font-mono text-[10px] text-retro-muted mb-3">Type to search Wikipedia; pick a suggestion or enter a title yourself.</p>
               <div class="space-y-2.5">
@@ -461,62 +507,68 @@
           <div class="mx-3 sm:mx-5"><div class="retro-divider"></div></div>
 
           <!-- Start button area -->
-          <div class="p-4 sm:p-5 md:p-6 flex flex-col items-center">
-            <div class="mb-3 w-full sm:w-auto sm:min-w-[300px] rounded-lg px-4 py-3"
-                 style="background: rgba(76,159,255,0.04); border: 1px solid rgba(76,159,255,0.2);">
-              <div class="font-pixel text-[7px] text-crt-cyan tracking-[0.15em] mb-2">ROUND SUMMARY</div>
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between gap-3">
-                  <span class="font-mono text-[10px] text-retro-muted">Mode</span>
-                  <span class="font-mono text-[10px] text-crt-cyan">{{ selectedMode?.name || 'Unknown' }}</span>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <span class="font-mono text-[10px] text-retro-muted">Objective</span>
-                  <span class="font-mono text-[10px] text-crt-white text-right">{{ modeGoalText }}</span>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <span class="font-mono text-[10px] text-retro-muted">Limit</span>
-                  <span class="font-mono text-[10px] text-crt-amber">{{ selectedLimitText }}</span>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <span class="font-mono text-[10px] text-retro-muted">Modifiers</span>
-                  <span class="font-mono text-[10px] text-crt-green">{{ modifierSummaryText }}</span>
+          <div class="p-4 sm:p-5 md:p-6">
+            <div class="setup-summary-grid">
+              <div class="setup-summary-panel">
+                <div class="font-pixel text-[6px] sm:text-[7px] text-crt-cyan tracking-[0.15em] mb-1.5">ROUND SUMMARY</div>
+                <div class="setup-summary-items">
+                  <div class="setup-summary-item">
+                    <span class="setup-summary-label">Mode</span>
+                    <span class="setup-summary-value text-crt-cyan">{{ selectedMode?.name || 'Unknown' }}</span>
+                  </div>
+                  <div class="setup-summary-item">
+                    <span class="setup-summary-label">Objective</span>
+                    <span class="setup-summary-value text-crt-white">{{ modeGoalText }}</span>
+                  </div>
+                  <div class="setup-summary-item">
+                    <span class="setup-summary-label">Limit</span>
+                    <span class="setup-summary-value text-crt-amber">{{ selectedLimitText }}</span>
+                  </div>
+                  <div class="setup-summary-item">
+                    <span class="setup-summary-label">Modifiers</span>
+                    <span class="setup-summary-value text-crt-green">{{ modifierSummaryText }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <!-- XP estimate -->
-            <div v-if="xpEstimate.multiplier > 0" class="mb-3 w-full sm:w-auto sm:min-w-[260px] rounded-lg px-4 py-2.5 flex items-center justify-between gap-3"
-                 style="background: rgba(57,255,20,0.03); border: 1px solid rgba(57,255,20,0.12);">
-              <div class="flex items-center gap-2">
-                <svg class="w-3.5 h-3.5 text-crt-green/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span class="font-mono text-[10px] text-retro-muted">Win XP</span>
+
+              <div class="setup-launch-panel">
+                <div class="setup-launch-head">
+                  <div>
+                    <div class="font-pixel text-[6px] sm:text-[7px] text-crt-green tracking-[0.15em]">LAUNCH READY</div>
+                    <p class="mt-1.5 font-terminal text-lg sm:text-xl text-crt-white">Start when the setup looks right</p>
+                  </div>
+                  <div v-if="xpEstimate.multiplier > 0" class="setup-xp-chip">
+                    <span class="font-terminal text-xs sm:text-sm text-crt-green">~{{ xpEstimate.total }} XP</span>
+                    <span v-if="xpEstimate.multiplier !== 1" class="setup-xp-multiplier">{{ xpEstimate.multiplier }}x</span>
+                  </div>
+                </div>
+
+                <p class="font-mono text-[10px] sm:text-[11px] leading-4 sm:leading-5 text-retro-muted">
+                  {{ hasActiveMultiplayerSession ? 'Finish or leave the current multiplayer session before starting a solo round.' : 'Your selected mode, limits, and modifiers are locked in when you press start.' }}
+                </p>
+
+                <div v-if="xpEstimate.multiplier <= 0" class="rounded-lg px-3 py-1.5 flex items-center justify-center gap-2"
+                     style="background: rgba(85,87,112,0.04); border: 1px solid rgba(85,87,112,0.15);">
+                  <span class="font-mono text-[9px] sm:text-[10px] text-retro-muted/50">No XP in this mode</span>
+                </div>
+
+                <button
+                  type="button"
+                  @click="startGame"
+                  :disabled="hasActiveMultiplayerSession"
+                  class="btn-retro-primary w-full min-h-[44px] sm:min-h-[48px] touch-manipulation text-[10px] sm:text-[11px] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {{ hasActiveMultiplayerSession ? 'LEAVE MULTIPLAYER TO START' : 'START GAME' }}
+                </button>
+
+                <div class="mt-1 flex items-center justify-center gap-2.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-crt-green/40 animate-blink"></span>
+                  <p class="font-pixel text-[6px] sm:text-[7px] text-retro-muted/40 tracking-[0.3em] animate-blink-slow">
+                    PRESS START TO BEGIN
+                  </p>
+                  <span class="w-1.5 h-1.5 rounded-full bg-crt-green/40 animate-blink"></span>
+                </div>
               </div>
-              <div class="flex items-center gap-2">
-                <span class="font-terminal text-sm text-crt-green">~{{ xpEstimate.total }} XP</span>
-                <span v-if="xpEstimate.multiplier !== 1" class="font-mono text-[9px] px-1.5 py-0.5 rounded"
-                      style="color: #39ff14; background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.2);">{{ xpEstimate.multiplier }}x</span>
-              </div>
-            </div>
-            <div v-else class="mb-3 w-full sm:w-auto sm:min-w-[260px] rounded-lg px-4 py-2 flex items-center justify-center gap-2"
-                 style="background: rgba(85,87,112,0.04); border: 1px solid rgba(85,87,112,0.15);">
-              <span class="font-mono text-[10px] text-retro-muted/50">No XP in this mode</span>
-            </div>
-            <button
-              type="button"
-              @click="startGame"
-              :disabled="hasActiveMultiplayerSession"
-              class="btn-retro-primary w-full sm:w-auto sm:min-w-[260px] min-h-[48px] sm:min-h-0 touch-manipulation text-[11px] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {{ hasActiveMultiplayerSession ? 'LEAVE MULTIPLAYER TO START' : 'START GAME' }}
-            </button>
-            <div class="mt-3 flex items-center justify-center gap-2.5">
-              <span class="w-1.5 h-1.5 rounded-full bg-crt-green/40 animate-blink"></span>
-              <p class="font-pixel text-[6px] sm:text-[7px] text-retro-muted/40 tracking-[0.3em] animate-blink-slow">
-                PRESS START TO BEGIN
-              </p>
-              <span class="w-1.5 h-1.5 rounded-full bg-crt-green/40 animate-blink"></span>
             </div>
           </div>
 

@@ -162,15 +162,19 @@
         </div>
       </div>
 
-      <div v-if="displayPath.length > 1 && !initialLoading" class="hidden sm:flex nav-breadcrumb">
+      <div
+        v-if="displayPath.length > 1 && !initialLoading"
+        class="nav-breadcrumb px-2 sm:px-0"
+        :class="displayPath.length > 1 ? 'flex' : 'hidden'"
+      >
         <template v-for="(article, idx) in displayPath" :key="idx">
           <span v-if="idx > 0" class="text-retro-border/30 shrink-0 text-[8px] sm:text-[10px] select-none">&rsaquo;</span>
-          <span v-if="article.type === 'collapsed'" class="shrink-0 px-1.5 py-0.5 rounded text-retro-muted/40 font-mono text-[9px] sm:text-[10px] whitespace-nowrap">
+          <span v-if="article.type === 'collapsed'" class="shrink-0 px-1.5 py-0.5 rounded text-retro-muted/40 font-mono text-[8px] sm:text-[10px] whitespace-nowrap">
             {{ article.label }}
           </span>
           <span
             v-else
-            class="shrink-0 px-1.5 sm:px-2 py-0.5 rounded-md font-mono text-[9px] sm:text-[10px] whitespace-nowrap transition-colors"
+            class="shrink-0 px-1.5 sm:px-2 py-0.5 rounded-md font-mono text-[8px] sm:text-[10px] whitespace-nowrap transition-colors"
             :class="article.active ? 'text-crt-green' : 'text-retro-muted/60'"
             :style="article.active ? 'background: rgba(57,255,20,0.06); border: 1px solid rgba(57,255,20,0.1);' : ''"
           >
