@@ -1,10 +1,10 @@
 <template>
   <Teleport to="body">
     <transition name="fade">
-      <div v-if="open" class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
+      <div v-if="open" class="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4">
         <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="$emit('close')"></div>
-        <div class="relative rounded-2xl p-4 sm:p-6 max-w-[520px] w-full max-h-[90vh] overflow-y-auto animate-scale-in" style="background: #0d0e15; border: 1.5px solid rgba(180,76,255,0.25); box-shadow: 0 0 60px rgba(0,0,0,0.8), 0 0 30px rgba(180,76,255,0.06);">
-          <div class="flex items-center justify-between mb-5">
+        <div class="pvp-modal-shell relative rounded-2xl p-3 sm:p-5 max-w-[520px] w-full max-h-[92vh] overflow-y-auto animate-scale-in" style="background: #0d0e15; border: 1.5px solid rgba(180,76,255,0.25); box-shadow: 0 0 60px rgba(0,0,0,0.8), 0 0 30px rgba(180,76,255,0.06);">
+          <div class="flex items-center justify-between mb-4 sm:mb-5">
             <div class="flex items-center gap-2.5">
               <div class="w-1 h-4 rounded-full bg-arcade-purple"></div>
               <h2 class="font-pixel text-[9px] text-arcade-purple tracking-[0.2em]">PVP</h2>
@@ -17,11 +17,18 @@
           </div>
 
           <template v-if="matchTab === 'group' && groupView === 'waiting'">
-            <div class="text-center py-3">
-              <div class="font-pixel text-[8px] mb-2 tracking-wider text-crt-cyan">GROUP LOBBY</div>
-              <div class="font-terminal text-3xl text-arcade-purple mb-2 tracking-[0.25em]">{{ groupLobbyCode }}</div>
-              <p class="font-mono text-[10px] text-retro-muted mb-3">Share the code. Host starts when everyone is ready (min. 2 players).</p>
-              <div class="rounded-lg px-3 py-2 mb-3 text-left" style="background: #12131c; border: 1px solid #252738;">
+            <div class="text-center py-2">
+              <div class="font-pixel text-[7px] sm:text-[8px] mb-2 tracking-wider text-crt-cyan">GROUP LOBBY</div>
+              <button
+                type="button"
+                @click="$emit('copy-group-code')"
+                class="pvp-code-pill mx-auto mb-2"
+                title="Copy code"
+              >
+                {{ groupLobbyCode }}
+              </button>
+              <p class="font-mono text-[10px] text-retro-muted mb-3 sm:mb-4">Tap the code to copy it. Host starts when everyone is ready (min. 2 players).</p>
+              <div class="pvp-card mb-3 text-left">
                 <div class="font-pixel text-[6px] text-retro-muted mb-1.5 tracking-wider">PLAYERS ({{ groupLobbyData?.players?.length || 0 }} / {{ groupLobbyData?.max_players || '—' }})</div>
                 <ul class="font-mono text-[11px] text-crt-white space-y-1.5 max-h-[180px] overflow-y-auto">
                   <li
@@ -49,7 +56,7 @@
                   </li>
                 </ul>
               </div>
-              <div v-if="groupLobbyData" class="rounded-lg px-3 py-2.5 mb-3 text-left" style="background: linear-gradient(180deg, #12131c, #0f1018); border: 1px solid #252738;">
+              <div v-if="groupLobbyData" class="pvp-card pvp-card--soft mb-3 text-left">
                 <div class="flex items-center justify-between gap-2 mb-2">
                   <div class="font-pixel text-[6px] text-retro-muted tracking-wider">LOBBY SETTINGS</div>
                   <span class="font-mono text-[9px] text-crt-cyan/70">{{ canEditRoomSettings ? 'Host controls' : 'View only' }}</span>
@@ -57,13 +64,13 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div>
                     <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Genre</p>
-                    <select :value="roomSettings.genre" :disabled="!canEditRoomSettings || roomSettings.mode === 'custom'" @change="$emit('update-room-settings', { genre: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
+                    <select :value="roomSettings.genre" :disabled="!canEditRoomSettings || roomSettings.mode === 'custom'" @change="$emit('update-room-settings', { genre: $event.target.value })" class="pvp-input w-full">
                       <option v-for="g in roomGenres" :key="g.id" :value="g.id">{{ g.name }}</option>
                     </select>
                   </div>
                   <div>
                     <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Game mode</p>
-                    <select :value="roomSettings.mode" :disabled="!canEditRoomSettings" @change="$emit('update-room-settings', { mode: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
+                    <select :value="roomSettings.mode" :disabled="!canEditRoomSettings" @change="$emit('update-room-settings', { mode: $event.target.value })" class="pvp-input w-full">
                       <option v-for="m in roomModes" :key="m.id" :value="m.id">{{ m.name }}</option>
                     </select>
                   </div>
@@ -77,7 +84,7 @@
                     type="number"
                     min="10"
                     max="3600"
-                    class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                    class="pvp-input w-full"
                   />
                 </div>
                 <div v-else-if="roomSettings.mode === 'challenge'" class="mt-2">
@@ -89,7 +96,7 @@
                     type="number"
                     min="1"
                     max="200"
-                    class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                    class="pvp-input w-full"
                   />
                 </div>
                 <div v-else-if="roomSettings.mode === 'custom'" class="mt-2 grid grid-cols-1 gap-2">
@@ -100,7 +107,7 @@
                       :disabled="!canEditRoomSettings"
                       @input="$emit('update-room-settings', { customStartTitle: $event.target.value })"
                       type="text"
-                      class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                      class="pvp-input w-full"
                     />
                   </div>
                   <div>
@@ -110,7 +117,7 @@
                       :disabled="!canEditRoomSettings"
                       @input="$emit('update-room-settings', { customEndTitle: $event.target.value })"
                       type="text"
-                      class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                      class="pvp-input w-full"
                     />
                   </div>
                 </div>
@@ -121,7 +128,7 @@
                     type="button"
                     @click="$emit('toggle-room-modifier', mod.id)"
                     :disabled="!canEditRoomSettings"
-                    class="px-2 py-1 rounded font-mono text-[9px] border transition-all"
+                    class="pvp-chip-btn"
                     :style="roomSettings.modifiers?.includes(mod.id)
                       ? 'color:#39ff14;border-color:rgba(57,255,20,0.35);background:rgba(57,255,20,0.08);'
                       : 'color:#9ca3af;border-color:#2a2d3f;background:#0a0b11;'">
@@ -136,19 +143,18 @@
                   </div>
                 </div>
               </div>
-              <div v-if="groupLobbyData?.status === 'waiting'" class="flex flex-col gap-2">
-                <div v-if="groupLobbyData?.is_host" class="flex gap-2">
-                  <button type="button" @click="$emit('copy-group-code')" class="btn-retro-ghost flex-1 !py-2 text-[10px]">COPY CODE</button>
-                  <button type="button" @click="$emit('start-group')" :disabled="groupStartLoading || !groupCanStart" class="flex-1 !py-2 !text-[9px]" :class="groupCanStart ? 'btn-retro-primary' : 'btn-retro-ghost opacity-40 cursor-not-allowed'">
+                <div v-if="groupLobbyData?.status === 'waiting'" class="flex flex-col gap-2">
+                  <div v-if="groupLobbyData?.is_host" class="flex flex-col sm:flex-row gap-2">
+                    <button type="button" @click="$emit('start-group')" :disabled="groupStartLoading || !groupCanStart" class="flex-1 !py-2 !text-[9px]" :class="groupCanStart ? 'btn-retro-primary' : 'btn-retro-ghost opacity-40 cursor-not-allowed'">
                     {{ groupStartLoading ? '...' : 'START' }}
                   </button>
                 </div>
                 <div v-else class="font-mono text-[10px] text-crt-amber/80 animate-blink-slow">Waiting for host to start...</div>
               </div>
-              <div v-if="canInviteFriends && groupLobbyData?.is_host" class="mt-3 rounded-lg px-3 py-2.5 text-left" style="background: #12131c; border: 1px solid #252738;">
+              <div v-if="canInviteFriends && groupLobbyData?.is_host" class="pvp-card mt-3 text-left">
                 <div class="font-pixel text-[6px] text-retro-muted tracking-wider mb-2">INVITE FRIEND TO LOBBY</div>
-                <div class="flex items-center gap-2">
-                  <select v-model="selectedGroupInviteFriend" class="min-w-0 flex-1 px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white">
+                <div class="flex flex-col sm:flex-row items-stretch gap-2">
+                  <select v-model="selectedGroupInviteFriend" class="pvp-input min-w-0 flex-1">
                     <option value="">Select friend</option>
                     <option v-for="f in friends" :key="`group-friend-${f.friend_user_id}`" :value="f.username">{{ f.username }}</option>
                   </select>
@@ -156,7 +162,7 @@
                     type="button"
                     @click="$emit('invite-friend-to-group', selectedGroupInviteFriend)"
                     :disabled="inviteBusy || !selectedGroupInviteFriend"
-                    class="px-3 py-1.5 rounded-lg font-pixel text-[8px] tracking-[0.12em] transition-all disabled:opacity-40"
+                    class="w-full sm:w-auto px-3 py-1.5 rounded-lg font-pixel text-[8px] tracking-[0.12em] transition-all disabled:opacity-40"
                     style="background: rgba(0,229,255,0.08); border: 1.5px solid rgba(0,229,255,0.35); color: #00e5ff;"
                   >
                     {{ inviteBusy ? '...' : 'INVITE' }}
@@ -169,13 +175,20 @@
           </template>
 
           <template v-else-if="matchTab === 'waiting'">
-            <div class="text-center py-4">
+            <div class="text-center py-2 sm:py-4">
               <div class="font-pixel text-[8px] mb-3 tracking-wider" :class="matchStatus === 'ready' ? 'text-crt-green' : 'text-crt-amber'">
                 {{ matchStatus === 'joined_waiting' ? 'WAITING FOR HOST' : (matchStatus === 'ready' ? 'OPPONENT JOINED!' : 'WAITING FOR OPPONENT') }}
               </div>
-              <div class="font-terminal text-4xl text-arcade-purple mb-3 tracking-[0.3em]">{{ matchCode || joinedMatchCode }}</div>
+              <button
+                type="button"
+                @click="$emit('copy-match-code')"
+                class="pvp-code-pill mx-auto mb-3 text-3xl sm:text-4xl"
+                title="Copy code"
+              >
+                {{ matchCode || joinedMatchCode }}
+              </button>
               <p class="font-mono text-xs text-retro-muted mb-2">
-                {{ matchStatus === 'joined_waiting' ? 'Host will start the match for both players' : 'Share this code with your opponent' }}
+                {{ matchStatus === 'joined_waiting' ? 'Tap the code to copy it. Host will start the match for both players' : 'Tap the code to copy it and share it with your opponent' }}
               </p>
 
               <div v-if="matchStatus === 'waiting' || matchStatus === 'joined_waiting' || matchStatus === 'ready'" class="mb-4 py-2">
@@ -195,7 +208,7 @@
                   <span class="font-mono text-[11px] text-crt-amber/70 animate-blink-slow">Scanning for opponent...</span>
                 </div>
               </div>
-              <div class="rounded-lg px-3 py-2.5 mb-3 text-left" style="background: linear-gradient(180deg, #12131c, #0f1018); border: 1px solid #252738;">
+              <div class="pvp-card pvp-card--soft mb-3 text-left">
                 <div class="flex items-center justify-between gap-2 mb-2">
                   <div class="font-pixel text-[6px] text-retro-muted tracking-wider">MATCH SETTINGS</div>
                   <span class="font-mono text-[9px] text-crt-cyan/70">{{ canEditRoomSettings ? 'Host controls' : 'View only' }}</span>
@@ -203,13 +216,13 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div>
                     <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Genre</p>
-                    <select :value="roomSettings.genre" :disabled="!canEditRoomSettings || roomSettings.mode === 'custom'" @change="$emit('update-room-settings', { genre: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
+                    <select :value="roomSettings.genre" :disabled="!canEditRoomSettings || roomSettings.mode === 'custom'" @change="$emit('update-room-settings', { genre: $event.target.value })" class="pvp-input w-full">
                       <option v-for="g in roomGenres" :key="g.id" :value="g.id">{{ g.name }}</option>
                     </select>
                   </div>
                   <div>
                     <p class="font-mono text-[9px] text-retro-muted/70 mb-1">Game mode</p>
-                    <select :value="roomSettings.mode" :disabled="!canEditRoomSettings" @change="$emit('update-room-settings', { mode: $event.target.value })" class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50">
+                    <select :value="roomSettings.mode" :disabled="!canEditRoomSettings" @change="$emit('update-room-settings', { mode: $event.target.value })" class="pvp-input w-full">
                       <option v-for="m in roomModes" :key="m.id" :value="m.id">{{ m.name }}</option>
                     </select>
                   </div>
@@ -223,7 +236,7 @@
                     type="number"
                     min="10"
                     max="3600"
-                    class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                    class="pvp-input w-full"
                   />
                 </div>
                 <div v-else-if="roomSettings.mode === 'challenge'" class="mt-2">
@@ -235,7 +248,7 @@
                     type="number"
                     min="1"
                     max="200"
-                    class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                    class="pvp-input w-full"
                   />
                 </div>
                 <div v-else-if="roomSettings.mode === 'custom'" class="mt-2 grid grid-cols-1 gap-2">
@@ -246,7 +259,7 @@
                       :disabled="!canEditRoomSettings"
                       @input="$emit('update-room-settings', { customStartTitle: $event.target.value })"
                       type="text"
-                      class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                      class="pvp-input w-full"
                     />
                   </div>
                   <div>
@@ -256,7 +269,7 @@
                       :disabled="!canEditRoomSettings"
                       @input="$emit('update-room-settings', { customEndTitle: $event.target.value })"
                       type="text"
-                      class="w-full px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white disabled:opacity-50"
+                      class="pvp-input w-full"
                     />
                   </div>
                 </div>
@@ -267,7 +280,7 @@
                     type="button"
                     @click="$emit('toggle-room-modifier', mod.id)"
                     :disabled="!canEditRoomSettings"
-                    class="px-2 py-1 rounded font-mono text-[9px] border transition-all"
+                    class="pvp-chip-btn"
                     :style="roomSettings.modifiers?.includes(mod.id)
                       ? 'color:#39ff14;border-color:rgba(57,255,20,0.35);background:rgba(57,255,20,0.08);'
                       : 'color:#9ca3af;border-color:#2a2d3f;background:#0a0b11;'">
@@ -283,10 +296,7 @@
                 </div>
               </div>
 
-              <div class="flex gap-2">
-                <button @click="$emit('copy-match-code')" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-2 text-[10px]">
-                  COPY CODE
-                </button>
+              <div class="flex flex-col sm:flex-row gap-2">
                 <button v-if="matchStatus !== 'joined_waiting'" @click="$emit('start-created-match')" :disabled="matchStatus !== 'ready'" class="flex-1 !py-2 !px-4 !text-[9px]" :class="matchStatus === 'ready' ? 'btn-retro-primary' : 'btn-retro-ghost opacity-40 cursor-not-allowed'">
                   {{ matchStatus === 'ready' ? 'START' : 'WAITING...' }}
                 </button>
@@ -294,10 +304,10 @@
                   HOST STARTS
                 </button>
               </div>
-              <div v-if="canInviteFriends && matchCode" class="mt-3 rounded-lg px-3 py-2.5 text-left" style="background: #12131c; border: 1px solid #252738;">
+              <div v-if="canInviteFriends && matchCode" class="pvp-card mt-3 text-left">
                 <div class="font-pixel text-[6px] text-retro-muted tracking-wider mb-2">INVITE FRIEND TO 1v1</div>
-                <div class="flex items-center gap-2">
-                  <select v-model="selectedMatchInviteFriend" class="min-w-0 flex-1 px-2 py-1.5 rounded-lg font-mono text-[10px] bg-[#0a0b11] border border-retro-border text-crt-white">
+                <div class="flex flex-col sm:flex-row items-stretch gap-2">
+                  <select v-model="selectedMatchInviteFriend" class="pvp-input min-w-0 flex-1">
                     <option value="">Select friend</option>
                     <option v-for="f in friends" :key="`match-friend-${f.friend_user_id}`" :value="f.username">{{ f.username }}</option>
                   </select>
@@ -305,7 +315,7 @@
                     type="button"
                     @click="$emit('invite-friend-to-match', selectedMatchInviteFriend)"
                     :disabled="inviteBusy || !selectedMatchInviteFriend"
-                    class="px-3 py-1.5 rounded-lg font-pixel text-[8px] tracking-[0.12em] transition-all disabled:opacity-40"
+                    class="w-full sm:w-auto px-3 py-1.5 rounded-lg font-pixel text-[8px] tracking-[0.12em] transition-all disabled:opacity-40"
                     style="background: rgba(180,76,255,0.08); border: 1.5px solid rgba(180,76,255,0.35); color: #b44cff;"
                   >
                     {{ inviteBusy ? '...' : 'INVITE' }}
@@ -317,43 +327,25 @@
           </template>
 
           <template v-else>
-            <div class="mb-4 rounded-xl px-3 py-3" style="background: rgba(0,229,255,0.04); border: 1px solid rgba(0,229,255,0.16);">
-              <div class="font-pixel text-[7px] text-crt-cyan tracking-[0.14em] mb-2">ROOM FLOW</div>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div class="rounded-lg px-2.5 py-2" style="background: #12131c; border: 1px solid #252738;">
-                  <p class="font-pixel text-[6px] tracking-wider text-crt-cyan mb-1">1. CHOOSE TYPE</p>
-                  <p class="font-mono text-[10px] text-retro-muted">Pick Duel or Group.</p>
-                </div>
-                <div class="rounded-lg px-2.5 py-2" style="background: #12131c; border: 1px solid #252738;">
-                  <p class="font-pixel text-[6px] tracking-wider text-crt-amber mb-1">2. CREATE OR JOIN</p>
-                  <p class="font-mono text-[10px] text-retro-muted">Create a room or enter a code.</p>
-                </div>
-                <div class="rounded-lg px-2.5 py-2" style="background: #12131c; border: 1px solid #252738;">
-                  <p class="font-pixel text-[6px] tracking-wider text-crt-green mb-1">3. START ROUND</p>
-                  <p class="font-mono text-[10px] text-retro-muted">Host starts when everyone is ready.</p>
-                </div>
-              </div>
+            <div class="flex p-1 mb-4 sm:mb-5 rounded-xl gap-1" style="background: #12131c; border: 1px solid #252738;">
+              <button type="button" class="flex-1 font-pixel text-[7px] sm:text-[8px] tracking-[0.1em] py-2 rounded-lg transition-all duration-200" :class="matchTab === 'duel' ? 'text-crt-white' : 'text-retro-muted hover:text-crt-white/75'" :style="matchTab === 'duel' ? 'background: linear-gradient(180deg, rgba(180,76,255,0.28), rgba(180,76,255,0.08)); border: 1px solid rgba(180,76,255,0.4); box-shadow: 0 0 16px rgba(180,76,255,0.12);' : 'border: 1px solid transparent;'" @click="$emit('switch-hub', 'duel')">1v1 DUEL</button>
+              <button type="button" class="flex-1 font-pixel text-[7px] sm:text-[8px] tracking-[0.1em] py-2 rounded-lg transition-all duration-200" :class="matchTab === 'group' && groupView === 'menu' ? 'text-crt-white' : 'text-retro-muted hover:text-crt-white/75'" :style="matchTab === 'group' && groupView === 'menu' ? 'background: linear-gradient(180deg, rgba(57,255,20,0.22), rgba(57,255,20,0.06)); border: 1px solid rgba(57,255,20,0.38); box-shadow: 0 0 16px rgba(57,255,20,0.1);' : 'border: 1px solid transparent;'" @click="$emit('switch-hub', 'group')">GROUP</button>
             </div>
 
-            <div class="flex p-1 mb-5 rounded-xl gap-1" style="background: #12131c; border: 1px solid #252738;">
-              <button type="button" class="flex-1 font-pixel text-[8px] tracking-[0.12em] py-2.5 rounded-lg transition-all duration-200" :class="matchTab === 'duel' ? 'text-crt-white' : 'text-retro-muted hover:text-crt-white/75'" :style="matchTab === 'duel' ? 'background: linear-gradient(180deg, rgba(180,76,255,0.28), rgba(180,76,255,0.08)); border: 1px solid rgba(180,76,255,0.4); box-shadow: 0 0 16px rgba(180,76,255,0.12);' : 'border: 1px solid transparent;'" @click="$emit('switch-hub', 'duel')">1v1 DUEL</button>
-              <button type="button" class="flex-1 font-pixel text-[8px] tracking-[0.12em] py-2.5 rounded-lg transition-all duration-200" :class="matchTab === 'group' && groupView === 'menu' ? 'text-crt-white' : 'text-retro-muted hover:text-crt-white/75'" :style="matchTab === 'group' && groupView === 'menu' ? 'background: linear-gradient(180deg, rgba(57,255,20,0.22), rgba(57,255,20,0.06)); border: 1px solid rgba(57,255,20,0.38); box-shadow: 0 0 16px rgba(57,255,20,0.1);' : 'border: 1px solid transparent;'" @click="$emit('switch-hub', 'group')">GROUP</button>
-            </div>
-
-            <div v-if="matchTab === 'duel'" class="space-y-4">
-              <div class="rounded-lg px-3 py-2.5" style="background: #12131c; border: 1px solid #252738;">
+            <div v-if="matchTab === 'duel'" class="space-y-3">
+              <div class="pvp-card">
                 <p class="font-pixel text-[7px] tracking-wider text-arcade-purple mb-1.5">DUEL RULES</p>
                 <p class="font-mono text-[11px] text-retro-muted leading-relaxed">
                   Same random article pair for two players. Fewest link-clicks wins; faster time breaks ties.
                 </p>
               </div>
-              <button type="button" @click="$emit('create-match')" :disabled="matchLoading" class="btn-retro-primary w-full !py-3 font-pixel text-[8px] tracking-[0.15em]">
+              <button type="button" @click="$emit('create-match')" :disabled="matchLoading" class="btn-retro-primary w-full !py-2.5 font-pixel text-[8px] tracking-[0.15em]">
                 {{ matchLoading ? 'CREATING...' : 'CREATE ROOM' }}
               </button>
             </div>
 
-            <div v-if="matchTab === 'group' && groupView === 'menu'" class="space-y-4">
-              <div class="rounded-lg px-3 py-2.5" style="background: #12131c; border: 1px solid #252738;">
+            <div v-if="matchTab === 'group' && groupView === 'menu'" class="space-y-3">
+              <div class="pvp-card">
                 <p class="font-pixel text-[7px] tracking-wider text-crt-green mb-1.5">GROUP RULES</p>
                 <p class="font-mono text-[11px] text-retro-muted leading-relaxed">
                   2-8 players, same pair. When everyone finishes, the leaderboard ranks by clicks, then time.
@@ -365,7 +357,7 @@
                   <option v-for="n in 7" :key="n + 1" :value="n + 1">{{ n + 1 }}</option>
                 </select>
               </div>
-              <button type="button" @click="$emit('create-group-lobby')" :disabled="groupLoading" class="btn-retro-primary w-full !py-3 font-pixel text-[8px] tracking-[0.15em]" style="border-color: rgba(57,255,20,0.45);">
+              <button type="button" @click="$emit('create-group-lobby')" :disabled="groupLoading" class="btn-retro-primary w-full !py-2.5 font-pixel text-[8px] tracking-[0.15em]" style="border-color: rgba(57,255,20,0.45);">
                 {{ groupLoading ? 'CREATING...' : 'CREATE LOBBY' }}
               </button>
             </div>
@@ -474,3 +466,77 @@ defineEmits([
   'invite-friend-to-group',
 ])
 </script>
+
+<style scoped>
+.pvp-card {
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.75rem;
+  background: #12131c;
+  border: 1px solid #252738;
+}
+
+.pvp-card--soft {
+  background: linear-gradient(180deg, #12131c, #0f1018);
+}
+
+.pvp-input {
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.65rem;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  background: #0a0b11;
+  border: 1px solid #252738;
+  color: #f3f6ff;
+}
+
+.pvp-input:focus {
+  outline: none;
+  border-color: rgba(0, 229, 255, 0.35);
+}
+
+.pvp-input:disabled {
+  opacity: 0.5;
+}
+
+.pvp-chip-btn {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.45rem;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  border: 1px solid;
+  transition: all 0.15s ease;
+}
+
+.pvp-code-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.9rem;
+  font-family: 'VT323', monospace;
+  font-size: 1.85rem;
+  line-height: 1;
+  letter-spacing: 0.22em;
+  color: #b44cff;
+  background: rgba(180, 76, 255, 0.08);
+  border: 1px solid rgba(180, 76, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 0 18px rgba(180, 76, 255, 0.06);
+  transition: all 0.15s ease;
+}
+
+.pvp-code-pill:hover {
+  border-color: rgba(180, 76, 255, 0.42);
+  background: rgba(180, 76, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 22px rgba(180, 76, 255, 0.1);
+}
+
+.pvp-modal-shell::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pvp-modal-shell::-webkit-scrollbar-thumb {
+  background: rgba(180, 76, 255, 0.18);
+  border-radius: 999px;
+}
+</style>

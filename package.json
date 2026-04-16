@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell -ArgumentList '-NoExit','-Command','Set-Location ''C:\\Users\\User\\Projects\\WikiGame''; php -S 127.0.0.1:8080 api/index.php'; npm run dev\"",
     "build": "vite build",
     "preview": "vite preview"
   },
