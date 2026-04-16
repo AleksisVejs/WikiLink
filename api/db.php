@@ -60,6 +60,16 @@ function initSchema($db) {
         )",
         "CREATE INDEX IF NOT EXISTS idx_daily_scores_date ON daily_scores(date)",
 
+        "CREATE TABLE IF NOT EXISTS daily_sessions (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            date         TEXT    NOT NULL,
+            snapshot_json TEXT   NOT NULL,
+            updated_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(user_id, date)
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_daily_sessions_date ON daily_sessions(date)",
+
         "CREATE TABLE IF NOT EXISTS shared_challenges (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             code        TEXT    NOT NULL UNIQUE,

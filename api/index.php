@@ -269,6 +269,51 @@ if ($method === 'GET' && $uri === '/daily/status') {
     jsonResponse(getUserDailyStatus($user['id'], $date));
 }
 
+// GET /daily/session (logged-in: returns in-progress snapshot for today)
+if ($method === 'GET' && $uri === '/daily/session') {
+    $user = requireAuth();
+    $date = isset($_GET['date']) ? $_GET['date'] : gmdate('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        jsonResponse(['error' => 'Invalid date format.'], 400);
+    }
+    jsonResponse(getUserDailySession($user['id'], $date));
+}
+
+// POST /daily/session (logged-in: upsert in-progress snapshot)
+if ($method === 'POST' && $uri === '/daily/session') {
+    $user = requireAuth();
+    requireRateLimit('daily_session_save', 6, 60);
+
+    $body = jsonInput();
+    $date = isset($body['date']) ? $body['date'] : gmdate('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        jsonResponse(['error' => 'Invalid date format.'], 400);
+    }
+
+    $snapshot = isset($body['snapshot']) ? $body['snapshot'] : null;
+    if (!is_array($snapshot) && !is_object($snapshot)) {
+        jsonResponse(['error' => 'Snapshot payload is required.'], 400);
+    }
+
+    $result = upsertDailySession($user['id'], $date, $snapshot);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /daily/session/clear (logged-in: clears in-progress snapshot)
+if ($method === 'POST' && $uri === '/daily/session/clear') {
+    $user = requireAuth();
+    requireRateLimit('daily_session_clear', 6, 60);
+
+    $body = jsonInput();
+    $date = isset($body['date']) ? $body['date'] : gmdate('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        jsonResponse(['error' => 'Invalid date format.'], 400);
+    }
+
+    $result = clearUserDailySession($user['id'], $date);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
 // POST /challenge
 if ($method === 'POST' && $uri === '/challenge') {
     requireRateLimit('challenge', 10, 60);

@@ -21,17 +21,17 @@
       <div class="max-w-4xl w-full">
 
         <!-- Title area -->
-        <div class="text-center mb-5 sm:mb-6 animate-fade-in">
+        <header class="text-center mb-5 sm:mb-6 animate-fade-in">
           <div class="retro-divider max-w-[200px] sm:max-w-xs mx-auto mb-3 sm:mb-4"></div>
           <h1 class="font-pixel text-2xl sm:text-4xl md:text-5xl mb-1.5 sm:mb-2 leading-tight sm:leading-relaxed tracking-wide">
             <span class="text-neon-green">WIKI</span><span class="text-neon-cyan">LINK</span>
           </h1>
           <p class="font-terminal text-base sm:text-lg text-crt-white/50 tracking-[0.2em] mb-2">The Wiki Game</p>
           <div class="retro-divider max-w-[200px] sm:max-w-xs mx-auto mt-3 sm:mt-4"></div>
-        </div>
+        </header>
 
         <!-- Global stats bar -->
-        <div v-if="globalStats" class="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-5 animate-fade-in">
+        <section v-if="globalStats" class="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-5 animate-fade-in">
           <div class="stat-pill">
             <div class="font-terminal text-base sm:text-lg text-crt-green tabular-nums">{{ globalStats.totalGames }}</div>
             <div class="font-mono text-[7px] sm:text-[8px] text-retro-muted tracking-wider">GAMES</div>
@@ -44,10 +44,10 @@
             <div class="font-terminal text-base sm:text-lg text-crt-amber tabular-nums">{{ globalStats.totalClicks }}</div>
             <div class="font-mono text-[7px] sm:text-[8px] text-retro-muted tracking-wider">CLICKS</div>
           </div>
-        </div>
+        </section>
 
         <!-- Trending ticker -->
-        <div v-if="trending.trendingArticles.value.length > 0" class="mb-3 sm:mb-4 animate-fade-in">
+        <section v-if="trending.trendingArticles.value.length > 0" class="mb-3 sm:mb-4 animate-fade-in">
           <div class="flex items-center gap-2 mb-1">
             <svg class="w-3.5 h-3.5 text-arcade-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
@@ -72,10 +72,10 @@
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- Daily challenge banner -->
-        <div v-if="!dailyCompleted" class="mb-3 sm:mb-4 animate-slide-up">
+        <section v-if="!dailyCompleted" class="mb-3 sm:mb-4 animate-slide-up">
           <button @click="startDaily"
                   :disabled="hasActiveMultiplayerSession"
                   class="daily-banner w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group touch-manipulation relative overflow-hidden"
@@ -101,8 +101,8 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </button>
-        </div>
-        <div v-else class="mb-3 sm:mb-4 animate-slide-up">
+        </section>
+        <section v-else class="mb-3 sm:mb-4 animate-slide-up">
           <div class="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl relative overflow-hidden"
                style="background: rgba(57,255,20,0.03); border: 1.5px solid rgba(57,255,20,0.18);">
             <div class="absolute top-0 left-0 right-0 h-[1px]" style="background: linear-gradient(90deg, transparent, rgba(57,255,20,0.25), transparent);"></div>
@@ -131,10 +131,10 @@
               <span class="hidden sm:inline">SHARE</span>
             </button>
           </div>
-        </div>
+        </section>
 
         <!-- Daily Leaderboard -->
-        <div v-if="dailyLeaderboard.length > 0" class="mb-3 sm:mb-4 animate-slide-up">
+        <section v-if="dailyLeaderboard.length > 0" class="mb-3 sm:mb-4 animate-slide-up">
           <button @click="showDailyLeaderboard = !showDailyLeaderboard"
                   class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-t-xl transition-all duration-200"
                   :class="showDailyLeaderboard ? 'rounded-b-none' : 'rounded-b-xl'"
@@ -230,10 +230,10 @@
               </div>
             </div>
           </transition>
-        </div>
+        </section>
 
         <!-- 1v1 Match banner -->
-        <div class="mb-3 sm:mb-4 animate-slide-up">
+        <section class="mb-3 sm:mb-4 animate-slide-up">
           <button @click="showMatchModal = true"
                   class="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group touch-manipulation relative overflow-hidden"
                   style="background: linear-gradient(135deg, rgba(180,76,255,0.05), rgba(76,159,255,0.03)); border: 1.5px solid rgba(180,76,255,0.2);">
@@ -256,9 +256,9 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </button>
-        </div>
+        </section>
 
-        <div v-if="resumeMultiplayerSession" class="mb-3 sm:mb-4 animate-slide-up">
+        <section v-if="resumeMultiplayerSession" class="mb-3 sm:mb-4 animate-slide-up">
           <button @click="resumeMultiplayer"
                   class="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-300 group touch-manipulation relative overflow-hidden"
                   style="background: linear-gradient(135deg, rgba(0,229,255,0.06), rgba(57,255,20,0.04)); border: 1.5px solid rgba(0,229,255,0.22);">
@@ -289,9 +289,9 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </button>
-        </div>
+        </section>
 
-        <div class="mb-3 sm:mb-4 animate-slide-up">
+        <section class="mb-3 sm:mb-4 animate-slide-up">
           <div class="rounded-xl p-3 sm:p-4" style="background: rgba(0,229,255,0.03); border: 1.5px solid rgba(0,229,255,0.15);">
             <div class="font-pixel text-[8px] text-crt-cyan tracking-[0.16em] mb-3">ROUND FLOW</div>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -309,14 +309,14 @@
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- Display frame (game config) -->
-        <div class="relative rounded-xl sm:rounded-2xl overflow-hidden animate-slide-up"
+        <section class="relative rounded-xl sm:rounded-2xl overflow-hidden animate-slide-up"
              style="background: linear-gradient(180deg, #0d0e15, #0a0b11); border: 1.5px solid rgba(37,39,56,0.7); box-shadow: 0 1px 0 0 rgba(0,229,255,0.04), inset 0 0 60px rgba(0,0,0,0.4), 0 12px 40px rgba(0,0,0,0.5);">
 
           <!-- Top decorative bar -->
-          <div class="relative px-3 sm:px-5 py-2.5 sm:py-3 border-b border-retro-border/40 flex items-center justify-between gap-2"
+          <header class="relative px-3 sm:px-5 py-2.5 sm:py-3 border-b border-retro-border/40 flex items-center justify-between gap-2"
                style="background: linear-gradient(180deg, rgba(22,23,36,0.9), rgba(18,19,28,0.9));">
             <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-colors" style="background: rgba(255,68,68,0.4); box-shadow: inset 0 -1px 2px rgba(0,0,0,0.3);"></span>
@@ -328,7 +328,7 @@
               <span class="w-2 h-2 rounded-full bg-crt-green/50 animate-glow-pulse" style="box-shadow: 0 0 6px rgba(57,255,20,0.3);"></span>
               <span class="font-mono text-[9px] sm:text-[10px] text-crt-green/60">READY</span>
             </div>
-          </div>
+          </header>
 
           <!-- Genre section (hidden for Custom) -->
           <div v-if="selectedModeId !== 'custom'" class="p-3 sm:p-4 md:p-5">
@@ -534,7 +534,7 @@
               {{ genres.length }} GENRES &middot; {{ displayModes.length }} MODES
             </div>
           </div>
-        </div>
+        </section>
 
       </div>
     </main>
@@ -671,6 +671,9 @@ const achievements = useAchievements()
 const wiki = useWikipedia()
 const friendsComposable = useFriends()
 
+// --------------------
+// UI / Modal State
+// --------------------
 const showStats = ref(false)
 const showAuthModal = ref(false)
 const showHowTo = ref(false)
@@ -682,6 +685,10 @@ const authConfirmPassword = ref('')
 const authError = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
+
+// --------------------
+// Home: Stats + Daily
+// --------------------
 const globalStats = ref(null)
 const dailyLeaderboard = ref([])
 const showDailyLeaderboard = ref(false)
@@ -691,10 +698,17 @@ const dailyMyEntry = computed(() => {
   if (!username) return null
   return dailyLeaderboard.value.find(entry => entry.username === username) || null
 })
+
+// --------------------
+// Multiplayer: Resume
+// --------------------
 const resumeMultiplayerSession = ref(null)
 const resumeNowMs = ref(Date.now())
 let resumeTicker = null
 
+// --------------------
+// Solo Round Configuration
+// --------------------
 const selectedGenreId = ref('random')
 const selectedModeId = ref('classic')
 const selectedDifficulty = ref('normal')
@@ -703,6 +717,10 @@ const customClickLimit = ref(6)
 const customStartTitle = ref('')
 const customEndTitle = ref('')
 const activeModifiers = ref([])
+
+// --------------------
+// Multiplayer: 1v1 (duel)
+// --------------------
 const matchCode = ref('')
 const showMatchModal = ref(false)
 const matchTab = ref('duel')
@@ -722,6 +740,9 @@ let handlingHostMatch = false
 const hostInviteId = ref(null)
 const hostInviteUser = ref('')
 
+// --------------------
+// Multiplayer: Group Lobby (up to 8)
+// --------------------
 const groupView = ref('menu')
 const groupLobbyCode = ref('')
 const groupLobbyData = ref(null)
@@ -730,6 +751,8 @@ const groupLoading = ref(false)
 const groupStartLoading = ref(false)
 const groupError = ref('')
 let groupPollTimer = null
+
+// Room settings draft (used by host editing before saving)
 function createDefaultRoomSettings() {
   return {
     mode: 'classic',

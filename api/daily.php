@@ -140,3 +140,65 @@ function getUserDailyStatus($userId, $date) {
         'totalCompletions' => $totalCompletions,
     ];
 }
+
+function upsertDailySession($userId, $date, $snapshot) {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        return ['error' => 'Invalid date format.'];
+    }
+
+    $today = gmdate('Y-m-d');
+    if ($date !== $today) {
+        return ['error' => 'Can only store sessions for today.'];
+    }
+
+    $snapshotJson = json_encode($snapshot);
+    if ($snapshotJson === false) {
+        return ['error' => 'Invalid snapshot payload.'];
+    }
+
+    $db = getDb();
+    $stmt = $db->prepare('
+        INSERT INTO daily_sessions (user_id, date, snapshot_json, updated_at)
+        VALUES (?, ?, ?, datetime(\'now\'))
+        ON CONFLICT(user_id, date) DO UPDATE SET
+            snapshot_json = excluded.snapshot_json,
+            updated_at = datetime(\'now\')
+    ');
+    $stmt->execute([(int)$userId, $date, $snapshotJson]);
+    return ['ok' => true];
+}
+
+function getUserDailySession($userId, $date) {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        $date = gmdate('Y-m-d');
+    }
+
+    $db = getDb();
+    $stmt = $db->prepare('
+        SELECT snapshot_json, updated_at
+        FROM daily_sessions
+        WHERE user_id = ? AND date = ?
+        LIMIT 1
+    ');
+    $stmt->execute([(int)$userId, $date]);
+    $row = $stmt->fetch();
+    if (!$row) return null;
+
+    return [
+        'date' => $date,
+        'userId' => (int)$userId,
+        'snapshot' => json_decode($row['snapshot_json'], true),
+        'updatedAt' => $row['updated_at'] ?? null,
+    ];
+}
+
+function clearUserDailySession($userId, $date) {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        $date = gmdate('Y-m-d');
+    }
+
+    $db = getDb();
+    $stmt = $db->prepare('DELETE FROM daily_sessions WHERE user_id = ? AND date = ?');
+    $stmt->execute([(int)$userId, $date]);
+    return ['ok' => true];
+}

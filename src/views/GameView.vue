@@ -275,6 +275,8 @@ let dailyPersistTimerId = null
 let multiplayerHeartbeatTimerId = null
 let activityHeartbeatTimerId = null
 let immediateRefreshTimerId = null
+const DAILY_SERVER_PERSIST_THROTTLE_MS = 20000
+let lastDailyServerPersistAt = 0
 const showLobbyPlayerLeftModal = ref(false)
 const lobbyLeftPlayerNames = ref([])
 const lobbyLeftPlayersLabel = computed(() => {
@@ -517,7 +519,10 @@ const timerClass = computed(() => {
 // Play sounds on game state changes; submit daily score; show confetti; award XP; check achievements
 watch(() => game.state.status, (val) => {
   if (val === 'won') {
-    if (props.mode === 'daily') clearDailySession()
+    if (props.mode === 'daily') {
+      clearDailySession()
+      api.post('/daily/session/clear', { date: utcDateKey() }).catch(() => {})
+    }
     sound.playWin()
     showConfetti.value = true
     setTimeout(() => showConfetti.value = false, 3500)
@@ -527,7 +532,10 @@ watch(() => game.state.status, (val) => {
     loadDailyLeaderboard()
     processPostGame(true)
   } else if (val === 'lost') {
-    if (props.mode === 'daily') clearDailySession()
+    if (props.mode === 'daily') {
+      clearDailySession()
+      api.post('/daily/session/clear', { date: utcDateKey() }).catch(() => {})
+    }
     sound.playLose()
     showScreenShake.value = true
     showRedVignette.value = true
@@ -683,49 +691,81 @@ function normalizeTitleForRestore(title) {
 async function tryRestoreDailyGame(pair) {
   if (props.mode !== 'daily') return false
 
-  const saved = loadDailySession()
-  if (!saved?.snapshot) return false
+  const dateKey = utcDateKey()
 
-  const savedDate = saved.date
-  if (savedDate && savedDate !== utcDateKey()) return false
-  if (!savedDate) return false
+  async function restoreSaved(saved, persistToLocal = false) {
+    if (!saved?.snapshot) return false
 
-  const currentUserId = auth.user.value?.id ?? null
-  const savedUserId = saved.userId ?? null
-  // Allow restoring across login state changes (guest <-> logged-in), but prevent restoring when
-  // two different authenticated users are involved.
-  if (savedUserId != null && currentUserId != null && savedUserId !== currentUserId) return false
+    const savedDate = saved.date
+    if (savedDate && savedDate !== dateKey) return false
+    if (!savedDate) return false
 
-  const savedSnapshot = saved.snapshot
-  if (savedSnapshot.status !== 'playing') return false
+    const currentUserId = auth.user.value?.id ?? null
+    const savedUserId = saved.userId ?? null
+    // Keep guest progress device-local: don't restore a guest local snapshot onto a logged-in user.
+    if (currentUserId != null && savedUserId == null) return false
+    // Prevent restoring when two different authenticated users are involved.
+    if (savedUserId != null && currentUserId != null && savedUserId !== currentUserId) return false
 
-  const savedStartTitle = savedSnapshot.startArticle?.title || saved.pair?.startTitle
-  const savedTargetTitle = savedSnapshot.targetArticle?.title || saved.pair?.targetTitle
-  if (!savedStartTitle || !savedTargetTitle) return false
+    const savedSnapshot = saved.snapshot
+    if (savedSnapshot.status !== 'playing') return false
 
-  if (normalizeTitleForRestore(savedStartTitle) !== normalizeTitleForRestore(pair.start.title)) return false
-  if (normalizeTitleForRestore(savedTargetTitle) !== normalizeTitleForRestore(pair.end.title)) return false
+    const savedStartTitle = savedSnapshot.startArticle?.title || saved.pair?.startTitle
+    const savedTargetTitle = savedSnapshot.targetArticle?.title || saved.pair?.targetTitle
+    if (!savedStartTitle || !savedTargetTitle) return false
 
-  const restored = game.restoreSnapshot(savedSnapshot)
-  if (!restored) return false
+    if (normalizeTitleForRestore(savedStartTitle) !== normalizeTitleForRestore(pair.start.title)) return false
+    if (normalizeTitleForRestore(savedTargetTitle) !== normalizeTitleForRestore(pair.end.title)) return false
 
-  await loadArticle(savedSnapshot.currentArticle)
-  toast.info('Daily progress restored')
-  return true
+    const restored = game.restoreSnapshot(savedSnapshot)
+    if (!restored) return false
+
+    await loadArticle(savedSnapshot.currentArticle)
+    if (persistToLocal) {
+      saveDailySession({ date: dateKey, userId: currentUserId, snapshot: savedSnapshot })
+    }
+    toast.info('Daily progress restored')
+    return true
+  }
+
+  // Prefer server snapshot (so mobile + PC restore the same progress).
+  if (auth.isLoggedIn()) {
+    try {
+      const serverSaved = await api.get(`/daily/session?date=${encodeURIComponent(dateKey)}`)
+      if (await restoreSaved(serverSaved, true)) return true
+    } catch {
+      // fall through to local restore
+    }
+  }
+
+  // Fallback to local restoration (guest / offline / server unavailable).
+  return restoreSaved(loadDailySession(), false)
 }
 
 function persistDailySession() {
   if (props.mode !== 'daily') return
   if (!game.isPlaying.value) return
 
+  const dateKey = utcDateKey()
   const snapshot = game.exportSnapshot()
   if (!snapshot) return
 
+  // Always persist locally so the current device can restore instantly.
   saveDailySession({
-    date: utcDateKey(),
+    date: dateKey,
     userId: auth.user.value?.id ?? null,
     snapshot,
   })
+
+  // Persist to server periodically so the same user can restore on other devices.
+  const uid = auth.user.value?.id ?? null
+  if (auth.isLoggedIn() && uid != null) {
+    const now = Date.now()
+    if (now - lastDailyServerPersistAt >= DAILY_SERVER_PERSIST_THROTTLE_MS) {
+      lastDailyServerPersistAt = now
+      api.post('/daily/session', { date: dateKey, snapshot }).catch(() => {})
+    }
+  }
 }
 
 async function initializeGame() {
@@ -1555,11 +1595,10 @@ async function rerollPair() {
 }
 
 function confirmQuit() {
-  if (game.isPlaying.value) {
-    showQuitConfirm.value = true
-  } else {
-    goHome()
-  }
+  // Daily sessions should not warn that progress won't save, since we persist it.
+  if (props.mode === 'daily') { goHome(); return }
+  if (game.isPlaying.value) showQuitConfirm.value = true
+  else goHome()
 }
 
 async function goHome() {
