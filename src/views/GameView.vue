@@ -189,6 +189,8 @@ import { useTrending } from '../composables/useTrending'
 import { useProgression } from '../composables/useProgression'
 import { useAchievements } from '../composables/useAchievements'
 import { saveMultiplayerSession, loadMultiplayerSession, clearMultiplayerSession } from '../utils/multiplayerSession'
+import { saveDailySession, loadDailySession, clearDailySession } from '../utils/dailySession'
+import { utcDateKey } from '../utils/dailySeed'
 import GameHintBanner from '../components/game/GameHintBanner.vue'
 import GameTopNav from '../components/game/GameTopNav.vue'
 import GameMainStage from '../components/game/GameMainStage.vue'
@@ -269,6 +271,7 @@ const lobbyResult = ref(null)
 const lobbyPolling = ref(false)
 let lobbyPollTimerId = null
 let multiplayerPersistTimerId = null
+let dailyPersistTimerId = null
 let multiplayerHeartbeatTimerId = null
 let activityHeartbeatTimerId = null
 let immediateRefreshTimerId = null
@@ -514,6 +517,7 @@ const timerClass = computed(() => {
 // Play sounds on game state changes; submit daily score; show confetti; award XP; check achievements
 watch(() => game.state.status, (val) => {
   if (val === 'won') {
+    if (props.mode === 'daily') clearDailySession()
     sound.playWin()
     showConfetti.value = true
     setTimeout(() => showConfetti.value = false, 3500)
@@ -523,6 +527,7 @@ watch(() => game.state.status, (val) => {
     loadDailyLeaderboard()
     processPostGame(true)
   } else if (val === 'lost') {
+    if (props.mode === 'daily') clearDailySession()
     sound.playLose()
     showScreenShake.value = true
     showRedVignette.value = true
@@ -671,6 +676,58 @@ watch(processedResult, (result) => {
   validLinks.value = result.allowedTitles
 })
 
+function normalizeTitleForRestore(title) {
+  return (title || '').trim().replace(/_/g, ' ').toLowerCase()
+}
+
+async function tryRestoreDailyGame(pair) {
+  if (props.mode !== 'daily') return false
+
+  const saved = loadDailySession()
+  if (!saved?.snapshot) return false
+
+  const savedDate = saved.date
+  if (savedDate && savedDate !== utcDateKey()) return false
+  if (!savedDate) return false
+
+  const currentUserId = auth.user.value?.id ?? null
+  const savedUserId = saved.userId ?? null
+  // Allow restoring across login state changes (guest <-> logged-in), but prevent restoring when
+  // two different authenticated users are involved.
+  if (savedUserId != null && currentUserId != null && savedUserId !== currentUserId) return false
+
+  const savedSnapshot = saved.snapshot
+  if (savedSnapshot.status !== 'playing') return false
+
+  const savedStartTitle = savedSnapshot.startArticle?.title || saved.pair?.startTitle
+  const savedTargetTitle = savedSnapshot.targetArticle?.title || saved.pair?.targetTitle
+  if (!savedStartTitle || !savedTargetTitle) return false
+
+  if (normalizeTitleForRestore(savedStartTitle) !== normalizeTitleForRestore(pair.start.title)) return false
+  if (normalizeTitleForRestore(savedTargetTitle) !== normalizeTitleForRestore(pair.end.title)) return false
+
+  const restored = game.restoreSnapshot(savedSnapshot)
+  if (!restored) return false
+
+  await loadArticle(savedSnapshot.currentArticle)
+  toast.info('Daily progress restored')
+  return true
+}
+
+function persistDailySession() {
+  if (props.mode !== 'daily') return
+  if (!game.isPlaying.value) return
+
+  const snapshot = game.exportSnapshot()
+  if (!snapshot) return
+
+  saveDailySession({
+    date: utcDateKey(),
+    userId: auth.user.value?.id ?? null,
+    snapshot,
+  })
+}
+
 async function initializeGame() {
   isLeavingGame.value = false
   initialLoading.value = true
@@ -730,8 +787,11 @@ async function initializeGame() {
         }
       }
       if (!pair) { toast.error('Failed to load daily challenge'); router.push({ name: 'home' }); return }
-      game.initGame('daily', pair.start, pair.end, 'random', 'normal')
-      await loadArticle(pair.start.title)
+      const restored = await tryRestoreDailyGame(pair)
+      if (!restored) {
+        game.initGame('daily', pair.start, pair.end, 'random', 'normal')
+        await loadArticle(pair.start.title)
+      }
     } else if (props.mode === 'custom') {
       const codeQ = typeof route.query.code === 'string' ? route.query.code.trim() : ''
       let fromQ = typeof route.query.from === 'string' ? route.query.from.trim() : ''
@@ -1506,6 +1566,8 @@ async function goHome() {
   if (isLeavingGame.value) return
   isLeavingGame.value = true
 
+  persistDailySession()
+
   const activeMatchCode = matchCode.value
   const activeLobbyCode = lobbyCode.value
   const canNotifyServer = auth.isLoggedIn()
@@ -1626,6 +1688,11 @@ onMounted(() => {
       persistMultiplayerSession()
     }, 5000)
   }
+  if (props.mode === 'daily' && !dailyPersistTimerId) {
+    dailyPersistTimerId = setInterval(() => {
+      persistDailySession()
+    }, 5000)
+  }
   if (isMultiplayerGame.value && auth.isLoggedIn() && !multiplayerHeartbeatTimerId) {
     sendMultiplayerHeartbeat()
     lastActivityHeartbeatAt = Date.now()
@@ -1650,10 +1717,12 @@ onUnmounted(() => {
   lobbyPolling.value = false
   if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
   if (multiplayerPersistTimerId) { clearInterval(multiplayerPersistTimerId); multiplayerPersistTimerId = null }
+  if (dailyPersistTimerId) { clearInterval(dailyPersistTimerId); dailyPersistTimerId = null }
   if (multiplayerHeartbeatTimerId) { clearInterval(multiplayerHeartbeatTimerId); multiplayerHeartbeatTimerId = null }
   if (activityHeartbeatTimerId) { clearTimeout(activityHeartbeatTimerId); activityHeartbeatTimerId = null }
   if (immediateRefreshTimerId) { clearTimeout(immediateRefreshTimerId); immediateRefreshTimerId = null }
   persistMultiplayerSession()
+  persistDailySession()
   game.resetGame()
 })
 
