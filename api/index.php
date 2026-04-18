@@ -334,6 +334,128 @@ if ($method === 'GET' && preg_match('#^/challenge/([A-Za-z0-9]+)$#', $uri, $m)) 
     jsonResponse($challenge);
 }
 
+// GET /community-paths?start=...&end=...
+if ($method === 'GET' && $uri === '/community-paths') {
+    $start = isset($_GET['start']) ? $_GET['start'] : '';
+    $end = isset($_GET['end']) ? $_GET['end'] : '';
+    $viewer = authenticateRequest();
+    $result = getCommunityPaths($start, $end, $viewer ? $viewer['id'] : null, 20);
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// GET /community/pairs
+if ($method === 'GET' && $uri === '/community/pairs') {
+    $pairLimit = isset($_GET['pairLimit']) ? (int)$_GET['pairLimit'] : 24;
+    $collectionLimit = isset($_GET['collectionLimit']) ? (int)$_GET['collectionLimit'] : 8;
+    $collectionPairsLimit = isset($_GET['collectionPairsLimit']) ? (int)$_GET['collectionPairsLimit'] : 5;
+    jsonResponse(getCommunityPairCatalog($pairLimit, $collectionLimit, $collectionPairsLimit));
+}
+
+// GET /community/hub
+if ($method === 'GET' && $uri === '/community/hub') {
+    $pairLimit = isset($_GET['pairLimit']) ? (int)$_GET['pairLimit'] : 30;
+    $groupLimit = isset($_GET['groupLimit']) ? (int)$_GET['groupLimit'] : 12;
+    $groupItemsLimit = isset($_GET['groupItemsLimit']) ? (int)$_GET['groupItemsLimit'] : 8;
+    $viewer = authenticateRequest();
+    jsonResponse(getCommunityHubData($pairLimit, $groupLimit, $groupItemsLimit, $viewer ? $viewer['id'] : null));
+}
+
+// GET /community/group/:id
+if ($method === 'GET' && preg_match('#^/community/group/(\d+)$#', $uri, $m)) {
+    $result = getCommunityGroupById((int)$m[1]);
+    if (!$result) jsonResponse(['error' => 'Group not found.'], 404);
+    jsonResponse($result);
+}
+
+// POST /community/pair
+if ($method === 'POST' && $uri === '/community/pair') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = createCommunityPair(
+        $user['id'],
+        isset($body['startTitle']) ? $body['startTitle'] : '',
+        isset($body['endTitle']) ? $body['endTitle'] : ''
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /community/group
+if ($method === 'POST' && $uri === '/community/group') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = createCommunityPairGroup(
+        $user['id'],
+        isset($body['name']) ? $body['name'] : '',
+        isset($body['pairs']) ? $body['pairs'] : []
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /community/pair/delete
+if ($method === 'POST' && $uri === '/community/pair/delete') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = deleteCommunityPair($user['id'], (int)(isset($body['pairId']) ? $body['pairId'] : 0));
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /community/group/delete
+if ($method === 'POST' && $uri === '/community/group/delete') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = deleteCommunityGroup($user['id'], (int)(isset($body['groupId']) ? $body['groupId'] : 0));
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /community/pair/vote
+if ($method === 'POST' && $uri === '/community/pair/vote') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = voteCommunityPair(
+        $user['id'],
+        (int)(isset($body['pairId']) ? $body['pairId'] : 0),
+        (int)(isset($body['vote']) ? $body['vote'] : 0)
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /community/group/vote
+if ($method === 'POST' && $uri === '/community/group/vote') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = voteCommunityGroup(
+        $user['id'],
+        (int)(isset($body['groupId']) ? $body['groupId'] : 0),
+        (int)(isset($body['vote']) ? $body['vote'] : 0)
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /community-paths
+if ($method === 'POST' && $uri === '/community-paths') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = submitCommunityPath(
+        $user['id'],
+        isset($body['startTitle']) ? $body['startTitle'] : '',
+        isset($body['endTitle']) ? $body['endTitle'] : '',
+        isset($body['path']) ? $body['path'] : []
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /community-paths/vote
+if ($method === 'POST' && $uri === '/community-paths/vote') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = voteCommunityPath(
+        $user['id'],
+        (int)(isset($body['pathId']) ? $body['pathId'] : 0),
+        (int)(isset($body['vote']) ? $body['vote'] : 0)
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
 // GET /stats
 if ($method === 'GET' && $uri === '/stats') {
     jsonResponse(getGlobalStats());

@@ -317,6 +317,25 @@
           </transition>
         </section>
 
+        <section class="mb-3 sm:mb-4 animate-slide-up">
+          <button @click="router.push({ name: 'community' })"
+                  class="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-200"
+                  style="background: rgba(0,229,255,0.04); border: 1.5px solid rgba(0,229,255,0.2);">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <svg class="w-4 h-4 text-crt-cyan shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+              <div class="text-left min-w-0">
+                <div class="font-pixel text-[8px] text-crt-cyan tracking-[0.15em]">COMMUNITY HUB</div>
+                <div class="font-mono text-[11px] text-retro-muted truncate">Create your own pairs and pair groups</div>
+              </div>
+            </div>
+            <svg class="w-4 h-4 text-crt-cyan/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </section>
+
         <section v-if="resumeMultiplayerSession" class="mb-3 sm:mb-4 animate-slide-up">
           <button @click="resumeMultiplayer"
                   class="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-300 group touch-manipulation relative overflow-hidden"

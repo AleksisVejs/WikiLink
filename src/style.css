@@ -1099,21 +1099,6 @@
   margin-bottom: 0.25rem;
 }
 
-/* ===== COMBO COUNTER ===== */
-.combo-float {
-  position: fixed;
-  z-index: 55;
-  pointer-events: none;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 14px;
-  animation: comboFloat 1s ease-out forwards;
-}
-@keyframes comboFloat {
-  0% { opacity: 1; transform: translateY(0) scale(1); }
-  50% { opacity: 1; transform: translateY(-30px) scale(1.2); }
-  100% { opacity: 0; transform: translateY(-60px) scale(0.8); }
-}
-
 /* ===== SCREEN SHAKE ===== */
 .screen-shake {
   animation: screenShake 0.4s ease-out;

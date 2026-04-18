@@ -188,7 +188,6 @@ export function useGame() {
     modifiers: [],
     hints: 3,
     hintsUsed: 0,
-    combo: 0,
     lastClickTime: null,
   })
 
@@ -255,21 +254,12 @@ export function useGame() {
     state.modifiers = modifiers
     state.hints = modifiers.includes('noback') ? 2 : 3
     state.hintsUsed = 0
-    state.combo = 0
     state.lastClickTime = null
     startTimer()
   }
 
   function navigateTo(title) {
     if (!isPlaying.value) return false
-
-    const now = Date.now()
-    if (state.lastClickTime && (now - state.lastClickTime) < 3000) {
-      state.combo++
-    } else {
-      state.combo = 1
-    }
-    state.lastClickTime = now
 
     state.clicks++
     state.currentArticle = title
@@ -503,7 +493,6 @@ export function useGame() {
     state.modifiers = []
     state.hints = 3
     state.hintsUsed = 0
-    state.combo = 0
     state.lastClickTime = null
   }
 
@@ -534,7 +523,6 @@ export function useGame() {
       modifiers: [...state.modifiers],
       hints: state.hints,
       hintsUsed: state.hintsUsed,
-      combo: state.combo,
       lastClickTime: state.lastClickTime,
       savedAt: now,
     }
@@ -572,7 +560,6 @@ export function useGame() {
     state.modifiers = Array.isArray(snapshot.modifiers) ? [...snapshot.modifiers] : []
     state.hints = Number.isFinite(snapshot.hints) ? snapshot.hints : 3
     state.hintsUsed = Number.isFinite(snapshot.hintsUsed) ? snapshot.hintsUsed : 0
-    state.combo = Number.isFinite(snapshot.combo) ? snapshot.combo : 0
     state.lastClickTime = Number.isFinite(snapshot.lastClickTime) ? snapshot.lastClickTime : null
 
     if (state.status === 'playing') {

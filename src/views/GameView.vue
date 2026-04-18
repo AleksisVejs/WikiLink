@@ -93,8 +93,8 @@
       :clicks="game.state.clicks"
       :formatted-time="game.formattedTime.value"
       :xp-reward-data="xpRewardData"
+      :next-unlock-xp="game.state.mode === 'custom' ? null : nextUnlockXp"
       :hints-used="game.state.hintsUsed"
-      :combo="game.state.combo"
       :modifiers="game.state.modifiers"
       :game-modifiers="game.MODIFIERS"
       :modifier-svg-path="modifierSvgPath"
@@ -107,23 +107,21 @@
       :lobby-your-rank="lobbyYourRank"
       :lobby-disconnected-count="lobbyDisconnectedCount"
       :current-user-id="auth.user.value?.id ?? null"
-      :allow-play-again="props.mode !== 'daily'"
+      :allow-play-again="props.mode !== 'daily' && !hasNextCommunityPair"
+      :show-next-pair="hasNextCommunityPair"
       :show-confetti="showConfetti"
       :confetti-style="confettiStyle"
+      :show-community-section="!isMultiplayerGame && !!game.state.targetArticle"
+      :best-community-path-length="bestCommunityPathLength"
+      :viewer-has-best-community-path="viewerHasBestCommunityPath"
+      :current-run-is-best-community="currentRunIsBestCommunity"
+      :community-paths="communityPaths"
       @copy-share="copyShareCard"
       @share-challenge="shareChallenge"
       @go-home="goHome"
       @play-again="playAgain"
+      @next-pair="nextCommunityPair"
     />
-
-    <!-- Combo counter -->
-    <transition name="fade">
-      <div v-if="comboDisplay" :key="comboDisplay.key" class="combo-float"
-           style="right: 120px; top: 60px;"
-           :style="{ color: comboDisplay.count >= 5 ? '#ff2ecc' : comboDisplay.count >= 3 ? '#ffbf00' : '#00e5ff' }">
-        COMBO x{{ comboDisplay.count }}
-      </div>
-    </transition>
 
     <!-- Red vignette on loss -->
     <div v-if="showRedVignette" class="red-vignette"></div>
@@ -255,6 +253,18 @@ const showConfetti = ref(false)
 const dailyLeaderboard = ref([])
 const matchCode = computed(() => route.query.match || null)
 const lobbyCode = computed(() => route.query.lobby || null)
+const communityGroupId = computed(() => {
+  const raw = route.query.cg
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isInteger(n) && n > 0 ? n : null
+})
+const communityGroupStep = computed(() => {
+  const raw = route.query.cstep
+  if (raw == null || raw === '') return 1
+  const n = Number(raw)
+  return Number.isInteger(n) && n > 0 ? n : 1
+})
 const matchResult = ref(null)
 const matchPolling = ref(false)
 let matchPollTimerId = null
@@ -311,8 +321,11 @@ const lobbyDisconnectedCount = computed(() => {
 })
 const showScreenShake = ref(false)
 const showRedVignette = ref(false)
-const comboDisplay = ref(null)
 const xpRewardData = ref(null)
+const communityPaths = ref([])
+const bestCommunityPathLength = ref(null)
+const viewerHasBestCommunityPath = ref(false)
+const activeCommunityGroup = ref(null)
 const achievementToasts = ref([])
 const showLevelUp = ref(false)
 const showHintMenu = ref(false)
@@ -518,6 +531,20 @@ const timerClass = computed(() => {
   return 'text-crt-white'
 })
 
+const nextUnlockXp = computed(() => {
+  const needed = (progression.nextLevelXp.value || 0) - (progression.currentXp.value || 0)
+  return needed > 0 ? needed : 0
+})
+const currentRunIsBestCommunity = computed(() => {
+  if (!game.state.targetArticle) return false
+  if (bestCommunityPathLength.value == null) return true
+  return game.state.path.length <= bestCommunityPathLength.value
+})
+const hasNextCommunityPair = computed(() => {
+  if (!activeCommunityGroup.value || !Array.isArray(activeCommunityGroup.value.items)) return false
+  return game.isWon.value && communityGroupStep.value < activeCommunityGroup.value.items.length
+})
+
 // Play sounds on game state changes; submit daily score; show confetti; award XP; check achievements
 watch(() => game.state.status, (val) => {
   if (val === 'won') {
@@ -532,6 +559,8 @@ watch(() => game.state.status, (val) => {
     submitMatchResult()
     submitLobbyResult()
     loadDailyLeaderboard()
+    submitCurrentRunAsCommunityPath()
+    loadCommunityPaths()
     processPostGame(true)
   } else if (val === 'lost') {
     if (props.mode === 'daily') {
@@ -545,21 +574,14 @@ watch(() => game.state.status, (val) => {
     submitMatchResult()
     submitLobbyResult()
     loadDailyLeaderboard()
+    loadCommunityPaths()
     processPostGame(false)
   }
 })
 
-watch(() => game.state.combo, (val) => {
-  if (val >= 2) {
-    sound.playCombo(val)
-    comboDisplay.value = { count: val, key: Date.now() }
-    setTimeout(() => { if (comboDisplay.value?.count === val) comboDisplay.value = null }, 1000)
-  }
-})
-
 function processPostGame(won) {
-  if (isMultiplayerGame.value) {
-    // Multiplayer rounds do not grant XP rewards.
+  if (isMultiplayerGame.value || game.state.mode === 'custom') {
+    // Multiplayer and Custom rounds do not grant XP or achievements.
     xpRewardData.value = null
     return
   }
@@ -835,6 +857,10 @@ async function initializeGame() {
   bootStep.value = 0
   previewCache = {}
   targetCategoriesCache.value = null
+  communityPaths.value = []
+  bestCommunityPathLength.value = null
+  viewerHasBestCommunityPath.value = false
+  activeCommunityGroup.value = null
 
   setTimeout(() => bootStep.value = 1, 300)
   setTimeout(() => bootStep.value = 2, 800)
@@ -904,6 +930,26 @@ async function initializeGame() {
       const codeQ = typeof route.query.code === 'string' ? route.query.code.trim() : ''
       let fromQ = typeof route.query.from === 'string' ? route.query.from.trim() : ''
       let toQ = typeof route.query.to === 'string' ? route.query.to.trim() : ''
+      if (communityGroupId.value) {
+        try {
+          const groupData = await api.get(`/community/group/${communityGroupId.value}`)
+          activeCommunityGroup.value = groupData
+          const items = Array.isArray(groupData?.items) ? groupData.items : []
+          const idx = Math.max(0, communityGroupStep.value - 1)
+          const item = items[idx]
+          if (!item) {
+            toast.warn('This pair group step does not exist.')
+            router.push({ name: 'community' })
+            return
+          }
+          fromQ = item.startTitle || fromQ
+          toQ = item.endTitle || toQ
+        } catch {
+          toast.error('Could not load community pair group')
+          router.push({ name: 'community' })
+          return
+        }
+      }
       if (codeQ && (!fromQ || !toQ)) {
         try {
           const ch = await api.get(`/challenge/${codeQ}`)
@@ -1638,6 +1684,69 @@ async function loadDailyLeaderboard() {
   } catch { /* ignore */ }
 }
 
+async function loadCommunityPaths() {
+  if (isMultiplayerGame.value) return
+  const startTitle = game.state.startArticle?.title
+  const endTitle = game.state.targetArticle?.title
+  if (!startTitle || !endTitle) return
+  try {
+    const data = await api.get(`/community-paths?start=${encodeURIComponent(startTitle)}&end=${encodeURIComponent(endTitle)}`)
+    communityPaths.value = Array.isArray(data.items) ? data.items : []
+    bestCommunityPathLength.value = Number.isFinite(data.bestPath?.path_length) ? data.bestPath.path_length : null
+    viewerHasBestCommunityPath.value = !!data.viewerHasBest
+  } catch {
+    communityPaths.value = []
+    bestCommunityPathLength.value = null
+    viewerHasBestCommunityPath.value = false
+  }
+}
+
+async function ensureAllTitlesExist(path) {
+  for (const title of path) {
+    const article = await wiki.getArticleSummary(title)
+    if (!article?.title) return false
+  }
+  return true
+}
+
+async function submitCurrentRunAsCommunityPath() {
+  if (!auth.isLoggedIn()) {
+    return
+  }
+  const startTitle = game.state.startArticle?.title
+  const endTitle = game.state.targetArticle?.title
+  if (!startTitle || !endTitle) return
+  const path = [...game.state.path]
+  if (path.length < 2) {
+    return
+  }
+  if (path[0].replace(/_/g, ' ').toLowerCase() !== startTitle.replace(/_/g, ' ').toLowerCase()) {
+    return
+  }
+  if (path[path.length - 1].replace(/_/g, ' ').toLowerCase() !== endTitle.replace(/_/g, ' ').toLowerCase()) {
+    return
+  }
+  try {
+    const allValid = await ensureAllTitlesExist(path)
+    if (!allValid) return
+    const data = await api.post('/community-paths', { startTitle, endTitle, path })
+    communityPaths.value = Array.isArray(data.items) ? data.items : []
+    bestCommunityPathLength.value = Number.isFinite(data.bestPath?.path_length) ? data.bestPath.path_length : null
+    viewerHasBestCommunityPath.value = !!data.viewerHasBest
+  } catch {}
+}
+
+async function nextCommunityPair() {
+  if (!communityGroupId.value || !hasNextCommunityPair.value) {
+    goHome()
+    return
+  }
+  const q = { ...route.query, cstep: String(communityGroupStep.value + 1) }
+  delete q.code
+  await router.replace({ name: 'game', params: { mode: props.mode }, query: q })
+  await initializeGame()
+}
+
 async function rerollPair() {
   if (!canReroll.value || rerolling.value || !game.isPlaying.value) return
   rerolling.value = true
@@ -1771,7 +1880,10 @@ function handleKeydown(e) {
     e.preventDefault()
     handleGoBack()
   }
-  if (e.key === 'Enter' && showEndModal.value && props.mode !== 'daily') playAgain()
+  if (e.key === 'Enter' && showEndModal.value && props.mode !== 'daily') {
+    if (hasNextCommunityPair.value) nextCommunityPair()
+    else playAgain()
+  }
   if ((e.key === 'r' || e.key === 'R') && !showEndModal.value && !showQuitConfirm.value) rerollPair()
 }
 

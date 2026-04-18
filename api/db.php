@@ -78,6 +78,73 @@ function initSchema($db) {
             created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
             created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
         )",
+        "CREATE INDEX IF NOT EXISTS idx_shared_challenges_created_by ON shared_challenges(created_by, created_at)",
+        "CREATE TABLE IF NOT EXISTS community_pair_votes (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            pair_id      INTEGER NOT NULL REFERENCES shared_challenges(id) ON DELETE CASCADE,
+            user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            vote         INTEGER NOT NULL CHECK (vote IN (-1, 1)),
+            created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(pair_id, user_id)
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_community_pair_votes_pair ON community_pair_votes(pair_id)",
+
+        "CREATE TABLE IF NOT EXISTS community_pair_groups (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name       TEXT    NOT NULL,
+            created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_community_pair_groups_user ON community_pair_groups(user_id, created_at)",
+        "CREATE TABLE IF NOT EXISTS community_group_votes (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id     INTEGER NOT NULL REFERENCES community_pair_groups(id) ON DELETE CASCADE,
+            user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            vote         INTEGER NOT NULL CHECK (vote IN (-1, 1)),
+            created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(group_id, user_id)
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_community_group_votes_group ON community_group_votes(group_id)",
+
+        "CREATE TABLE IF NOT EXISTS community_pair_group_items (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id     INTEGER NOT NULL REFERENCES community_pair_groups(id) ON DELETE CASCADE,
+            position_idx INTEGER NOT NULL,
+            challenge_code TEXT,
+            start_title TEXT    NOT NULL,
+            end_title   TEXT    NOT NULL
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_community_pair_group_items_group ON community_pair_group_items(group_id, position_idx)",
+
+        "CREATE TABLE IF NOT EXISTS community_paths (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            start_title  TEXT    NOT NULL,
+            end_title    TEXT    NOT NULL,
+            path_json    TEXT    NOT NULL,
+            path_hash    TEXT    NOT NULL,
+            path_length  INTEGER NOT NULL,
+            likes_count  INTEGER NOT NULL DEFAULT 0,
+            dislikes_count INTEGER NOT NULL DEFAULT 0,
+            score        INTEGER NOT NULL DEFAULT 0,
+            created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(user_id, start_title, end_title, path_hash)
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_community_paths_pair ON community_paths(start_title, end_title, path_length, score)",
+
+        "CREATE TABLE IF NOT EXISTS community_path_votes (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            community_path_id INTEGER NOT NULL REFERENCES community_paths(id) ON DELETE CASCADE,
+            user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            vote         INTEGER NOT NULL CHECK (vote IN (-1, 1)),
+            created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(community_path_id, user_id)
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_community_votes_path ON community_path_votes(community_path_id)",
 
         "CREATE TABLE IF NOT EXISTS global_stats (
             id           INTEGER PRIMARY KEY CHECK (id = 1),

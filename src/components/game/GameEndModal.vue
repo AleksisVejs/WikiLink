@@ -40,7 +40,7 @@
           </div>
 
           <div class="px-5 pb-3">
-            <div class="grid grid-cols-3 gap-2">
+            <div class="grid grid-cols-2 gap-2">
               <div class="rounded-lg py-2.5 px-1 text-center" style="background: #12131c; border: 1px solid rgba(57,255,20,0.1);">
                 <svg class="w-4 h-4 text-crt-green/40 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
@@ -54,13 +54,6 @@
                 </svg>
                 <div class="font-terminal text-xl text-crt-amber leading-none">{{ formattedTime }}</div>
                 <div class="font-mono text-[8px] text-retro-muted mt-1 tracking-wider">TIME</div>
-              </div>
-              <div class="rounded-lg py-2.5 px-1 text-center" style="background: #12131c; border: 1px solid rgba(255,46,204,0.1);">
-                <svg class="w-4 h-4 text-crt-magenta/40 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <div class="font-terminal text-xl text-crt-magenta leading-none">{{ pathLength }}</div>
-                <div class="font-mono text-[8px] text-retro-muted mt-1 tracking-wider">PAGES</div>
               </div>
             </div>
           </div>
@@ -76,6 +69,11 @@
               <span class="font-terminal text-base text-crt-green">+{{ xpRewardData.totalReward }}</span>
             </div>
 
+            <div v-if="nextUnlockXp != null" class="flex items-center justify-between rounded-lg px-3 py-2.5" style="background: rgba(0,229,255,0.03); border: 1px solid rgba(0,229,255,0.12);">
+              <span class="font-pixel text-[7px] text-crt-cyan/70 tracking-wider">NEXT LVL</span>
+              <span class="font-terminal text-base text-crt-cyan">{{ nextUnlockXp }} XP</span>
+            </div>
+
             <div class="flex flex-wrap items-center gap-1.5">
               <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md font-mono text-[10px]" style="background: #12131c; border: 1px solid #252738;">
                 <svg class="w-3 h-3 text-crt-amber/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,20 +82,38 @@
                 <span class="text-retro-muted">Hints</span>
                 <span :class="hintsUsed > 0 ? 'text-crt-amber' : 'text-crt-green'">{{ hintsUsed }}</span>
               </span>
-              <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md font-mono text-[10px]" style="background: #12131c; border: 1px solid #252738;">
-                <svg class="w-3 h-3 text-crt-cyan/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span class="text-retro-muted">Combo</span>
-                <span class="text-crt-cyan">{{ combo }}x</span>
-              </span>
               <span v-for="modId in modifiers" :key="modId" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md font-mono text-[10px]" style="background: rgba(255,191,0,0.04); border: 1px solid rgba(255,191,0,0.15);">
                 <svg class="w-3 h-3 text-crt-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24" v-html="modifierSvgPath(modId)"></svg>
                 <span class="text-crt-amber">{{ gameModifiers[modId]?.name }}</span>
               </span>
             </div>
 
+            <div v-if="showCommunitySection && !freeplayFinished && targetTitle" class="rounded-lg px-3 py-2.5 space-y-2" style="background: #12131c; border: 1px solid #252738;">
+              <div class="font-pixel text-[6px] text-crt-cyan tracking-[0.15em]">FASTEST COMMUNITY PATH</div>
+              <div v-if="bestCommunityPathLength != null" class="font-mono text-[10px] text-retro-muted">
+                <span v-if="viewerHasBestCommunityPath" class="text-crt-green">You currently hold the shortest community route: {{ Math.max(0, bestCommunityPathLength - 1) }} {{ Math.max(0, bestCommunityPathLength - 1) === 1 ? 'click' : 'clicks' }}.</span>
+                <span v-else-if="currentRunIsBestCommunity" class="text-crt-green">Your run is the shortest so far. Submit it to claim first shortest route.</span>
+                <span v-else>Shortest community route: <span class="text-crt-green">{{ Math.max(0, bestCommunityPathLength - 1) }}</span> {{ Math.max(0, bestCommunityPathLength - 1) === 1 ? 'click' : 'clicks' }}.</span>
+              </div>
+              <div v-else class="font-mono text-[10px] text-crt-green">No community route yet. Submit yours as the first shortest route.</div>
+              <div class="space-y-1 max-h-[150px] overflow-y-auto">
+                <div v-for="entry in communityPaths" :key="entry.id" class="rounded px-2 py-1.5" style="background: rgba(0,229,255,0.03); border: 1px solid rgba(0,229,255,0.12);">
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono text-[10px] text-crt-white truncate flex-1">{{ entry.username }}</span>
+                    <span class="font-terminal text-[11px] text-crt-green shrink-0">{{ Math.max(0, entry.path_length - 1) }}c</span>
+                  </div>
+                  <div class="flex items-center gap-1 overflow-x-auto pt-1 font-mono text-[9px]">
+                    <template v-for="(article, idx) in (entry.path || [])" :key="`cp-${entry.id}-${idx}`">
+                      <span v-if="idx > 0" class="text-retro-border/40 shrink-0 text-[8px]">&rsaquo;</span>
+                      <span class="shrink-0 whitespace-nowrap px-1 py-0.5 rounded text-retro-muted">{{ String(article || '').replace(/_/g, ' ') }}</span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="rounded-lg px-3 py-2" style="background: #12131c; border: 1px solid #252738;">
+              <div class="font-pixel text-[6px] text-crt-green/60 tracking-[0.15em] mb-1.5">YOUR PATH</div>
               <div class="flex items-center gap-1 overflow-x-auto pb-0.5 font-mono text-[10px]">
                 <template v-for="(article, idx) in path" :key="idx">
                   <span v-if="idx > 0" class="text-retro-border/40 shrink-0 text-[8px]">&rsaquo;</span>
@@ -320,6 +336,7 @@
             </div>
             <div class="flex gap-2.5 pb-[env(safe-area-inset-bottom)]">
               <button @click="$emit('go-home')" class="btn-secondary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation">HOME</button>
+              <button v-if="showNextPair" @click="$emit('next-pair')" class="btn-retro-primary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation">NEXT PAIR</button>
               <button v-if="allowPlayAgain" @click="$emit('play-again')" class="btn-primary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation">PLAY AGAIN</button>
             </div>
           </div>
@@ -356,7 +373,7 @@ function formatPinnedBadge(value) {
   return raw.replace(/_/g, ' ').toUpperCase()
 }
 
-defineProps({
+const props = defineProps({
   showEndModal: { type: Boolean, required: true },
   endModalStyle: { type: String, required: true },
   isWon: { type: Boolean, required: true },
@@ -368,8 +385,8 @@ defineProps({
   clicks: { type: Number, required: true },
   formattedTime: { type: String, required: true },
   xpRewardData: { type: Object, default: null },
+  nextUnlockXp: { type: Number, default: null },
   hintsUsed: { type: Number, required: true },
-  combo: { type: Number, required: true },
   modifiers: { type: Array, required: true },
   gameModifiers: { type: Object, required: true },
   modifierSvgPath: { type: Function, required: true },
@@ -383,9 +400,14 @@ defineProps({
   lobbyDisconnectedCount: { type: Number, required: true },
   currentUserId: { type: Number, default: null },
   allowPlayAgain: { type: Boolean, default: true },
+  showNextPair: { type: Boolean, default: false },
   showConfetti: { type: Boolean, required: true },
   confettiStyle: { type: Function, required: true },
+  showCommunitySection: { type: Boolean, default: false },
+  bestCommunityPathLength: { type: Number, default: null },
+  viewerHasBestCommunityPath: { type: Boolean, default: false },
+  currentRunIsBestCommunity: { type: Boolean, default: false },
+  communityPaths: { type: Array, default: () => [] },
 })
-
-defineEmits(['copy-share', 'share-challenge', 'go-home', 'play-again'])
+defineEmits(['copy-share', 'share-challenge', 'go-home', 'play-again', 'next-pair'])
 </script>
