@@ -41,8 +41,11 @@
                 <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-cyan">Backspace</kbd> go back one page when the mode allows it</li>
                 <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-amber">R</kbd> reroll for a new pair in supported solo modes</li>
                 <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-red">Esc</kbd> quit the current run</li>
+                <li><kbd class="px-1 py-0.5 rounded text-[10px] bg-retro-surface border border-retro-border text-crt-magenta">Ctrl/Cmd + F</kbd> is disabled during play</li>
                 <li>Daily and Click Limit runs disable backtracking by default</li>
-                <li>Optional modifiers can hide links, disable some links, or make runs more chaotic for extra challenge</li>
+                <li>Daily can only be completed once per day; after completion it is locked until the next day</li>
+                <li>Sprint fails when the timer reaches zero; Click Limit fails when you run out of allowed clicks</li>
+                <li>In multiplayer, fewer clicks ranks higher; time breaks ties</li>
               </ul>
             </div>
             <div>

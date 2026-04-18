@@ -66,12 +66,13 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useApi } from './composables/useApi'
 import { useAuth } from './composables/useAuth'
 import { useToast } from './composables/useToast'
 
 const router = useRouter()
+const route = useRoute()
 const api = useApi()
 const auth = useAuth()
 const { toasts } = useToast()
@@ -80,6 +81,14 @@ const toast = useToast()
 const incomingInvite = ref(null)
 const inviteActionLoading = ref(false)
 let invitePollInterval = null
+
+function handleGlobalKeydown(e) {
+  const key = String(e.key || '').toLowerCase()
+  if (route.name !== 'game') return
+  if ((e.ctrlKey || e.metaKey) && key === 'f') {
+    e.preventDefault()
+  }
+}
 
 async function pollIncomingInvites() {
   if (!auth.user.value) {
@@ -131,11 +140,13 @@ async function respondToInvite(action) {
 }
 
 onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
   pollIncomingInvites()
   invitePollInterval = setInterval(pollIncomingInvites, 3000)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
   if (invitePollInterval) {
     clearInterval(invitePollInterval)
     invitePollInterval = null

@@ -34,9 +34,6 @@ function saveTrendingCache($articles) {
 }
 
 function fetchTrendingFromWikipedia() {
-    $yesterday = gmdate('Y/m/d', strtotime('-1 day'));
-    $url = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/{$yesterday}";
-
     $ctx = stream_context_create([
         'http' => [
             'header' => "User-Agent: WikiLink/2.0 (https://wikilink.fraksis.com)\r\n",
@@ -44,10 +41,21 @@ function fetchTrendingFromWikipedia() {
         ]
     ]);
 
-    $response = @file_get_contents($url, false, $ctx);
-    if (!$response) return null;
+    $data = null;
+    // Wikimedia pageview dumps can lag; system clocks can also drift.
+    // Probe up to the past week and use the first day that returns valid data.
+    for ($daysBack = 1; $daysBack <= 7; $daysBack++) {
+        $date = gmdate('Y/m/d', strtotime("-{$daysBack} day"));
+        $url = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/{$date}";
+        $response = @file_get_contents($url, false, $ctx);
+        if (!$response) continue;
 
-    $data = json_decode($response, true);
+        $decoded = json_decode($response, true);
+        if (!$decoded || empty($decoded['items'][0]['articles'])) continue;
+        $data = $decoded;
+        break;
+    }
+
     if (!$data || empty($data['items'][0]['articles'])) return null;
 
     $excluded = [

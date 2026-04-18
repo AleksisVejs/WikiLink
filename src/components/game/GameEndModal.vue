@@ -320,7 +320,7 @@
             </div>
             <div class="flex gap-2.5 pb-[env(safe-area-inset-bottom)]">
               <button @click="$emit('go-home')" class="btn-secondary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation">HOME</button>
-              <button @click="$emit('play-again')" class="btn-primary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation">PLAY AGAIN</button>
+              <button v-if="allowPlayAgain" @click="$emit('play-again')" class="btn-primary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation">PLAY AGAIN</button>
             </div>
           </div>
         </div>
@@ -382,6 +382,7 @@ defineProps({
   lobbyYourRank: { type: Number, default: null },
   lobbyDisconnectedCount: { type: Number, required: true },
   currentUserId: { type: Number, default: null },
+  allowPlayAgain: { type: Boolean, default: true },
   showConfetti: { type: Boolean, required: true },
   confettiStyle: { type: Function, required: true },
 })

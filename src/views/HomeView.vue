@@ -872,8 +872,10 @@ const modePalette = {
   custom:    { uiColor: '#c9a227', borderHex: 'rgba(201,162,39,0.35)',  bgGlow: 'rgba(201,162,39,0.1)',   shadowColor: 'rgba(201,162,39,0.2)',  tagBg: 'rgba(201,162,39,0.08)',  tagBorder: 'rgba(201,162,39,0.2)' },
 }
 
-const displayModes = Object.values(GAME_MODES)
-  .filter(m => m.id !== 'daily')
+const SOLO_MODE_ORDER = ['classic', 'sprint', 'challenge', 'trending', 'freeplay', 'custom']
+const displayModes = SOLO_MODE_ORDER
+  .map(id => GAME_MODES[id])
+  .filter(Boolean)
   .map(m => {
     const p = modePalette[m.id] || modePalette.classic
     const tag = m.id === 'sprint' ? 'TIMER' : m.id === 'challenge' ? 'CLICK CAP' : m.id === 'trending' ? 'HOT' : null
@@ -1198,6 +1200,10 @@ function startGame() {
 function startDaily() {
   if (hasActiveMultiplayerSession.value) {
     toast.warn('Leave your multiplayer room before starting a solo game.')
+    return
+  }
+  if (dailyCompleted.value) {
+    toast.info('Today\'s daily is already completed.')
     return
   }
   sound.playStart()

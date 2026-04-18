@@ -7,6 +7,18 @@ const trendingLoaded = ref(false)
 const trendingLoading = ref(false)
 let trendingFailedAt = 0
 const TRENDING_RETRY_MS = 60_000
+const FALLBACK_TRENDING_ARTICLES = [
+  { title: 'World War II', views: 1900000, rank: 1 },
+  { title: 'United States', views: 1750000, rank: 2 },
+  { title: 'India', views: 1600000, rank: 3 },
+  { title: 'YouTube', views: 1450000, rank: 4 },
+  { title: 'Artificial intelligence', views: 1320000, rank: 5 },
+  { title: 'Lionel Messi', views: 1180000, rank: 6 },
+  { title: 'Taylor Swift', views: 1090000, rank: 7 },
+  { title: 'Cristiano Ronaldo', views: 980000, rank: 8 },
+  { title: 'Python (programming language)', views: 910000, rank: 9 },
+  { title: 'Minecraft', views: 860000, rank: 10 },
+]
 
 function fisherYatesShuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -20,6 +32,11 @@ export function useTrending() {
   const api = useApi()
   const wiki = useWikipedia()
 
+  function ensureFallbackArticles() {
+    if (trendingArticles.value.length > 0) return
+    trendingArticles.value = [...FALLBACK_TRENDING_ARTICLES]
+  }
+
   async function fetchTrending() {
     if (trendingLoaded.value || trendingLoading.value) return trendingArticles.value
     if (trendingFailedAt && (Date.now() - trendingFailedAt) < TRENDING_RETRY_MS) return trendingArticles.value
@@ -32,9 +49,11 @@ export function useTrending() {
         trendingFailedAt = 0
       } else {
         trendingFailedAt = Date.now()
+        ensureFallbackArticles()
       }
     } catch {
       trendingFailedAt = Date.now()
+      ensureFallbackArticles()
     } finally {
       trendingLoading.value = false
     }
@@ -74,7 +93,7 @@ export function useTrending() {
   }
 
   function formatViews(views) {
-    if (!views) return ''
+    if (views == null) return ''
     if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`
     if (views >= 1000) return `${(views / 1000).toFixed(0)}K`
     return String(views)

@@ -107,6 +107,7 @@
       :lobby-your-rank="lobbyYourRank"
       :lobby-disconnected-count="lobbyDisconnectedCount"
       :current-user-id="auth.user.value?.id ?? null"
+      :allow-play-again="props.mode !== 'daily'"
       :show-confetti="showConfetti"
       :confetti-style="confettiStyle"
       @copy-share="copyShareCard"
@@ -872,6 +873,14 @@ async function initializeGame() {
     }
 
     if (props.mode === 'daily') {
+      if (auth.isLoggedIn()) {
+        await game.refreshDailyStatus()
+      }
+      if (game.getDailyStatus()?.completed) {
+        toast.info('Daily already completed. Come back tomorrow.')
+        router.replace({ name: 'home' })
+        return
+      }
       let pair = null
       try {
         const serverDaily = await api.get('/daily')
@@ -1762,7 +1771,7 @@ function handleKeydown(e) {
     e.preventDefault()
     handleGoBack()
   }
-  if (e.key === 'Enter' && showEndModal.value) playAgain()
+  if (e.key === 'Enter' && showEndModal.value && props.mode !== 'daily') playAgain()
   if ((e.key === 'r' || e.key === 'R') && !showEndModal.value && !showQuitConfirm.value) rerollPair()
 }
 
