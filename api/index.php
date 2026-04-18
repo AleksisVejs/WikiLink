@@ -353,11 +353,24 @@ if ($method === 'GET' && $uri === '/community/pairs') {
 
 // GET /community/hub
 if ($method === 'GET' && $uri === '/community/hub') {
-    $pairLimit = isset($_GET['pairLimit']) ? (int)$_GET['pairLimit'] : 30;
-    $groupLimit = isset($_GET['groupLimit']) ? (int)$_GET['groupLimit'] : 12;
+    $pairLimit = isset($_GET['pairLimit']) ? (int)$_GET['pairLimit'] : 15;
+    $pairOffset = isset($_GET['pairOffset']) ? (int)$_GET['pairOffset'] : 0;
+    $groupLimit = isset($_GET['groupLimit']) ? (int)$_GET['groupLimit'] : 10;
+    $groupOffset = isset($_GET['groupOffset']) ? (int)$_GET['groupOffset'] : 0;
     $groupItemsLimit = isset($_GET['groupItemsLimit']) ? (int)$_GET['groupItemsLimit'] : 8;
+    $topRatedPairLimit = isset($_GET['topRatedPairLimit']) ? (int)$_GET['topRatedPairLimit'] : 6;
+    $topRatedGroupLimit = isset($_GET['topRatedGroupLimit']) ? (int)$_GET['topRatedGroupLimit'] : 6;
     $viewer = authenticateRequest();
-    jsonResponse(getCommunityHubData($pairLimit, $groupLimit, $groupItemsLimit, $viewer ? $viewer['id'] : null));
+    jsonResponse(getCommunityHubData(
+        $pairLimit,
+        $pairOffset,
+        $groupLimit,
+        $groupOffset,
+        $groupItemsLimit,
+        $topRatedPairLimit,
+        $topRatedGroupLimit,
+        $viewer ? $viewer['id'] : null
+    ));
 }
 
 // GET /community/group/:id
@@ -365,6 +378,22 @@ if ($method === 'GET' && preg_match('#^/community/group/(\d+)$#', $uri, $m)) {
     $result = getCommunityGroupById((int)$m[1]);
     if (!$result) jsonResponse(['error' => 'Group not found.'], 404);
     jsonResponse($result);
+}
+
+// GET /community/leaderboard/pair?pairId=&limit=
+if ($method === 'GET' && $uri === '/community/leaderboard/pair') {
+    $pairId = isset($_GET['pairId']) ? (int)$_GET['pairId'] : 0;
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 20;
+    $result = getCommunityPairRunLeaderboardForPairId($pairId, $limit);
+    jsonResponse($result, isset($result['error']) ? 404 : 200);
+}
+
+// GET /community/leaderboard/group?groupId=&limit=
+if ($method === 'GET' && $uri === '/community/leaderboard/group') {
+    $groupId = isset($_GET['groupId']) ? (int)$_GET['groupId'] : 0;
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 20;
+    $result = getCommunityGroupRunLeaderboardForGroupId($groupId, $limit);
+    jsonResponse($result, isset($result['error']) ? 404 : 200);
 }
 
 // POST /community/pair
@@ -439,7 +468,22 @@ if ($method === 'POST' && $uri === '/community-paths') {
         $user['id'],
         isset($body['startTitle']) ? $body['startTitle'] : '',
         isset($body['endTitle']) ? $body['endTitle'] : '',
-        isset($body['path']) ? $body['path'] : []
+        isset($body['path']) ? $body['path'] : [],
+        isset($body['timeSeconds']) ? $body['timeSeconds'] : null,
+        isset($body['clicks']) ? $body['clicks'] : null
+    );
+    jsonResponse($result, isset($result['error']) ? 400 : 200);
+}
+
+// POST /community/group-run
+if ($method === 'POST' && $uri === '/community/group-run') {
+    $user = requireAuth();
+    $body = jsonInput();
+    $result = submitCommunityGroupRun(
+        $user['id'],
+        (int)(isset($body['groupId']) ? $body['groupId'] : 0),
+        (int)(isset($body['totalClicks']) ? $body['totalClicks'] : 0),
+        (int)(isset($body['totalTimeSeconds']) ? $body['totalTimeSeconds'] : 0)
     );
     jsonResponse($result, isset($result['error']) ? 400 : 200);
 }

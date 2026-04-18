@@ -70,6 +70,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useApi } from './composables/useApi'
 import { useAuth } from './composables/useAuth'
 import { useToast } from './composables/useToast'
+import { createVisibilityAwarePoller } from './composables/useVisibilityPoller'
 
 const router = useRouter()
 const route = useRoute()
@@ -80,7 +81,7 @@ const toast = useToast()
 
 const incomingInvite = ref(null)
 const inviteActionLoading = ref(false)
-let invitePollInterval = null
+let incomingInvitePoller = null
 
 function handleGlobalKeydown(e) {
   const key = String(e.key || '').toLowerCase()
@@ -141,15 +142,15 @@ async function respondToInvite(action) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
-  pollIncomingInvites()
-  invitePollInterval = setInterval(pollIncomingInvites, 3000)
+  incomingInvitePoller = createVisibilityAwarePoller(pollIncomingInvites, 3000, 20000)
+  incomingInvitePoller.start()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
-  if (invitePollInterval) {
-    clearInterval(invitePollInterval)
-    invitePollInterval = null
+  if (incomingInvitePoller) {
+    incomingInvitePoller.stop()
+    incomingInvitePoller = null
   }
 })
 </script>

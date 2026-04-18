@@ -107,8 +107,9 @@
       :lobby-your-rank="lobbyYourRank"
       :lobby-disconnected-count="lobbyDisconnectedCount"
       :current-user-id="auth.user.value?.id ?? null"
-      :allow-play-again="props.mode !== 'daily' && !hasNextCommunityPair"
+      :allow-play-again="props.mode !== 'daily' && !hasNextCommunityPair && !showReplayCommunityGroup"
       :show-next-pair="hasNextCommunityPair"
+      :show-replay-community-group="showReplayCommunityGroup"
       :show-confetti="showConfetti"
       :confetti-style="confettiStyle"
       :show-community-section="!isMultiplayerGame && !!game.state.targetArticle"
@@ -116,11 +117,11 @@
       :viewer-has-best-community-path="viewerHasBestCommunityPath"
       :current-run-is-best-community="currentRunIsBestCommunity"
       :community-paths="communityPaths"
-      @copy-share="copyShareCard"
-      @share-challenge="shareChallenge"
+      @copy-share="copyShareToClipboard"
       @go-home="goHome"
       @play-again="playAgain"
       @next-pair="nextCommunityPair"
+      @replay-community-group="replayCommunityGroup"
     />
 
     <!-- Red vignette on loss -->
@@ -326,6 +327,9 @@ const communityPaths = ref([])
 const bestCommunityPathLength = ref(null)
 const viewerHasBestCommunityPath = ref(false)
 const activeCommunityGroup = ref(null)
+/** Cumulative clicks/time for current community group playthrough (reset at group step 1). */
+const groupRunClicks = ref(0)
+const groupRunTime = ref(0)
 const achievementToasts = ref([])
 const showLevelUp = ref(false)
 const showHintMenu = ref(false)
@@ -545,6 +549,14 @@ const hasNextCommunityPair = computed(() => {
   return game.isWon.value && communityGroupStep.value < activeCommunityGroup.value.items.length
 })
 
+const showReplayCommunityGroup = computed(() => {
+  if (!game.isGameOver.value || freeplayFinished.value) return false
+  if (!communityGroupId.value || !activeCommunityGroup.value) return false
+  const items = activeCommunityGroup.value.items
+  if (!Array.isArray(items) || items.length === 0) return false
+  return communityGroupStep.value >= items.length
+})
+
 // Play sounds on game state changes; submit daily score; show confetti; award XP; check achievements
 watch(() => game.state.status, (val) => {
   if (val === 'won') {
@@ -559,6 +571,7 @@ watch(() => game.state.status, (val) => {
     submitMatchResult()
     submitLobbyResult()
     loadDailyLeaderboard()
+    trackCommunityGroupRunOnWin()
     submitCurrentRunAsCommunityPath()
     loadCommunityPaths()
     processPostGame(true)
@@ -970,6 +983,10 @@ async function initializeGame() {
       if (!startArticle || !targetArticle) { toast.error('Could not find one or both articles. Check the titles and try again.'); router.push({ name: 'home' }); return }
       game.initGame('custom', startArticle, targetArticle, 'random', 'normal')
       await loadArticle(startArticle.title)
+      if (communityGroupId.value && communityGroupStep.value === 1) {
+        groupRunClicks.value = 0
+        groupRunTime.value = 0
+      }
     } else if (props.mode === 'trending') {
       const pair = await trending.getTrendingPair()
       if (!pair) {
@@ -1300,7 +1317,7 @@ function generateShareText(challengeUrl) {
     pathText = [...head, `... ${pathSteps.length - 5} more ...`, ...tail].join(' -> ')
   }
 
-  const link = challengeUrl || 'https://wikilink.fraksis.com'
+  const link = challengeUrl || (typeof window !== 'undefined' ? window.location.origin : '')
 
   return [
     header,
@@ -1314,42 +1331,50 @@ function generateShareText(challengeUrl) {
   ].join('\n')
 }
 
-async function copyShareCard() {
+const challengeUrlCache = ref(null)
+let challengeUrlPromise = null
+
+watch(showEndModal, (open) => {
+  if (!open) {
+    challengeUrlCache.value = null
+    challengeUrlPromise = null
+  }
+})
+
+async function resolveChallengePlayUrl() {
+  if (challengeUrlCache.value) return challengeUrlCache.value
+  if (challengeUrlPromise) return challengeUrlPromise
+
   const start = game.state.startArticle?.title
   const end = game.state.targetArticle?.title
-  let challengeUrl = null
+  if (!start || !end) return null
 
-  if (start && end) {
+  challengeUrlPromise = (async () => {
     try {
       const data = await api.post('/challenge', { startTitle: start, endTitle: end })
-      challengeUrl = `${window.location.origin}/play/custom?code=${data.code}`
+      const url = `${window.location.origin}/play/custom?code=${data.code}`
+      challengeUrlCache.value = url
+      return url
     } catch {
-      challengeUrl = `${window.location.origin}/play/custom?from=${encodeURIComponent(start)}&to=${encodeURIComponent(end)}`
+      const url = `${window.location.origin}/play/custom?from=${encodeURIComponent(start)}&to=${encodeURIComponent(end)}`
+      challengeUrlCache.value = url
+      return url
+    } finally {
+      challengeUrlPromise = null
     }
-  }
+  })()
 
+  return challengeUrlPromise
+}
+
+async function copyShareToClipboard() {
+  const challengeUrl = await resolveChallengePlayUrl()
   const text = generateShareText(challengeUrl)
   try {
     await navigator.clipboard.writeText(text)
-    toast.success('Result copied to clipboard!')
+    toast.success('Copied to clipboard')
   } catch {
     toast.warn('Could not copy to clipboard')
-  }
-}
-
-async function shareChallenge() {
-  const start = game.state.startArticle?.title
-  const end = game.state.targetArticle?.title
-  if (!start || !end) return
-  try {
-    const data = await api.post('/challenge', { startTitle: start, endTitle: end })
-    const url = `${window.location.origin}/play/custom?code=${data.code}`
-    await navigator.clipboard.writeText(url)
-    toast.success('Challenge link copied!')
-  } catch {
-    const url = `${window.location.origin}/play/custom?from=${encodeURIComponent(start)}&to=${encodeURIComponent(end)}`
-    await navigator.clipboard.writeText(url).catch(() => {})
-    toast.success('Challenge link copied!')
   }
 }
 
@@ -1684,6 +1709,22 @@ async function loadDailyLeaderboard() {
   } catch { /* ignore */ }
 }
 
+function trackCommunityGroupRunOnWin() {
+  if (!communityGroupId.value || !activeCommunityGroup.value) return
+  if (!auth.isLoggedIn()) return
+  const items = activeCommunityGroup.value.items
+  if (!Array.isArray(items) || items.length === 0) return
+  groupRunClicks.value += game.state.clicks
+  groupRunTime.value += game.state.elapsed
+  if (communityGroupStep.value >= items.length) {
+    api.post('/community/group-run', {
+      groupId: communityGroupId.value,
+      totalClicks: groupRunClicks.value,
+      totalTimeSeconds: groupRunTime.value,
+    }).catch(() => {})
+  }
+}
+
 async function loadCommunityPaths() {
   if (isMultiplayerGame.value) return
   const startTitle = game.state.startArticle?.title
@@ -1729,7 +1770,13 @@ async function submitCurrentRunAsCommunityPath() {
   try {
     const allValid = await ensureAllTitlesExist(path)
     if (!allValid) return
-    const data = await api.post('/community-paths', { startTitle, endTitle, path })
+    const data = await api.post('/community-paths', {
+      startTitle,
+      endTitle,
+      path,
+      timeSeconds: game.state.elapsed,
+      clicks: game.state.clicks,
+    })
     communityPaths.value = Array.isArray(data.items) ? data.items : []
     bestCommunityPathLength.value = Number.isFinite(data.bestPath?.path_length) ? data.bestPath.path_length : null
     viewerHasBestCommunityPath.value = !!data.viewerHasBest
@@ -1742,6 +1789,26 @@ async function nextCommunityPair() {
     return
   }
   const q = { ...route.query, cstep: String(communityGroupStep.value + 1) }
+  delete q.code
+  await router.replace({ name: 'game', params: { mode: props.mode }, query: q })
+  await initializeGame()
+}
+
+async function replayCommunityGroup() {
+  if (!communityGroupId.value) return
+  groupRunClicks.value = 0
+  groupRunTime.value = 0
+  game.resetGame()
+  freeplayFinished.value = false
+  articleData.value = null
+  matchResult.value = null
+  matchPolling.value = false
+  if (matchPollTimerId) { clearTimeout(matchPollTimerId); matchPollTimerId = null }
+  if (matchPresencePollTimerId) { clearTimeout(matchPresencePollTimerId); matchPresencePollTimerId = null }
+  lobbyResult.value = null
+  lobbyPolling.value = false
+  if (lobbyPollTimerId) { clearTimeout(lobbyPollTimerId); lobbyPollTimerId = null }
+  const q = { ...route.query, cstep: '1' }
   delete q.code
   await router.replace({ name: 'game', params: { mode: props.mode }, query: q })
   await initializeGame()
@@ -1882,6 +1949,7 @@ function handleKeydown(e) {
   }
   if (e.key === 'Enter' && showEndModal.value && props.mode !== 'daily') {
     if (hasNextCommunityPair.value) nextCommunityPair()
+    else if (showReplayCommunityGroup.value) replayCommunityGroup()
     else playAgain()
   }
   if ((e.key === 'r' || e.key === 'R') && !showEndModal.value && !showQuitConfirm.value) rerollPair()

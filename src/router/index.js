@@ -1,9 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import GameView from '../views/GameView.vue'
-import ProfileView from '../views/ProfileView.vue'
-import CommunityView from '../views/CommunityView.vue'
-import NotFoundView from '../views/NotFoundView.vue'
+
+const GameView = () => import('../views/GameView.vue')
+const ProfileView = () => import('../views/ProfileView.vue')
+const CommunityView = () => import('../views/CommunityView.vue')
+const NotFoundView = () => import('../views/NotFoundView.vue')
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },

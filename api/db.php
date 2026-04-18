@@ -118,6 +118,28 @@ function initSchema($db) {
         )",
         "CREATE INDEX IF NOT EXISTS idx_community_pair_group_items_group ON community_pair_group_items(group_id, position_idx)",
 
+        "CREATE TABLE IF NOT EXISTS community_pair_user_best (
+            user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            start_norm        TEXT    NOT NULL,
+            end_norm          TEXT    NOT NULL,
+            best_path_length  INTEGER NOT NULL,
+            best_clicks       INTEGER NOT NULL,
+            best_time_seconds INTEGER NOT NULL DEFAULT 0,
+            updated_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (user_id, start_norm, end_norm)
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_cpu_pair_route ON community_pair_user_best(start_norm, end_norm, best_path_length, best_time_seconds)",
+
+        "CREATE TABLE IF NOT EXISTS community_group_user_best (
+            user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            group_id          INTEGER NOT NULL REFERENCES community_pair_groups(id) ON DELETE CASCADE,
+            best_total_clicks INTEGER NOT NULL,
+            best_total_time   INTEGER NOT NULL DEFAULT 0,
+            updated_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (user_id, group_id)
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_cgu_group ON community_group_user_best(group_id, best_total_clicks, best_total_time)",
+
         "CREATE TABLE IF NOT EXISTS community_paths (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

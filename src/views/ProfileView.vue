@@ -723,6 +723,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useApi } from '../composables/useApi'
+import { createVisibilityAwarePoller } from '../composables/useVisibilityPoller'
 import { useToast } from '../composables/useToast'
 import { useGame } from '../composables/useGame'
 import { useProgression } from '../composables/useProgression'
@@ -1058,7 +1059,7 @@ const inviteTargetUser = ref('')
 const inviteId = ref(null)
 const inviteMatchData = ref(null)
 const inviteError = ref('')
-let invitePollInterval = null
+let inviteStatusPoller = null
 
 watch(authMode, () => {
   authError.value = ''
@@ -1371,16 +1372,17 @@ async function inviteFriendTo1v1(username) {
 }
 
 function clearInvitePolling() {
-  if (invitePollInterval) {
-    clearInterval(invitePollInterval)
-    invitePollInterval = null
+  if (inviteStatusPoller) {
+    inviteStatusPoller.stop()
+    inviteStatusPoller = null
   }
 }
 
 function startInvitePolling() {
   clearInvitePolling()
   if (!inviteId.value) return
-  invitePollInterval = setInterval(checkInviteStatus, 2000)
+  inviteStatusPoller = createVisibilityAwarePoller(checkInviteStatus, 2000, 15000)
+  inviteStatusPoller.start()
 }
 
 async function checkInviteStatus() {

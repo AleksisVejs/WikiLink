@@ -113,7 +113,188 @@ function getCommunityPaths($startTitle, $endTitle, $viewerUserId = null, $limit 
     ];
 }
 
-function submitCommunityPath($userId, $startTitle, $endTitle, $path) {
+function upsertCommunityPairUserBest($userId, $startNorm, $endNorm, $pathLength, $timeSeconds, $clicks) {
+    $sn = normalizePairTitle($startNorm);
+    $en = normalizePairTitle($endNorm);
+    if ($sn === '' || $en === '' || $sn === $en) {
+        return;
+    }
+
+    $db = getDb();
+    $stmt = $db->prepare('SELECT best_path_length, best_time_seconds, best_clicks FROM community_pair_user_best WHERE user_id = ? AND start_norm = ? AND end_norm = ?');
+    $stmt->execute([(int)$userId, $sn, $en]);
+    $row = $stmt->fetch();
+    $better = !$row;
+    if ($row) {
+        $bl = (int)$row['best_path_length'];
+        $bt = (int)$row['best_time_seconds'];
+        $bc = (int)$row['best_clicks'];
+        if ($pathLength < $bl) {
+            $better = true;
+        } elseif ($pathLength > $bl) {
+            $better = false;
+        } elseif ($timeSeconds < $bt) {
+            $better = true;
+        } elseif ($timeSeconds > $bt) {
+            $better = false;
+        } elseif ($clicks < $bc) {
+            $better = true;
+        } else {
+            $better = false;
+        }
+    }
+    if (!$better) {
+        return;
+    }
+
+    if ($row) {
+        $u = $db->prepare('UPDATE community_pair_user_best SET best_path_length = ?, best_clicks = ?, best_time_seconds = ?, updated_at = datetime(\'now\') WHERE user_id = ? AND start_norm = ? AND end_norm = ?');
+        $u->execute([$pathLength, $clicks, $timeSeconds, (int)$userId, $sn, $en]);
+    } else {
+        $i = $db->prepare('INSERT INTO community_pair_user_best (user_id, start_norm, end_norm, best_path_length, best_clicks, best_time_seconds, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\'))');
+        $i->execute([(int)$userId, $sn, $en, $pathLength, $clicks, $timeSeconds]);
+    }
+}
+
+function getCommunityPairRunLeaderboardForPairId($pairId, $limit = 20) {
+    $pairId = max(1, (int)$pairId);
+    $limit = max(1, min(50, (int)$limit));
+    $db = getDb();
+    $stmt = $db->prepare('SELECT id, start_title, end_title FROM shared_challenges WHERE id = ? LIMIT 1');
+    $stmt->execute([$pairId]);
+    $pair = $stmt->fetch();
+    if (!$pair) {
+        return ['error' => 'Pair not found.'];
+    }
+
+    $sn = normalizePairTitle($pair['start_title']);
+    $en = normalizePairTitle($pair['end_title']);
+
+    $lb = $db->prepare(
+        'SELECT u.username, u.id AS user_id, u.profile_title,
+                b.best_path_length, b.best_clicks, b.best_time_seconds
+         FROM community_pair_user_best b
+         JOIN users u ON u.id = b.user_id
+         WHERE b.start_norm = ? AND b.end_norm = ?
+         ORDER BY b.best_path_length ASC, b.best_time_seconds ASC, b.best_clicks ASC
+         LIMIT ?'
+    );
+    $lb->execute([$sn, $en, $limit]);
+    $rows = $lb->fetchAll();
+
+    $rank = 1;
+    $out = [];
+    foreach ($rows as $r) {
+        $out[] = [
+            'rank' => $rank++,
+            'username' => (string)$r['username'],
+            'userId' => (int)$r['user_id'],
+            'profileTitle' => (string)($r['profile_title'] ?? 'newcomer'),
+            'bestPathLength' => (int)$r['best_path_length'],
+            'bestClicks' => (int)$r['best_clicks'],
+            'bestTimeSeconds' => (int)$r['best_time_seconds'],
+        ];
+    }
+
+    return [
+        'pairId' => $pairId,
+        'startTitle' => normalizePathTitle($pair['start_title']),
+        'endTitle' => normalizePathTitle($pair['end_title']),
+        'rows' => $out,
+    ];
+}
+
+function getCommunityGroupRunLeaderboardForGroupId($groupId, $limit = 20) {
+    $groupId = max(1, (int)$groupId);
+    $limit = max(1, min(50, (int)$limit));
+    $db = getDb();
+    $stmt = $db->prepare('SELECT id, name FROM community_pair_groups WHERE id = ? LIMIT 1');
+    $stmt->execute([$groupId]);
+    $g = $stmt->fetch();
+    if (!$g) {
+        return ['error' => 'Group not found.'];
+    }
+
+    $lb = $db->prepare(
+        'SELECT u.username, u.id AS user_id, u.profile_title,
+                b.best_total_clicks, b.best_total_time
+         FROM community_group_user_best b
+         JOIN users u ON u.id = b.user_id
+         WHERE b.group_id = ?
+         ORDER BY b.best_total_clicks ASC, b.best_total_time ASC
+         LIMIT ?'
+    );
+    $lb->execute([$groupId, $limit]);
+    $rows = $lb->fetchAll();
+
+    $rank = 1;
+    $out = [];
+    foreach ($rows as $r) {
+        $out[] = [
+            'rank' => $rank++,
+            'username' => (string)$r['username'],
+            'userId' => (int)$r['user_id'],
+            'profileTitle' => (string)($r['profile_title'] ?? 'newcomer'),
+            'bestTotalClicks' => (int)$r['best_total_clicks'],
+            'bestTotalTimeSeconds' => (int)$r['best_total_time'],
+        ];
+    }
+
+    return [
+        'groupId' => $groupId,
+        'name' => (string)$g['name'],
+        'rows' => $out,
+    ];
+}
+
+function submitCommunityGroupRun($userId, $groupId, $totalClicks, $totalTime) {
+    $groupId = (int)$groupId;
+    $totalClicks = (int)$totalClicks;
+    $totalTime = (int)$totalTime;
+    if ($groupId < 1 || $totalClicks < 1) {
+        return ['error' => 'Invalid run.'];
+    }
+
+    $db = getDb();
+    $stmt = $db->prepare('SELECT id FROM community_pair_groups WHERE id = ? LIMIT 1');
+    $stmt->execute([$groupId]);
+    if (!$stmt->fetch()) {
+        return ['error' => 'Group not found.'];
+    }
+
+    $stmt = $db->prepare('SELECT best_total_clicks, best_total_time FROM community_group_user_best WHERE user_id = ? AND group_id = ?');
+    $stmt->execute([(int)$userId, $groupId]);
+    $row = $stmt->fetch();
+    $better = !$row;
+    if ($row) {
+        $bc = (int)$row['best_total_clicks'];
+        $bt = (int)$row['best_total_time'];
+        if ($totalClicks < $bc) {
+            $better = true;
+        } elseif ($totalClicks > $bc) {
+            $better = false;
+        } elseif ($totalTime < $bt) {
+            $better = true;
+        } else {
+            $better = false;
+        }
+    }
+    if (!$better) {
+        return ['ok' => true, 'updated' => false];
+    }
+
+    if ($row) {
+        $u = $db->prepare('UPDATE community_group_user_best SET best_total_clicks = ?, best_total_time = ?, updated_at = datetime(\'now\') WHERE user_id = ? AND group_id = ?');
+        $u->execute([$totalClicks, $totalTime, (int)$userId, $groupId]);
+    } else {
+        $i = $db->prepare('INSERT INTO community_group_user_best (user_id, group_id, best_total_clicks, best_total_time, updated_at) VALUES (?, ?, ?, ?, datetime(\'now\'))');
+        $i->execute([(int)$userId, $groupId, $totalClicks, $totalTime]);
+    }
+
+    return ['ok' => true, 'updated' => true];
+}
+
+function submitCommunityPath($userId, $startTitle, $endTitle, $path, $timeSeconds = null, $clicks = null) {
     $startNorm = normalizePathTitle($startTitle);
     $endNorm = normalizePathTitle($endTitle);
     if ($startNorm === '' || $endNorm === '' || strtolower($startNorm) === strtolower($endNorm)) {
@@ -177,6 +358,10 @@ function submitCommunityPath($userId, $startTitle, $endTitle, $path) {
             $clearVotesStmt->execute([(int)$existing['id']]);
         }
     }
+
+    $ts = $timeSeconds !== null ? max(0, (int)$timeSeconds) : 0;
+    $ck = $clicks !== null ? max(0, (int)$clicks) : 0;
+    upsertCommunityPairUserBest($userId, $startNorm, $endNorm, $pathLength, $ts, $ck);
 
     return getCommunityPaths($startNorm, $endNorm, $userId, 20);
 }
@@ -314,72 +499,34 @@ function getCommunityPairCatalog($pairLimit = 24, $collectionLimit = 8, $collect
     ];
 }
 
-function getCommunityHubData($pairLimit = 30, $groupLimit = 12, $groupItemsLimit = 8, $viewerUserId = null) {
-    $db = getDb();
-    $pairLimit = max(1, min(100, (int)$pairLimit));
-    $groupLimit = max(1, min(40, (int)$groupLimit));
-    $groupItemsLimit = max(1, min(20, (int)$groupItemsLimit));
+/**
+ * @param array<int, array<string, mixed>> $pairRows
+ * @return array<int, array<string, mixed>>
+ */
+function mapCommunityHubPairRows(array $pairRows, $viewerUserId) {
+    return array_map(function ($row) use ($viewerUserId) {
+        return [
+            'id' => (int)$row['id'],
+            'code' => (string)$row['code'],
+            'startTitle' => (string)$row['start_title'],
+            'endTitle' => (string)$row['end_title'],
+            'userId' => $row['created_by'] == null ? null : (int)$row['created_by'],
+            'username' => $row['username'] ? (string)$row['username'] : 'Anonymous',
+            'createdAt' => (string)$row['created_at'],
+            'likes' => (int)($row['likes_count'] ?? 0),
+            'dislikes' => (int)($row['dislikes_count'] ?? 0),
+            'score' => (int)($row['score'] ?? 0),
+            'yourVote' => $row['your_vote'] === null ? 0 : (int)$row['your_vote'],
+            'canDelete' => $viewerUserId != null && $row['created_by'] != null && (int)$row['created_by'] === (int)$viewerUserId,
+        ];
+    }, $pairRows);
+}
 
-    $pairsStmt = $db->prepare(
-        'SELECT
-            sc.id,
-            sc.code,
-            sc.start_title,
-            sc.end_title,
-            sc.created_at,
-            sc.created_by,
-            u.username,
-            COALESCE(v.likes_count, 0) AS likes_count,
-            COALESCE(v.dislikes_count, 0) AS dislikes_count,
-            COALESCE(v.likes_count, 0) - COALESCE(v.dislikes_count, 0) AS score,
-            (SELECT vote FROM community_pair_votes cpv WHERE cpv.pair_id = sc.id AND cpv.user_id = :viewer LIMIT 1) AS your_vote
-         FROM shared_challenges sc
-         LEFT JOIN users u ON u.id = sc.created_by
-         LEFT JOIN (
-            SELECT
-                pair_id,
-                SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS likes_count,
-                SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS dislikes_count
-            FROM community_pair_votes
-            GROUP BY pair_id
-         ) v ON v.pair_id = sc.id
-         ORDER BY sc.created_at DESC
-         LIMIT :limit'
-    );
-    $pairsStmt->bindValue(':viewer', (int)($viewerUserId ?: 0), PDO::PARAM_INT);
-    $pairsStmt->bindValue(':limit', $pairLimit, PDO::PARAM_INT);
-    $pairsStmt->execute();
-    $pairRows = $pairsStmt->fetchAll();
-
-    $groupsStmt = $db->prepare(
-        'SELECT
-            g.id,
-            g.name,
-            g.user_id,
-            g.created_at,
-            u.username,
-            COALESCE(v.likes_count, 0) AS likes_count,
-            COALESCE(v.dislikes_count, 0) AS dislikes_count,
-            COALESCE(v.likes_count, 0) - COALESCE(v.dislikes_count, 0) AS score,
-            (SELECT vote FROM community_group_votes cgv WHERE cgv.group_id = g.id AND cgv.user_id = :viewer LIMIT 1) AS your_vote
-         FROM community_pair_groups g
-         JOIN users u ON u.id = g.user_id
-         LEFT JOIN (
-            SELECT
-                group_id,
-                SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS likes_count,
-                SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS dislikes_count
-            FROM community_group_votes
-            GROUP BY group_id
-         ) v ON v.group_id = g.id
-         ORDER BY g.created_at DESC
-         LIMIT :limit'
-    );
-    $groupsStmt->bindValue(':viewer', (int)($viewerUserId ?: 0), PDO::PARAM_INT);
-    $groupsStmt->bindValue(':limit', $groupLimit, PDO::PARAM_INT);
-    $groupsStmt->execute();
-    $groupRows = $groupsStmt->fetchAll();
-
+/**
+ * @param array<int, array<string, mixed>> $groupRows
+ * @return array<int, array<string, mixed>>
+ */
+function buildCommunityHubGroups(PDO $db, array $groupRows, $groupItemsLimit) {
     $groupItemsStmt = $db->prepare(
         'SELECT position_idx, challenge_code, start_title, end_title
          FROM community_pair_group_items
@@ -387,7 +534,6 @@ function getCommunityHubData($pairLimit = 30, $groupLimit = 12, $groupItemsLimit
          ORDER BY position_idx ASC
          LIMIT ?'
     );
-
     $groups = [];
     foreach ($groupRows as $g) {
         $groupItemsStmt->execute([(int)$g['id'], $groupItemsLimit]);
@@ -412,25 +558,142 @@ function getCommunityHubData($pairLimit = 30, $groupLimit = 12, $groupItemsLimit
             }, $items),
         ];
     }
+    return $groups;
+}
+
+function getCommunityHubData(
+    $pairLimit = 15,
+    $pairOffset = 0,
+    $groupLimit = 10,
+    $groupOffset = 0,
+    $groupItemsLimit = 8,
+    $topRatedPairLimit = 6,
+    $topRatedGroupLimit = 6,
+    $viewerUserId = null
+) {
+    $db = getDb();
+    $pairLimit = max(1, min(100, (int)$pairLimit));
+    $pairOffset = max(0, min(50000, (int)$pairOffset));
+    $groupLimit = max(1, min(40, (int)$groupLimit));
+    $groupOffset = max(0, min(50000, (int)$groupOffset));
+    $groupItemsLimit = max(1, min(20, (int)$groupItemsLimit));
+    $topRatedPairLimit = max(0, min(20, (int)$topRatedPairLimit));
+    $topRatedGroupLimit = max(0, min(20, (int)$topRatedGroupLimit));
+
+    $pairTotal = (int)$db->query('SELECT COUNT(*) FROM shared_challenges')->fetchColumn();
+    $groupTotal = (int)$db->query('SELECT COUNT(*) FROM community_pair_groups')->fetchColumn();
+    $groupLegTotal = (int)$db->query('SELECT COUNT(*) FROM community_pair_group_items')->fetchColumn();
+
+    $pairSqlBase =
+        'SELECT
+            sc.id,
+            sc.code,
+            sc.start_title,
+            sc.end_title,
+            sc.created_at,
+            sc.created_by,
+            u.username,
+            COALESCE(v.likes_count, 0) AS likes_count,
+            COALESCE(v.dislikes_count, 0) AS dislikes_count,
+            COALESCE(v.likes_count, 0) - COALESCE(v.dislikes_count, 0) AS score,
+            (SELECT vote FROM community_pair_votes cpv WHERE cpv.pair_id = sc.id AND cpv.user_id = :viewer LIMIT 1) AS your_vote
+         FROM shared_challenges sc
+         LEFT JOIN users u ON u.id = sc.created_by
+         LEFT JOIN (
+            SELECT
+                pair_id,
+                SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS likes_count,
+                SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS dislikes_count
+            FROM community_pair_votes
+            GROUP BY pair_id
+         ) v ON v.pair_id = sc.id ';
+
+    $pairsNewestStmt = $db->prepare(
+        $pairSqlBase .
+        'ORDER BY sc.created_at DESC
+         LIMIT :limit OFFSET :offset'
+    );
+    $pairsNewestStmt->bindValue(':viewer', (int)($viewerUserId ?: 0), PDO::PARAM_INT);
+    $pairsNewestStmt->bindValue(':limit', $pairLimit, PDO::PARAM_INT);
+    $pairsNewestStmt->bindValue(':offset', $pairOffset, PDO::PARAM_INT);
+    $pairsNewestStmt->execute();
+    $pairRowsNewest = $pairsNewestStmt->fetchAll();
+
+    $pairRowsTop = [];
+    if ($topRatedPairLimit > 0) {
+        $pairsTopStmt = $db->prepare(
+            $pairSqlBase .
+            'ORDER BY (COALESCE(v.likes_count, 0) - COALESCE(v.dislikes_count, 0)) DESC,
+                     COALESCE(v.likes_count, 0) DESC,
+                     sc.id DESC
+             LIMIT :topLimit'
+        );
+        $pairsTopStmt->bindValue(':viewer', (int)($viewerUserId ?: 0), PDO::PARAM_INT);
+        $pairsTopStmt->bindValue(':topLimit', $topRatedPairLimit, PDO::PARAM_INT);
+        $pairsTopStmt->execute();
+        $pairRowsTop = $pairsTopStmt->fetchAll();
+    }
+
+    $groupSqlBase =
+        'SELECT
+            g.id,
+            g.name,
+            g.user_id,
+            g.created_at,
+            u.username,
+            COALESCE(v.likes_count, 0) AS likes_count,
+            COALESCE(v.dislikes_count, 0) AS dislikes_count,
+            COALESCE(v.likes_count, 0) - COALESCE(v.dislikes_count, 0) AS score,
+            (SELECT vote FROM community_group_votes cgv WHERE cgv.group_id = g.id AND cgv.user_id = :viewer LIMIT 1) AS your_vote
+         FROM community_pair_groups g
+         JOIN users u ON u.id = g.user_id
+         LEFT JOIN (
+            SELECT
+                group_id,
+                SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS likes_count,
+                SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS dislikes_count
+            FROM community_group_votes
+            GROUP BY group_id
+         ) v ON v.group_id = g.id ';
+
+    $groupsNewestStmt = $db->prepare(
+        $groupSqlBase .
+        'ORDER BY g.created_at DESC
+         LIMIT :limit OFFSET :offset'
+    );
+    $groupsNewestStmt->bindValue(':viewer', (int)($viewerUserId ?: 0), PDO::PARAM_INT);
+    $groupsNewestStmt->bindValue(':limit', $groupLimit, PDO::PARAM_INT);
+    $groupsNewestStmt->bindValue(':offset', $groupOffset, PDO::PARAM_INT);
+    $groupsNewestStmt->execute();
+    $groupRowsNewest = $groupsNewestStmt->fetchAll();
+
+    $groupRowsTop = [];
+    if ($topRatedGroupLimit > 0) {
+        $groupsTopStmt = $db->prepare(
+            $groupSqlBase .
+            'ORDER BY (COALESCE(v.likes_count, 0) - COALESCE(v.dislikes_count, 0)) DESC,
+                     COALESCE(v.likes_count, 0) DESC,
+                     g.id DESC
+             LIMIT :topLimit'
+        );
+        $groupsTopStmt->bindValue(':viewer', (int)($viewerUserId ?: 0), PDO::PARAM_INT);
+        $groupsTopStmt->bindValue(':topLimit', $topRatedGroupLimit, PDO::PARAM_INT);
+        $groupsTopStmt->execute();
+        $groupRowsTop = $groupsTopStmt->fetchAll();
+    }
 
     return [
-        'pairs' => array_map(function ($row) {
-            return [
-            'id' => (int)$row['id'],
-                'code' => (string)$row['code'],
-                'startTitle' => (string)$row['start_title'],
-                'endTitle' => (string)$row['end_title'],
-            'userId' => $row['created_by'] == null ? null : (int)$row['created_by'],
-                'username' => $row['username'] ? (string)$row['username'] : 'Anonymous',
-                'createdAt' => (string)$row['created_at'],
-                'likes' => (int)($row['likes_count'] ?? 0),
-                'dislikes' => (int)($row['dislikes_count'] ?? 0),
-                'score' => (int)($row['score'] ?? 0),
-                'yourVote' => $row['your_vote'] === null ? 0 : (int)$row['your_vote'],
-                'canDelete' => $viewerUserId != null && $row['created_by'] != null && (int)$row['created_by'] === (int)$viewerUserId,
-            ];
-        }, $pairRows),
-        'groups' => $groups,
+        'pairs' => mapCommunityHubPairRows($pairRowsNewest, $viewerUserId),
+        'groups' => buildCommunityHubGroups($db, $groupRowsNewest, $groupItemsLimit),
+        'topPairs' => mapCommunityHubPairRows($pairRowsTop, $viewerUserId),
+        'topGroups' => buildCommunityHubGroups($db, $groupRowsTop, $groupItemsLimit),
+        'pairTotal' => $pairTotal,
+        'groupTotal' => $groupTotal,
+        'stats' => [
+            'pairCount' => $pairTotal,
+            'groupCount' => $groupTotal,
+            'routeCount' => $pairTotal + $groupLegTotal,
+        ],
     ];
 }
 

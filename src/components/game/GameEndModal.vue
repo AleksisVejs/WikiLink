@@ -320,23 +320,45 @@
           </div>
 
           <div class="px-5 pb-5 pt-2">
-            <div v-if="!freeplayFinished && targetTitle" class="flex gap-2 mb-2.5">
-              <button @click="$emit('copy-share')" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-1.5 !text-[9px] !px-2">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div v-if="!freeplayFinished && targetTitle" class="mb-2.5">
+              <div class="flex items-center gap-3 mb-2.5 px-1">
+                <div class="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                <span class="font-pixel text-[6px] text-retro-muted tracking-[0.28em] shrink-0">SHARE</span>
+                <div class="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+              </div>
+              <button
+                type="button"
+                @click="$emit('copy-share')"
+                class="group w-full flex items-center justify-center gap-2.5 rounded-lg py-3 px-4 touch-manipulation transition-colors
+                       bg-[#12131c] border border-white/[0.08] hover:border-crt-green/35 hover:bg-crt-green/[0.04]"
+              >
+                <svg class="w-4 h-4 text-crt-green/70 group-hover:text-crt-green shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                 </svg>
-                SHARE
+                <span class="font-pixel text-[9px] text-crt-white/90 tracking-[0.14em] group-hover:text-crt-green">COPY RUN</span>
               </button>
-              <button @click="$emit('share-challenge')" class="btn-retro-ghost flex-1 flex items-center justify-center gap-1.5 !py-1.5 !text-[9px] !px-2">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                </svg>
-                CHALLENGE
-              </button>
+              <p class="text-center font-mono text-[9px] text-retro-muted/65 mt-2 leading-snug px-1">
+                Stats, your path, and a link so friends can try the same route.
+              </p>
             </div>
             <div class="flex gap-2.5 pb-[env(safe-area-inset-bottom)]">
               <button @click="$emit('go-home')" class="btn-secondary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation">HOME</button>
-              <button v-if="showNextPair" @click="$emit('next-pair')" class="btn-retro-primary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation">NEXT PAIR</button>
+              <button
+                v-if="showNextPair"
+                type="button"
+                @click="$emit('next-pair')"
+                class="btn-secondary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation !border-crt-green/25 !text-crt-green/90 hover:!border-crt-green/45 hover:!text-crt-green hover:!shadow-[0_0_14px_rgba(57,255,20,0.12)]"
+              >
+                NEXT PAIR
+              </button>
+              <button
+                v-if="showReplayCommunityGroup"
+                type="button"
+                @click="$emit('replay-community-group')"
+                class="btn-secondary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation !border-crt-amber/30 !text-crt-amber/95 hover:!border-crt-amber/50 hover:!shadow-[0_0_14px_rgba(255,191,0,0.12)]"
+              >
+                REPLAY GROUP
+              </button>
               <button v-if="allowPlayAgain" @click="$emit('play-again')" class="btn-primary flex-1 !py-3 sm:!py-2.5 !text-sm touch-manipulation">PLAY AGAIN</button>
             </div>
           </div>
@@ -401,6 +423,7 @@ const props = defineProps({
   currentUserId: { type: Number, default: null },
   allowPlayAgain: { type: Boolean, default: true },
   showNextPair: { type: Boolean, default: false },
+  showReplayCommunityGroup: { type: Boolean, default: false },
   showConfetti: { type: Boolean, required: true },
   confettiStyle: { type: Function, required: true },
   showCommunitySection: { type: Boolean, default: false },
@@ -409,5 +432,5 @@ const props = defineProps({
   currentRunIsBestCommunity: { type: Boolean, default: false },
   communityPaths: { type: Array, default: () => [] },
 })
-defineEmits(['copy-share', 'share-challenge', 'go-home', 'play-again', 'next-pair'])
+defineEmits(['copy-share', 'go-home', 'play-again', 'next-pair', 'replay-community-group'])
 </script>
