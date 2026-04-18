@@ -29,11 +29,32 @@ require_once __DIR__ . '/match.php';
 require_once __DIR__ . '/lobby.php';
 require_once __DIR__ . '/friends.php';
 
-$uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
-$uri = parse_url($uri, PHP_URL_PATH);
-$uri = preg_replace('#^/api#', '', $uri);
-$uri = rtrim($uri, '/');
-if ($uri === '') $uri = '/';
+// Route path after /api (works at site root and in subfolders, e.g. /wiki/api/... on cPanel).
+$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$path = $path === false ? '/' : (string) $path;
+$path = rtrim($path, '/');
+if ($path === '') {
+    $path = '/';
+}
+$apiMarker = '/api';
+$pos = strpos($path, $apiMarker);
+if ($pos !== false) {
+    $path = substr($path, $pos + strlen($apiMarker));
+    if ($path === '' || $path === false) {
+        $path = '/';
+    } elseif (isset($path[0]) && $path[0] !== '/') {
+        $path = '/' . $path;
+    }
+} else {
+    $path = preg_replace('#^/api#', '', $path);
+    if ($path === '' || $path === false) {
+        $path = '/';
+    }
+}
+$uri = $path;
+if ($uri === '') {
+    $uri = '/';
+}
 $method = $_SERVER['REQUEST_METHOD'];
 
 function jsonInput() {

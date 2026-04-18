@@ -157,7 +157,10 @@ function upsertCommunityPairUserBest($userId, $startNorm, $endNorm, $pathLength,
 }
 
 function getCommunityPairRunLeaderboardForPairId($pairId, $limit = 20) {
-    $pairId = max(1, (int)$pairId);
+    $pairId = (int)$pairId;
+    if ($pairId < 1) {
+        return ['error' => 'Invalid pair.'];
+    }
     $limit = max(1, min(50, (int)$limit));
     $db = getDb();
     $stmt = $db->prepare('SELECT id, start_title, end_title FROM shared_challenges WHERE id = ? LIMIT 1');
@@ -205,7 +208,10 @@ function getCommunityPairRunLeaderboardForPairId($pairId, $limit = 20) {
 }
 
 function getCommunityGroupRunLeaderboardForGroupId($groupId, $limit = 20) {
-    $groupId = max(1, (int)$groupId);
+    $groupId = (int)$groupId;
+    if ($groupId < 1) {
+        return ['error' => 'Invalid group.'];
+    }
     $limit = max(1, min(50, (int)$limit));
     $db = getDb();
     $stmt = $db->prepare('SELECT id, name FROM community_pair_groups WHERE id = ? LIMIT 1');

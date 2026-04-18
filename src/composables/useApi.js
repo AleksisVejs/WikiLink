@@ -1,4 +1,7 @@
-const API_BASE = '/api'
+// Match Vite `base` (e.g. /wiki/ on cPanel subfolder) so /wiki/api/... is used in production.
+const rawBase = import.meta.env.BASE_URL || '/'
+const baseNoSlash = rawBase.replace(/\/$/, '')
+const API_BASE = baseNoSlash === '' ? '/api' : `${baseNoSlash}/api`
 const DEFAULT_TIMEOUT_MS = 25_000
 
 function getToken() {
